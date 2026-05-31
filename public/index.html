@@ -8,7 +8,7 @@
 </head>
 <body>
 <!-- ================= FAKE DECOY CODE ================= -->
-<!-- 20+ lines of fake comments (same as before) -->
+<!-- 20+ lines of fake comments and invisible divs (same as before) -->
 <div id="app-root">Loading Vrythos Neural Core...</div>
 
 <script>
@@ -55,7 +55,6 @@
     let attachedFiles = [];
     let isProcessing = false;
 
-    // Load data from server
     async function loadAllData() {
         modules = await apiGet('/api/modules');
     }
@@ -188,7 +187,7 @@
     // ------------------------------------------------------------------
     async function generateImageWithCloudflare(prompt) {
         try {
-            const res = await fetch('/api/cloudflare/image', {
+            const res = await fetch('/api/generate/image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt })
@@ -283,29 +282,21 @@
     }
 
     // ------------------------------------------------------------------
-    // AI ENGINE CALLS (via backend Cloudflare proxy)
+    // AI ENGINE CALLS (using backend /api/chat)
     // ------------------------------------------------------------------
-    const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest.`;
-
-    async function callCloudflare(messagesArr, deepThinkActive) {
-        let sys = CREATOR_SYSTEM_PROMPT;
-        if (deepThinkActive) sys += " Use step-by-step reasoning.";
-        const formattedMessages = [{ role: "system", content: sys }, ...messagesArr];
-        const res = await fetch('/api/cloudflare/text', {
+    async function callChatAPI(module_id, messages, deepThinkActive) {
+        const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: formattedMessages })
+            body: JSON.stringify({
+                module_id: module_id,
+                messages: messages,
+                deep_think: deepThinkActive
+            })
         });
         const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        return data.response;
-    }
-
-    async function callWithKeyRotation(module, messagesArr, deepThinkActive) {
-        if (module.type === "cloudflare") {
-            return await callCloudflare(messagesArr, deepThinkActive);
-        }
-        return "⚠️ Only Cloudflare AI is supported in this demo. Please select a Cloudflare module.";
+        if (!data.success) throw new Error(data.error || 'Chat API error');
+        return data.reply;
     }
 
     // ------------------------------------------------------------------
@@ -405,22 +396,21 @@
             let typing = showTyping();
             let reply = "";
             try {
-                reply = await callWithKeyRotation(module, messagesHistory.slice(-12), deepThink);
+                // Call the unified backend endpoint
+                reply = await callChatAPI(selectedModuleId, messagesHistory.slice(-12), deepThink);
                 await incrementDailyCalls();
                 updateRemainingDisplay();
                 updateSidebarStats();
-                if (reply.includes("quota") || reply.includes("limit")) {
-                    await addAbuseScore(5, "API quota warning", userText);
-                }
+                // Random abuse score (1-3%) – still active but doesn't block chat
                 await addAbuseScore(Math.floor(Math.random() * 3) + 1, "Random monitoring", userText);
-
+                // Override for creator questions
                 const lowerInput = userText.toLowerCase();
                 const creatorKeywords = ["who made you", "who created you", "your creator", "who built you", "viraj", "bodare"];
                 if (creatorKeywords.some(keyword => lowerInput.includes(keyword))) {
                     reply = "I am Vrythos, an advanced AI framework built by **Viraj S. Bodare**. I operate through multiple high-performance engines and am designed to be helpful, safe, and honest.";
                 }
             } catch(e) {
-                reply = `⚠️ Service temporarily unavailable. Please check your internet connection and try again later.`;
+                reply = `⚠️ Service temporarily unavailable. Please check your internet connection and try again later. Error: ${e.message}`;
             } finally {
                 if(typing) typing.remove();
             }
@@ -434,7 +424,9 @@
     async function updateRemainingDisplay() {
         let mod = modules.find(m => m.id === selectedModuleId);
         if (mod) {
-            document.getElementById("moduleRemaining").innerHTML = `📨 Today: --/${mod.dailyLimitPerUser} msgs left`;
+            const used = await getTodayCalls();
+            const left = mod.dailyLimitPerUser - used;
+            document.getElementById("moduleRemaining").innerHTML = `📨 Today: ${left > 0 ? left : 0}/${mod.dailyLimitPerUser} msgs left`;
         } else {
             document.getElementById("moduleRemaining").innerHTML = `⚠️ No active engine`;
         }
