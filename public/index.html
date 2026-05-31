@@ -131,10 +131,15 @@
 
     // Abuse score (local, but reported to server)
     let abuseScore = 0;
-    async function addAbuseScore(points, reason, context) {
+    let abuseWarningShown = false; // to avoid spamming the user
+
+    async function addAbuseScore(points, reason, context, showUserWarning = true) {
         if (!currentUser) return;
+        const oldScore = abuseScore;
         abuseScore = Math.min(100, abuseScore + points);
-        console.log(`⚠️ Abuse score +${points} → ${abuseScore}%`);
+        console.log(`⚠️ Abuse score +${points} → ${abuseScore}% (${reason})`);
+        
+        // Always report to admin
         await addPendingBan({
             username: currentUser.username,
             score: abuseScore,
@@ -144,7 +149,21 @@
             reviewed: false
         });
         await addAbuseReport({ username: currentUser.username, reason, context: context.slice(0,100), timestamp: Date.now() });
-        addAIMessage(`⚠️ Suspicious activity detected (${points}% abuse score). Admin has been notified.`);
+
+        // Show warning to user only if:
+        // - The score crossed the 10% threshold for the first time, OR
+        // - The added points are >= 5 (serious action) AND showUserWarning is true
+        // - The current score is >= 10 and we haven't shown a warning yet
+        let shouldWarn = false;
+        if (abuseScore >= 10 && !abuseWarningShown) {
+            shouldWarn = true;
+            abuseWarningShown = true;
+        } else if (points >= 5 && showUserWarning) {
+            shouldWarn = true;
+        }
+        if (shouldWarn) {
+            addAIMessage(`⚠️ Warning: Your account has been flagged for suspicious activity (current abuse score: ${abuseScore}%). Repeated violations may lead to a ban.`);
+        }
     }
 
     // Right-click & dev tools detection
@@ -396,13 +415,16 @@
             let typing = showTyping();
             let reply = "";
             try {
-                // Call the unified backend endpoint
                 reply = await callChatAPI(selectedModuleId, messagesHistory.slice(-12), deepThink);
                 await incrementDailyCalls();
                 updateRemainingDisplay();
                 updateSidebarStats();
-                // Random abuse score (1-3%) – still active but doesn't block chat
-                await addAbuseScore(Math.floor(Math.random() * 3) + 1, "Random monitoring", userText);
+                
+                // Check for API quota warnings – add abuse points only if the reply indicates quota/limit
+                if (reply.includes("quota") || reply.includes("limit")) {
+                    await addAbuseScore(5, "API quota warning", userText, true);
+                }
+                
                 // Override for creator questions
                 const lowerInput = userText.toLowerCase();
                 const creatorKeywords = ["who made you", "who created you", "your creator", "who built you", "viraj", "bodare"];
@@ -478,7 +500,7 @@
     }
 
     // ------------------------------------------------------------------
-    // USER SETTINGS MODAL (with API key management)
+    // USER SETTINGS MODAL (with API key management) – unchanged
     // ------------------------------------------------------------------
     async function openUserSettings() {
         // Load current user's API keys
