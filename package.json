@@ -1,7 +1,7 @@
 {
   "name": "vrythos-server",
   "version": "1.0.0",
-  "description": "Vrythos AI backend with file storage, Cloudflare AI, and user API keys",
+  "description": "Vrythos AI backend with multiple providers and image generation",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
