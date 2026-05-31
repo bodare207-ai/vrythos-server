@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Ensure data directory exists
 const dataDir = path.join(__dirname, 'data');
@@ -51,10 +51,13 @@ app.delete('/api/users/:username', (req, res) => {
     let users = readJSON('users.json');
     users = users.filter(u => u.username !== req.params.username);
     writeJSON('users.json', users);
-    // Also clean up related data
+    // Clean up related data
     let imgQuotas = readJSON('imageQuotas.json');
     imgQuotas = imgQuotas.filter(q => q.username !== req.params.username);
     writeJSON('imageQuotas.json', imgQuotas);
+    let apiKeys = readJSON('userApiKeys.json');
+    apiKeys = apiKeys.filter(k => k.username !== req.params.username);
+    writeJSON('userApiKeys.json', apiKeys);
     res.json({ success: true });
 });
 
@@ -101,7 +104,7 @@ app.post('/api/abuse', (req, res) => {
 });
 app.delete('/api/abuse', (req, res) => { writeJSON('abuse.json', []); res.json({ success: true }); });
 
-// Pending bans (abuse needing admin review)
+// Pending bans
 app.get('/api/pendingBans', (req, res) => { res.json(readJSON('pendingBans.json')); });
 app.post('/api/pendingBans', (req, res) => {
     let pending = readJSON('pendingBans.json');
@@ -118,6 +121,7 @@ app.delete('/api/pendingBans/:index', (req, res) => {
     }
     res.json({ success: true });
 });
+app.delete('/api/pendingBans', (req, res) => { writeJSON('pendingBans.json', []); res.json({ success: true }); });
 
 // IP registrations
 app.get('/api/ipRegs', (req, res) => { res.json(readJSON('ipRegs.json')); });
@@ -127,19 +131,14 @@ app.post('/api/ipRegs', (req, res) => {
     writeJSON('ipRegs.json', regs);
     res.json({ success: true });
 });
+app.delete('/api/ipRegs', (req, res) => { writeJSON('ipRegs.json', []); res.json({ success: true }); });
 
 // User API keys
 app.get('/api/userApiKeys', (req, res) => { res.json(readJSON('userApiKeys.json')); });
 app.post('/api/userApiKeys', (req, res) => {
     let keys = readJSON('userApiKeys.json');
-    keys.push(req.body);
-    writeJSON('userApiKeys.json', keys);
-    res.json({ success: true });
-});
-app.put('/api/userApiKeys/:username', (req, res) => {
-    let keys = readJSON('userApiKeys.json');
-    const idx = keys.findIndex(k => k.username === req.params.username);
-    if (idx !== -1) keys[idx] = req.body;
+    const existingIdx = keys.findIndex(k => k.username === req.body.username);
+    if (existingIdx !== -1) keys[existingIdx] = req.body;
     else keys.push(req.body);
     writeJSON('userApiKeys.json', keys);
     res.json({ success: true });
@@ -153,6 +152,7 @@ app.delete('/api/userApiKeys/:username/:keyName', (req, res) => {
     }
     res.json({ success: true });
 });
+app.delete('/api/userApiKeys', (req, res) => { writeJSON('userApiKeys.json', []); res.json({ success: true }); });
 
 // Image quotas
 app.get('/api/imageQuotas', (req, res) => { res.json(readJSON('imageQuotas.json')); });
@@ -164,8 +164,9 @@ app.post('/api/imageQuotas', (req, res) => {
     writeJSON('imageQuotas.json', quotas);
     res.json({ success: true });
 });
+app.delete('/api/imageQuotas', (req, res) => { writeJSON('imageQuotas.json', []); res.json({ success: true }); });
 
-// Chat module usage (daily counts per user per module)
+// Chat usage
 app.get('/api/chatUsage', (req, res) => { res.json(readJSON('chatUsage.json')); });
 app.post('/api/chatUsage', (req, res) => {
     let usage = readJSON('chatUsage.json');
@@ -174,6 +175,86 @@ app.post('/api/chatUsage', (req, res) => {
     else usage.push(req.body);
     writeJSON('chatUsage.json', usage);
     res.json({ success: true });
+});
+app.delete('/api/chatUsage', (req, res) => { writeJSON('chatUsage.json', []); res.json({ success: true }); });
+
+// ========== EXTERNAL API (for user API keys) ==========
+const EXTERNAL_DAILY_LIMIT = 20;
+
+app.post('/api/external/chat', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing or invalid Authorization header. Use Bearer YOUR_API_KEY' });
+    }
+    const token = authHeader.split(' ')[1];
+    // Find the key in userApiKeys.json
+    let allKeys = readJSON('userApiKeys.json');
+    let found = null;
+    let foundUser = null;
+    for (const entry of allKeys) {
+        const keyObj = entry.keys.find(k => k.key === token);
+        if (keyObj) {
+            found = keyObj;
+            foundUser = entry.username;
+            break;
+        }
+    }
+    if (!found) return res.status(401).json({ error: 'Invalid API key' });
+
+    // Check daily limit
+    const today = new Date().toISOString().slice(0, 10);
+    if (found.date !== today) {
+        found.used = 0;
+        found.date = today;
+    }
+    if (found.used >= EXTERNAL_DAILY_LIMIT) {
+        return res.status(429).json({ error: `Daily limit (${EXTERNAL_DAILY_LIMIT}) reached for this API key.` });
+    }
+
+    const { module_id, messages, deep_think = false } = req.body;
+    if (!module_id) return res.status(400).json({ error: 'module_id required' });
+    if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array required' });
+
+    // Get module config
+    const modules = readJSON('modules.json');
+    const module = modules.find(m => m.id === module_id);
+    if (!module) return res.status(404).json({ error: 'Module not found' });
+
+    // Only Cloudflare is supported in this demo
+    if (module.type !== 'cloudflare') {
+        return res.status(400).json({ error: 'Only Cloudflare AI modules are supported for external API' });
+    }
+
+    const CLOUD_ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID;
+    const CLOUD_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+    if (!CLOUD_ACCOUNT || !CLOUD_TOKEN) {
+        return res.status(500).json({ error: 'Cloudflare credentials not configured on server' });
+    }
+
+    const sys = "You are Vrythos AI, created by Viraj S. Bodare. Be helpful.";
+    const formattedMessages = [{ role: "system", content: sys }, ...messages];
+    try {
+        const url = `https://api.cloudflare.com/client/v4/accounts/${CLOUD_ACCOUNT}/ai/run/${module.model}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${CLOUD_TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: formattedMessages })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare error');
+        
+        // Increment usage
+        found.used += 1;
+        // Save back to userApiKeys.json
+        const userEntry = allKeys.find(e => e.username === foundUser);
+        const keyIndex = userEntry.keys.findIndex(k => k.key === token);
+        userEntry.keys[keyIndex] = found;
+        writeJSON('userApiKeys.json', allKeys);
+        
+        res.json({ success: true, reply: data.result.response, remaining: EXTERNAL_DAILY_LIMIT - found.used });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ========== CLOUDFLARE AI PROXY ==========
@@ -236,6 +317,11 @@ app.post('/api/fallback/image', async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
+});
+
+// Fallback route for any other GET request – serve index.html (for client-side routing)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
