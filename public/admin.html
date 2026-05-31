@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vrythos · Admin Panel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: monospace, system-ui; background: #0a0c15; color: #f0f3fa; padding: 2rem; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { margin-bottom: 1rem; color: #8b5cf6; }
+        h2, h3 { margin: 1.5rem 0 0.5rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.3rem; }
+        .card { background: #11141f; border: 1px solid #1e293b; border-radius: 1rem; padding: 1rem; margin-bottom: 1rem; }
+        button, select, input, textarea { background: #0a0c15; border: 1px solid #1e293b; padding: 0.5rem 1rem; border-radius: 2rem; color: white; cursor: pointer; margin: 0.2rem; }
+        button { background: #2d3748; }
+        button.danger { background: #7f1a1a; }
+        button.success { background: #2e5c3e; }
+        .module-item, .user-item, .bug-item { background: #0e111b; margin: 0.5rem 0; padding: 0.7rem; border-radius: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
+        .chat-container { background: #0a0c15; border-radius: 1rem; padding: 1rem; margin-top: 1rem; max-height: 500px; overflow-y: auto; }
+        .message { display: flex; gap: 12px; margin-bottom: 12px; max-width: 80%; }
+        .admin-user-message { justify-content: flex-end; flex-direction: row-reverse; }
+        .admin-bubble { padding: 8px 14px; border-radius: 20px; background: #1e293b; }
+        .admin-user-bubble { background: #7c3aed; }
+        .avatar-small { width: 28px; height: 28px; border-radius: 50%; background: #8b5cf6; display: inline-flex; align-items: center; justify-content: center; }
+        .file-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .file-tag { background: #2d3748; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔐 Vrythos Admin Portal</h1>
+    <div id="authArea">
+        <input type="password" id="adminPassword" placeholder="Master Password">
+        <button id="adminLoginBtn">Login</button>
+        <div id="adminMsg" style="color:#f97316;"></div>
+    </div>
+    <div id="adminContent" style="display:none;">
+        <div class="grid">
+            <div class="card">
+                <h3>🤖 AI Engines (dual‑key + failover)</h3>
+                <div id="modulesList"></div>
+                <button id="addFlash">+ Groq Flash (gsk_)</button>
+                <button id="addGemini">+ Gemini (AIza)</button>
+                <button id="addOpenRouter">+ OpenRouter (sk-or-)</button>
+                <button id="addCloudflare">+ ☁️ Vrythos Premium (Cloudflare AI)</button>
+                <button id="addClaude">+ 🧠 Claude (Anthropic)</button>
+                <button id="addCustom">+ Custom Engine</button>
+            </div>
+            <div class="card">
+                <h3>👥 User Management</h3>
+                <select id="userSelect"></select>
+                <button id="grantChat10">+10 Extra Chat Credits</button>
+                <button id="grantImage5">+5 Extra Image Credits</button>
+                <button id="grantChat50">+50 Extra Chat Credits</button>
+                <button id="banUserBtn">🚫 Ban User</button>
+                <button id="unbanUserBtn">🔓 Unban</button>
+                <div id="userInfo"></div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>🐞 Bug Reports (Real = Grant extra, Fake = Penalty)</h3>
+            <div id="bugsList"></div>
+        </div>
+        <div class="card">
+            <h3>⚠️ Suspicious Abuse Reports (auto-detected)</h3>
+            <div id="abuseList"></div>
+        </div>
+        <div class="card">
+            <h3>🚨 Pending Abuse Reviews (needs admin decision)</h3>
+            <div id="pendingBansList"></div>
+        </div>
+        <div class="card">
+            <h3>📊 System Actions</h3>
+            <button id="resetAllChatUsage">Reset Daily Chat Usage (all users)</button>
+            <button id="clearAllReports">Clear All Reports</button>
+            <button id="exportData">Export All Data (JSON)</button>
+            <button id="hardReset">⚠️ Factory Reset (all data)</button>
+        </div>
+
+        <!-- Admin AI Chat Interface -->
+        <div class="card">
+            <h3>🤖 Admin AI Chat Tester (same as user experience)</h3>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                <select id="adminModuleSelect"></select>
+                <label><input type="checkbox" id="adminDeepThink"> 🔬 Deep Think</label>
+                <label><input type="checkbox" id="adminLiveImage"> 🎨 Live Image Mode</label>
+                <button id="adminNewChatBtn">+ New Chat</button>
+            </div>
+            <div id="adminMessages" class="chat-container" style="height: 400px; overflow-y: auto; background: #0e111b; padding: 1rem;">
+                <div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">Admin chat ready – test any AI engine below.</div></div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 1rem;">
+                <input type="text" id="adminUserInput" placeholder="Type your message..." style="flex:1;">
+                <button id="adminSendBtn">Send</button>
+                <button id="adminImageGenBtn">🎨 Generate Image</button>
+                <input type="file" id="adminFileInput" multiple style="display:none;" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg">
+                <button id="adminAttachBtn">📎 Attach</button>
+            </div>
+            <div id="adminFilePreview" class="file-badge"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ------------------------------------------------------------------
+    // BACKEND API HELPERS
+    // ------------------------------------------------------------------
+    const MASTER_PASSWORD = "VrythosAdmin@2025";
+
+    async function apiGet(endpoint) {
+        const res = await fetch(endpoint);
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+    async function apiPost(endpoint, data) {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+    async function apiPut(endpoint, data) {
+        const res = await fetch(endpoint, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+    async function apiDelete(endpoint) {
+        const res = await fetch(endpoint, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+
+    // Global data
+    let modules = [];
+    let users = [];
+    let bugs = [];
+    let abuseReports = [];
+    let pendingBans = [];
+    let adminSelectedModuleId = null;
+    let adminDeepThink = false;
+    let adminLiveImage = false;
+    let adminMessagesHistory = [];
+    let adminAttachedFiles = [];
+
+    // Load all data from server
+    async function loadAllData() {
+        modules = await apiGet('/api/modules');
+        users = await apiGet('/api/users');
+        bugs = await apiGet('/api/bugs');
+        abuseReports = await apiGet('/api/abuse');
+        pendingBans = await apiGet('/api/pendingBans');
+    }
+
+    // Helper: escape HTML
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Render modules list (admin)
+    async function renderModules() {
+        const container = document.getElementById("modulesList");
+        container.innerHTML = "";
+        modules.forEach((mod, idx) => {
+            let keyDisplay = "";
+            if (mod.type === "cloudflare") {
+                keyDisplay = `Account ID: ${mod.accountId?.substring(0,12)}... | Token: ${mod.apiToken?.substring(0,12)}...`;
+            } else if (mod.type === "claude") {
+                keyDisplay = `API Key: ${mod.primaryKey?.substring(0,12)}... | URL: ${mod.apiUrl || 'default'}`;
+            } else {
+                keyDisplay = `Primary: ${mod.primaryKey?.substring(0,12)}... | Secondary: ${mod.secondaryKey?.substring(0,12) || 'none'}`;
+            }
+            const div = document.createElement("div");
+            div.className = "module-item";
+            div.innerHTML = `
+                <div><strong>${escapeHtml(mod.displayName)}</strong> (${mod.type})<br>
+                ${keyDisplay}<br>
+                Limit: ${mod.dailyLimitPerUser}/day<br>
+                Model: ${mod.model}</div>
+                <div>
+                    <button class="editMod" data-idx="${idx}">✏️ Edit</button>
+                    <button class="delMod" data-idx="${idx}">🗑️ Delete</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+        document.querySelectorAll(".editMod").forEach(btn => btn.onclick = () => editModule(parseInt(btn.dataset.idx)));
+        document.querySelectorAll(".delMod").forEach(btn => btn.onclick = async () => {
+            const idx = parseInt(btn.dataset.idx);
+            const mod = modules[idx];
+            await apiDelete(`/api/modules/${mod.id}`);
+            await refreshAll();
+        });
+    }
+
+    async function editModule(idx) {
+        let m = modules[idx];
+        let newName = prompt("Display name", m.displayName);
+        let newLimit = parseInt(prompt("Daily limit per user", m.dailyLimitPerUser));
+        let newModel = prompt("Model name", m.model);
+        
+        if (m.type === "cloudflare") {
+            let newAccountId = prompt("Cloudflare Account ID", m.accountId || "");
+            let newApiToken = prompt("Cloudflare API Token", m.apiToken || "");
+            if (newName && newLimit && newModel && newAccountId && newApiToken) {
+                await apiPut(`/api/modules/${m.id}`, {
+                    ...m,
+                    displayName: newName,
+                    dailyLimitPerUser: newLimit,
+                    model: newModel,
+                    accountId: newAccountId,
+                    apiToken: newApiToken
+                });
+                await refreshAll();
+            }
+        } else if (m.type === "claude") {
+            let newApiKey = prompt("Claude API Key", m.primaryKey);
+            let newApiUrl = prompt("API URL (optional)", m.apiUrl || "https://api.anthropic.com/v1/messages");
+            if (newName && newLimit && newModel && newApiKey) {
+                await apiPut(`/api/modules/${m.id}`, {
+                    ...m,
+                    displayName: newName,
+                    dailyLimitPerUser: newLimit,
+                    model: newModel,
+                    primaryKey: newApiKey,
+                    apiUrl: newApiUrl
+                });
+                await refreshAll();
+            }
+        } else {
+            let newPrimary = prompt("Primary API Key", m.primaryKey);
+            let newSecondary = prompt("Secondary API Key (optional)", m.secondaryKey || "");
+            let newApiUrl = prompt("API URL", m.apiUrl || "");
+            if (newName && newPrimary && newLimit) {
+                await apiPut(`/api/modules/${m.id}`, {
+                    ...m,
+                    displayName: newName,
+                    dailyLimitPerUser: newLimit,
+                    primaryKey: newPrimary,
+                    secondaryKey: newSecondary || "",
+                    apiUrl: newApiUrl || m.apiUrl,
+                    model: newModel || m.model
+                });
+                await refreshAll();
+            }
+        }
+    }
+
+    // Render user select and info
+    async function renderUserSelect() {
+        const select = document.getElementById("userSelect");
+        select.innerHTML = "";
+        users.forEach(u => {
+            let opt = document.createElement("option");
+            opt.value = u.username;
+            let todayCalls = (u.dailyCallsRecord?.date === new Date().toDateString()) ? (u.dailyCallsRecord.count || 0) : 0;
+            opt.textContent = `${u.username} ${u.banned ? "[BANNED]" : ""} | extraChat:${u.extraChatCredits||0} extraImg:${u.extraImageCredits||0} | used:${todayCalls}/50`;
+            select.appendChild(opt);
+        });
+        select.onchange = () => updateUserInfo(select.value);
+        if (select.options.length) updateUserInfo(select.value);
+    }
+
+    function updateUserInfo(uname) {
+        let u = users.find(u => u.username === uname);
+        if (!u) return;
+        let banInfo = u.banned ? `<br><span style="color:#ef4444;">Ban reason: ${u.banReason || 'Admin action'}</span>` : '';
+        document.getElementById("userInfo").innerHTML = `
+            <small>
+                Joined: ${new Date(u.createdAt).toLocaleString()}<br>
+                Extra chat credits: ${u.extraChatCredits || 0}<br>
+                Extra image credits: ${u.extraImageCredits || 0}<br>
+                ${banInfo}
+            </small>
+        `;
+    }
+
+    // Render bug reports
+    async function renderBugs() {
+        const container = document.getElementById("bugsList");
+        container.innerHTML = "";
+        if (bugs.length === 0) { container.innerHTML = "<i>No pending bug reports.</i>"; return; }
+        bugs.forEach((bug, idx) => {
+            let div = document.createElement("div");
+            div.className = "bug-item";
+            div.innerHTML = `
+                <div><strong>${escapeHtml(bug.username)}</strong><br>${escapeHtml(bug.description)}<br><small>${new Date(bug.timestamp).toLocaleString()}</small></div>
+                <div>
+                    <button class="realBug" data-idx="${idx}">✅ Real → +10 chat +2 images</button>
+                    <button class="fakeBug" data-idx="${idx}">❌ Fake → -15 chat credits</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+        document.querySelectorAll(".realBug").forEach(btn => btn.onclick = async () => {
+            let idx = parseInt(btn.dataset.idx);
+            let bug = bugs[idx];
+            let user = users.find(u => u.username === bug.username);
+            if (user) {
+                user.extraChatCredits = (user.extraChatCredits || 0) + 10;
+                user.extraImageCredits = (user.extraImageCredits || 0) + 2;
+                await apiPut(`/api/users/${user.username}`, user);
+            }
+            bugs.splice(idx, 1);
+            await apiPost('/api/bugs', bugs); // overwrite whole array
+            await refreshAll();
+        });
+        document.querySelectorAll(".fakeBug").forEach(btn => btn.onclick = async () => {
+            let idx = parseInt(btn.dataset.idx);
+            let bug = bugs[idx];
+            let user = users.find(u => u.username === bug.username);
+            if (user) {
+                let penalty = (user.extraChatCredits || 0) - 15;
+                if (penalty < -10) user.banned = true;
+                user.extraChatCredits = Math.max(-10, penalty);
+                await apiPut(`/api/users/${user.username}`, user);
+            }
+            bugs.splice(idx, 1);
+            await apiPost('/api/bugs', bugs);
+            await refreshAll();
+        });
+    }
+
+    // Render abuse reports (simple list)
+    function renderAbuse() {
+        const container = document.getElementById("abuseList");
+        container.innerHTML = "";
+        if (abuseReports.length === 0) { container.innerHTML = "<i>No suspicious activity flagged.</i>"; return; }
+        abuseReports.forEach(a => {
+            let div = document.createElement("div");
+            div.className = "bug-item";
+            div.innerHTML = `<strong>${escapeHtml(a.username)}</strong> - ${escapeHtml(a.reason)}<br>${escapeHtml(a.context)}<br><small>${new Date(a.timestamp).toLocaleString()}</small>`;
+            container.appendChild(div);
+        });
+    }
+
+    // Render pending bans (admin decision)
+    async function renderPendingBans() {
+        const container = document.getElementById("pendingBansList");
+        container.innerHTML = "";
+        if (pendingBans.length === 0) { container.innerHTML = "<i>No pending abuse reviews. System is clean.</i>"; return; }
+        pendingBans.forEach((item, idx) => {
+            let div = document.createElement("div");
+            div.className = "bug-item";
+            div.innerHTML = `
+                <div><strong>${escapeHtml(item.username)}</strong><br>
+                Abuse score: ${item.score}%<br>
+                Reason: ${escapeHtml(item.reason)}<br>
+                Context: "${escapeHtml(item.context)}"<br>
+                <small>${new Date(item.timestamp).toLocaleString()}</small>
+                </div>
+                <div>
+                    <button class="approveBan" data-idx="${idx}" style="background:#ef4444;">🔨 Ban User</button>
+                    <button class="ignoreBan" data-idx="${idx}" style="background:#2d3748;">✅ Ignore (false positive)</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+        document.querySelectorAll(".approveBan").forEach(btn => btn.onclick = async () => {
+            let idx = parseInt(btn.dataset.idx);
+            let item = pendingBans[idx];
+            let user = users.find(u => u.username === item.username);
+            if (user) {
+                user.banned = true;
+                user.banReason = item.reason;
+                user.banTimestamp = Date.now();
+                await apiPut(`/api/users/${user.username}`, user);
+            }
+            pendingBans.splice(idx, 1);
+            await apiPost('/api/pendingBans', pendingBans);
+            await refreshAll();
+        });
+        document.querySelectorAll(".ignoreBan").forEach(btn => btn.onclick = async () => {
+            let idx = parseInt(btn.dataset.idx);
+            pendingBans.splice(idx, 1);
+            await apiPost('/api/pendingBans', pendingBans);
+            await refreshAll();
+        });
+    }
+
+    // Admin AI Chat Tester functions (same as user app but using backend Cloudflare)
+    async function callCloudflare(messagesArr, deepThinkActive) {
+        const sys = "You are Vrythos AI, created by Viraj S. Bodare. Be helpful.";
+        const formattedMessages = [{ role: "system", content: sys }, ...messagesArr];
+        const res = await fetch('/api/cloudflare/text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: formattedMessages })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        return data.response;
+    }
+
+    async function callWithKeyRotation(module, messagesArr, deepThinkActive) {
+        if (module.type === "cloudflare") {
+            return await callCloudflare(messagesArr, deepThinkActive);
+        }
+        return "⚠️ Only Cloudflare AI is supported in this demo. Please select a Cloudflare module.";
+    }
+
+    async function generateImagePollinations(prompt) {
+        try {
+            const res = await fetch('/api/fallback/image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
+            const data = await res.json();
+            if (data.success) return `<img src="${data.image}" style="max-width:100%; border-radius:16px;" /><br><button onclick="downloadImage('${data.image}')">⬇️ Download</button>`;
+            return "❌ Image generation failed.";
+        } catch(e) { return `❌ Image generation failed.`; }
+    }
+
+    function addAdminMessage(text, isUser = false, isHtml = false) {
+        const container = document.getElementById("adminMessages");
+        const div = document.createElement("div");
+        div.className = "message " + (isUser ? "admin-user-message" : "");
+        if (isHtml) {
+            div.innerHTML = `<div class="avatar-small">${isUser ? '👤' : '🧠'}</div><div class="admin-bubble ${isUser ? 'admin-user-bubble' : ''}">${text}</div>`;
+        } else {
+            div.innerHTML = `<div class="avatar-small">${isUser ? '👤' : '🧠'}</div><div class="admin-bubble ${isUser ? 'admin-user-bubble' : ''}">${escapeHtml(text).replace(/\n/g,"<br>")}</div>`;
+        }
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        if (!isUser && !isHtml) adminMessagesHistory.push({ role: "assistant", content: text });
+        if (isUser) adminMessagesHistory.push({ role: "user", content: text });
+    }
+
+    async function adminSendMessage(forceImage = false) {
+        let inp = document.getElementById("adminUserInput");
+        let text = inp.value.trim();
+        if (!text) return;
+        inp.value = "";
+        let willImage = (adminLiveImage || forceImage) && text.length > 2;
+        if (willImage) {
+            addAdminMessage(text, true);
+            let imgHtml = await generateImagePollinations(text);
+            addAdminMessage(imgHtml, false, true);
+            return;
+        }
+        let module = modules.find(m => m.id === adminSelectedModuleId);
+        if (!module) {
+            addAdminMessage("❌ No AI engine selected. Please add an engine in the Admin panel.", false);
+            return;
+        }
+        addAdminMessage(text, true);
+        let typingDiv = document.createElement("div");
+        typingDiv.className = "message";
+        typingDiv.innerHTML = `<div class="avatar-small">🧠</div><div class="admin-bubble">▮ Thinking...</div>`;
+        document.getElementById("adminMessages").appendChild(typingDiv);
+        let reply = "";
+        try {
+            reply = await callWithKeyRotation(module, adminMessagesHistory.slice(-12), adminDeepThink);
+        } catch(e) { reply = `⚠️ Service temporarily unavailable. Please check your internet connection and try again later.`; }
+        typingDiv.remove();
+        addAdminMessage(reply, false);
+    }
+
+    function renderAdminModuleDropdown() {
+        let sel = document.getElementById("adminModuleSelect");
+        sel.innerHTML = "";
+        if (!modules.length) {
+            let opt = document.createElement("option");
+            opt.text = "❌ No engines — add one above";
+            opt.disabled = true;
+            sel.appendChild(opt);
+            return;
+        }
+        modules.forEach(mod => {
+            let opt = document.createElement("option");
+            opt.value = mod.id;
+            opt.textContent = `${mod.displayName} (${mod.dailyLimitPerUser}/day)`;
+            if (adminSelectedModuleId === mod.id) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.onchange = (e) => { adminSelectedModuleId = e.target.value; };
+    }
+
+    function refreshAdminChat() {
+        document.getElementById("adminSendBtn").onclick = () => adminSendMessage(false);
+        document.getElementById("adminImageGenBtn").onclick = () => adminSendMessage(true);
+        document.getElementById("adminAttachBtn").onclick = () => document.getElementById("adminFileInput").click();
+        document.getElementById("adminNewChatBtn").onclick = () => {
+            adminMessagesHistory = [];
+            document.getElementById("adminMessages").innerHTML = `<div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">New session started.</div></div>`;
+        };
+        document.getElementById("adminUserInput").addEventListener("keypress", (e) => { if (e.key === "Enter") adminSendMessage(false); });
+        document.getElementById("adminDeepThink").onchange = (e) => adminDeepThink = e.target.checked;
+        document.getElementById("adminLiveImage").onchange = (e) => adminLiveImage = e.target.checked;
+        document.getElementById("adminFileInput").onchange = (e) => {
+            if (e.target.files) {
+                Array.from(e.target.files).forEach(f => {
+                    let reader = new FileReader();
+                    reader.onload = ev => {
+                        adminAttachedFiles.push({ name: f.name, content: ev.target.result, isText: f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i) });
+                        renderAdminFileBadges();
+                    };
+                    if (f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
+                    else reader.readAsDataURL(f);
+                });
+            }
+        };
+        renderAdminFileBadges();
+    }
+
+    function renderAdminFileBadges() {
+        let container = document.getElementById("adminFilePreview");
+        container.innerHTML = adminAttachedFiles.map((f, idx) => `<span class="file-tag">📄 ${f.name} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444; cursor:pointer;">✖</button></span>`).join("");
+        document.querySelectorAll("#adminFilePreview .file-tag button").forEach(btn => {
+            btn.onclick = () => {
+                let idx = parseInt(btn.dataset.idx);
+                adminAttachedFiles.splice(idx, 1);
+                renderAdminFileBadges();
+            };
+        });
+    }
+
+    // Refresh everything
+    async function refreshAll() {
+        await loadAllData();
+        renderModules();
+        renderUserSelect();
+        renderBugs();
+        renderAbuse();
+        renderPendingBans();
+        renderAdminModuleDropdown();
+        if (modules.length && !adminSelectedModuleId) adminSelectedModuleId = modules[0].id;
+        refreshAdminChat();
+    }
+
+    // Add module presets (using API)
+    document.getElementById("addFlash").addEventListener("click", async () => {
+        let primaryKey = prompt("Groq API Key (gsk_)");
+        if (!primaryKey) return;
+        await apiPost('/api/modules', {
+            id: "mod_" + Date.now(),
+            displayName: "Vrythos Flash",
+            type: "groq",
+            primaryKey: primaryKey,
+            secondaryKey: "",
+            apiUrl: "https://api.groq.com/openai/v1/chat/completions",
+            model: "llama-3.3-70b-versatile",
+            dailyLimitPerUser: 25
+        });
+        await refreshAll();
+    });
+    document.getElementById("addGemini").addEventListener("click", async () => {
+        let primaryKey = prompt("Gemini API Key (AIza...)");
+        if (!primaryKey) return;
+        await apiPost('/api/modules', {
+            id: "mod_" + Date.now(),
+            displayName: "Gemini 2.0 Flash",
+            type: "gemini",
+            primaryKey: primaryKey,
+            secondaryKey: "",
+            apiUrl: "",
+            model: "gemini-2.0-flash",
+            dailyLimitPerUser: 15
+        });
+        await refreshAll();
+    });
+    document.getElementById("addOpenRouter").addEventListener("click", async () => {
+        let primaryKey = prompt("OpenRouter API Key (sk-or-)");
+        if (!primaryKey) return;
+        await apiPost('/api/modules', {
+            id: "mod_" + Date.now(),
+            displayName: "OpenRouter GPT-OSS",
+            type: "openrouter",
+            primaryKey: primaryKey,
+            secondaryKey: "",
+            apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+            model: "openai/gpt-oss-120b:free",
+            dailyLimitPerUser: 10
+        });
+        await refreshAll();
+    });
+    document.getElementById("addCloudflare").addEventListener("click", async () => {
+        let accountId = prompt("Cloudflare Account ID (from Cloudflare Dashboard)");
+        if (!accountId) return;
+        let apiToken = prompt("Cloudflare API Token (with AI permissions)");
+        if (!apiToken) return;
+        await apiPost('/api/modules', {
+            id: "mod_" + Date.now(),
+            displayName: "Vrythos Premium",
+            type: "cloudflare",
+            accountId: accountId,
+            apiToken: apiToken,
+            model: "@cf/meta/llama-3.1-8b-instruct",
+            dailyLimitPerUser: 10
+        });
+        await refreshAll();
+    });
+    document.getElementById("addClaude").addEventListener("click", async () => {
+        let apiKey = prompt("Claude API Key (sk-ant-...)");
+        if (!apiKey) return;
+        let model = prompt("Model name (default: claude-3-haiku-20240307)", "claude-3-haiku-20240307");
+        let apiUrl = prompt("API URL (optional, press Enter for default)", "https://api.anthropic.com/v1/messages");
+        await apiPost('/api/modules', {
+            id: "mod_" + Date.now(),
+            displayName: "Claude AI",
+            type: "claude",
+            primaryKey: apiKey,
+            secondaryKey: "",
+            apiUrl: apiUrl || "https://api.anthropic.com/v1/messages",
+            model: model || "claude-3-haiku-20240307",
+            dailyLimitPerUser: 20
+        });
+        await refreshAll();
+    });
+    document.getElementById("addCustom").addEventListener("click", async () => {
+        let displayName = prompt("Engine name");
+        let type = prompt("Type (groq/gemini/openrouter/cloudflare/claude)", "groq");
+        let apiUrl = prompt("API URL");
+        let model = prompt("Model name");
+        let primaryKey = prompt("Primary API Key");
+        let dailyLimit = parseInt(prompt("Daily limit per user", 20));
+        if (displayName && apiUrl && model && primaryKey) {
+            let moduleObj = {
+                id: "mod_" + Date.now(),
+                displayName, type, primaryKey, secondaryKey: "",
+                apiUrl, model, dailyLimitPerUser: dailyLimit
+            };
+            if (type === "cloudflare") {
+                moduleObj.accountId = primaryKey;
+                moduleObj.apiToken = apiUrl;
+                delete moduleObj.primaryKey;
+                delete moduleObj.secondaryKey;
+                delete moduleObj.apiUrl;
+            }
+            await apiPost('/api/modules', moduleObj);
+            await refreshAll();
+        }
+    });
+
+    // User management actions
+    document.getElementById("grantChat10").addEventListener("click", async () => {
+        let sel = document.getElementById("userSelect").value;
+        if (!sel) return;
+        let user = users.find(u => u.username === sel);
+        if (user) {
+            user.extraChatCredits = (user.extraChatCredits || 0) + 10;
+            await apiPut(`/api/users/${user.username}`, user);
+            await refreshAll();
+        }
+    });
+    document.getElementById("grantChat50").addEventListener("click", async () => {
+        let sel = document.getElementById("userSelect").value;
+        if (!sel) return;
+        let user = users.find(u => u.username === sel);
+        if (user) {
+            user.extraChatCredits = (user.extraChatCredits || 0) + 50;
+            await apiPut(`/api/users/${user.username}`, user);
+            await refreshAll();
+        }
+    });
+    document.getElementById("grantImage5").addEventListener("click", async () => {
+        let sel = document.getElementById("userSelect").value;
+        if (!sel) return;
+        let user = users.find(u => u.username === sel);
+        if (user) {
+            user.extraImageCredits = (user.extraImageCredits || 0) + 5;
+            await apiPut(`/api/users/${user.username}`, user);
+            await refreshAll();
+        }
+    });
+    document.getElementById("banUserBtn").addEventListener("click", async () => {
+        let sel = document.getElementById("userSelect").value;
+        if (!sel) return;
+        let user = users.find(u => u.username === sel);
+        if (user) {
+            user.banned = true;
+            await apiPut(`/api/users/${user.username}`, user);
+            await refreshAll();
+        }
+    });
+    document.getElementById("unbanUserBtn").addEventListener("click", async () => {
+        let sel = document.getElementById("userSelect").value;
+        if (!sel) return;
+        let user = users.find(u => u.username === sel);
+        if (user) {
+            user.banned = false;
+            await apiPut(`/api/users/${user.username}`, user);
+            await refreshAll();
+        }
+    });
+
+    // System actions
+    document.getElementById("resetAllChatUsage").addEventListener("click", async () => {
+        if (confirm("Reset daily chat usage counters for ALL users?")) {
+            // Delete all chatUsage records
+            await apiDelete('/api/chatUsage'); // we need to implement DELETE /api/chatUsage in server, but for simplicity we can just clear the file
+            // Alternatively, we can iterate and reset each user's dailyCallsRecord
+            for (let user of users) {
+                user.dailyCallsRecord = { date: "", count: 0 };
+                await apiPut(`/api/users/${user.username}`, user);
+            }
+            alert("All daily chat usage reset.");
+            await refreshAll();
+        }
+    });
+    document.getElementById("clearAllReports").addEventListener("click", async () => {
+        if (confirm("Clear all bug and abuse reports?")) {
+            await apiDelete('/api/bugs');
+            await apiDelete('/api/abuse');
+            await apiDelete('/api/pendingBans');
+            await refreshAll();
+        }
+    });
+    document.getElementById("exportData").addEventListener("click", async () => {
+        let exportObj = {
+            users: await apiGet('/api/users'),
+            modules: await apiGet('/api/modules'),
+            bugs: await apiGet('/api/bugs'),
+            abuse: await apiGet('/api/abuse'),
+            pendingBans: await apiGet('/api/pendingBans'),
+            imageQuotas: await apiGet('/api/imageQuotas'),
+            chatUsage: await apiGet('/api/chatUsage')
+        };
+        let dataStr = JSON.stringify(exportObj, null, 2);
+        let blob = new Blob([dataStr], { type: "application/json" });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement("a");
+        a.href = url;
+        a.download = "vrythos_backup.json";
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+    document.getElementById("hardReset").addEventListener("click", async () => {
+        if (confirm("⚠️ FACTORY RESET: This will delete ALL users, modules, reports, API keys. This cannot be undone. Type 'RESET' to confirm.")) {
+            let check = prompt("Type RESET to proceed");
+            if (check === "RESET") {
+                // Clear all data files
+                await apiDelete('/api/users');
+                await apiDelete('/api/modules');
+                await apiDelete('/api/bugs');
+                await apiDelete('/api/abuse');
+                await apiDelete('/api/pendingBans');
+                await apiDelete('/api/userApiKeys');
+                await apiDelete('/api/ipRegs');
+                await apiDelete('/api/imageQuotas');
+                await apiDelete('/api/chatUsage');
+                alert("All data erased. Refresh the page.");
+                location.reload();
+            }
+        }
+    });
+
+    // Login
+    document.getElementById("adminLoginBtn").addEventListener("click", async () => {
+        let pwd = document.getElementById("adminPassword").value;
+        if (pwd === MASTER_PASSWORD) {
+            document.getElementById("authArea").style.display = "none";
+            document.getElementById("adminContent").style.display = "block";
+            await refreshAll();
+        } else {
+            document.getElementById("adminMsg").innerText = "Wrong password.";
+        }
+    });
+</script>
+</body>
+</html>
