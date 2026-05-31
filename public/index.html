@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Vrythos AI · Neural Core</title>
+    <style>/* fake style - real app built by JS */</style>
+</head>
+<body>
+<!-- ================= FAKE DECOY CODE ================= -->
+<!-- 20+ lines of fake comments and invisible divs (same as before) -->
+<div id="app-root">Loading Vrythos Neural Core...</div>
+
+<script>
+(async function(){
+    // ------------------------------------------------------------------
+    // BACKEND API HELPERS
+    // ------------------------------------------------------------------
+    async function apiGet(endpoint) {
+        const res = await fetch(endpoint);
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+    async function apiPost(endpoint, data) {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+    async function apiPut(endpoint, data) {
+        const res = await fetch(endpoint, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+    async function apiDelete(endpoint) {
+        const res = await fetch(endpoint, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+
+    // Global data
+    let currentUser = null;
+    let modules = [];
+    let selectedModuleId = null;
+    let deepThink = false;
+    let liveImageMode = false;
+    let messagesHistory = [];
+    let attachedFiles = [];
+    let isProcessing = false;
+
+    // Load data from server
+    async function loadAllData() {
+        modules = await apiGet('/api/modules');
+        // users are only needed for login, not stored globally
+    }
+
+    // User management
+    async function loadUsers() { return await apiGet('/api/users'); }
+    async function saveUser(userData) { return await apiPost('/api/users', userData); }
+    async function updateUser(username, updates) { return await apiPut(`/api/users/${username}`, updates); }
+    async function deleteUser(username) { return await apiDelete(`/api/users/${username}`); }
+
+    // Abuse & pending bans
+    async function addAbuseReport(report) { return await apiPost('/api/abuse', report); }
+    async function addPendingBan(ban) { return await apiPost('/api/pendingBans', ban); }
+
+    // Image quotas
+    async function getImageQuota(username) {
+        const quotas = await apiGet('/api/imageQuotas');
+        return quotas.find(q => q.username === username) || { username, count: 0, windowStart: Date.now() };
+    }
+    async function setImageQuota(quota) { return await apiPost('/api/imageQuotas', quota); }
+
+    // Chat usage
+    async function getChatUsage(username, moduleId, date) {
+        const all = await apiGet('/api/chatUsage');
+        return all.find(u => u.username === username && u.moduleId === moduleId && u.date === date) || { username, moduleId, date, count: 0 };
+    }
+    async function setChatUsage(usage) { return await apiPost('/api/chatUsage', usage); }
+
+    // Bug reports
+    async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
+
+    // IP registration (used during signup)
+    async function addIpReg(reg) { return await apiPost('/api/ipRegs', reg); }
+    async function getIpRegs() { return await apiGet('/api/ipRegs'); }
+
+    // ------------------------------------------------------------------
+    // HELPER FUNCTIONS (abuse detection, hashing, etc.)
+    // ------------------------------------------------------------------
+    async function hashPassword(pw) {
+        const enc = new TextEncoder().encode(pw);
+        const hash = await crypto.subtle.digest('SHA-256', enc);
+        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    async function getPublicIP() {
+        try {
+            let res = await fetch('https://api.ipify.org?format=json');
+            let data = await res.json();
+            return data.ip;
+        } catch(e) { return '0.0.0.0'; }
+    }
+
+    async function canRegisterMoreAccounts(ip) {
+        const regs = await getIpRegs();
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${now.getMonth()}`;
+        const countThisMonth = regs.filter(r => r.ip === ip && r.month === currentMonth).length;
+        return countThisMonth < 4;
+    }
+
+    // Abuse score (local, but reported to server)
+    let abuseScore = 0;
+    async function addAbuseScore(points, reason, context) {
+        if (!currentUser) return;
+        abuseScore = Math.min(100, abuseScore + points);
+        console.log(`⚠️ Abuse score +${points} → ${abuseScore}%`);
+        // Record the abuse event for admin review (pending ban)
+        await addPendingBan({
+            username: currentUser.username,
+            score: abuseScore,
+            reason: reason,
+            context: context.slice(0, 200),
+            timestamp: Date.now(),
+            reviewed: false
+        });
+        await addAbuseReport({ username: currentUser.username, reason, context: context.slice(0,100), timestamp: Date.now() });
+        addAIMessage(`⚠️ Suspicious activity detected (${points}% abuse score). Admin has been notified.`);
+    }
+
+    // Right-click & dev tools detection
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        addAbuseScore(5, "Right-click attempt", "User right-clicked on page");
+        showWarningModal("Right-click is prohibited. Your action has been reported to admin.");
+        return false;
+    });
+
+    function detectDevTools() {
+        const threshold = 160;
+        const widthDiff = window.outerWidth - window.innerWidth > threshold;
+        const heightDiff = window.outerHeight - window.innerHeight > threshold;
+        if (widthDiff || heightDiff) {
+            addAbuseScore(10, "Developer tools detected", "DevTools opened");
+            showWarningModal("Developer tools detected! This has been reported to admin.");
+        }
+    }
+    setInterval(detectDevTools, 2000);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
+            e.preventDefault();
+            addAbuseScore(10, "View source attempt", "Tried to view page source");
+            showWarningModal("Viewing source is forbidden. Reported to admin.");
+            return false;
+        }
+    });
+
+    function showWarningModal(msg) {
+        let modal = document.createElement("div");
+        modal.className = "modal";
+        modal.innerHTML = `<div class="modal-content"><h3>⚠️ Warning</h3><p>${msg}</p><button id="closeWarningBtn">OK</button></div>`;
+        document.body.appendChild(modal);
+        document.getElementById("closeWarningBtn").onclick = () => modal.remove();
+    }
+
+    // ------------------------------------------------------------------
+    // IMAGE GENERATION (Cloudflare SD + fallback)
+    // ------------------------------------------------------------------
+    async function generateImageWithCloudflare(prompt) {
+        try {
+            const res = await fetch('/api/cloudflare/image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
+            const data = await res.json();
+            if (data.success) return data.image;
+        } catch(e) { console.warn(e); }
+        return null;
+    }
+    async function generateImageWithPollinations(prompt) {
+        try {
+            const res = await fetch('/api/fallback/image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
+            const data = await res.json();
+            if (data.success) return data.image;
+        } catch(e) { console.warn(e); }
+        return null;
+    }
+
+    async function generateImageAndShow(prompt) {
+        addAIMessage("🖌️ Generating image...", false);
+        let imgData = await generateImageWithCloudflare(prompt);
+        if (!imgData) imgData = await generateImageWithPollinations(prompt);
+        if (imgData && imgData.startsWith('data:image')) {
+            const imgHtml = `<img src="${imgData}" style="max-width:100%; border-radius:16px;" /><br>
+                             <button onclick="downloadImage('${imgData}')">⬇️ Download</button>
+                             <button onclick="copyImageToClipboard('${imgData}')">📋 Copy</button>`;
+            addAIMessage(imgHtml, true);
+        } else {
+            addAIMessage("❌ Image generation failed. Please try again later.");
+        }
+    }
+
+    window.downloadImage = function(dataUrl) {
+        const link = document.createElement('a');
+        link.download = 'vrythos_image.png';
+        link.href = dataUrl;
+        link.click();
+    };
+    window.copyImageToClipboard = async function(dataUrl) {
+        const blob = await (await fetch(dataUrl)).blob();
+        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+        alert('Image copied to clipboard!');
+    };
+
+    // Image quota management (similar to original)
+    async function getRemainingImages() {
+        const quota = await getImageQuota(currentUser.username);
+        const now = Date.now();
+        const windowMs = 5 * 60 * 60 * 1000;
+        let base = (now - quota.windowStart >= windowMs) ? 5 : Math.max(0, 5 - quota.count);
+        let extra = currentUser.extraImageCredits || 0;
+        return base + extra;
+    }
+    async function consumeImage() {
+        let quota = await getImageQuota(currentUser.username);
+        const now = Date.now();
+        const windowMs = 5 * 60 * 60 * 1000;
+        if (now - quota.windowStart >= windowMs) {
+            quota = { username: currentUser.username, count: 0, windowStart: now };
+        }
+        if (await getRemainingImages() <= 0) return false;
+        quota.count++;
+        await setImageQuota(quota);
+        updateImageDisplay();
+        return true;
+    }
+
+    // ------------------------------------------------------------------
+    // CHAT LIMITS
+    // ------------------------------------------------------------------
+    async function getTodayCalls() {
+        const today = new Date().toDateString();
+        const usage = await getChatUsage(currentUser.username, selectedModuleId, today);
+        return usage.count || 0;
+    }
+    async function incrementDailyCalls() {
+        const today = new Date().toDateString();
+        let usage = await getChatUsage(currentUser.username, selectedModuleId, today);
+        usage.count = (usage.count || 0) + 1;
+        await setChatUsage(usage);
+        updateSidebarStats();
+    }
+    async function canMakeChatCall() {
+        if (currentUser.banned) return false;
+        const used = await getTodayCalls();
+        const limit = 50 + (currentUser.extraChatCredits || 0);
+        return used < limit;
+    }
+
+    // ------------------------------------------------------------------
+    // AI ENGINE CALLS (via backend Cloudflare proxy)
+    // ------------------------------------------------------------------
+    const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest.`;
+
+    async function callCloudflare(messagesArr, deepThinkActive) {
+        let sys = CREATOR_SYSTEM_PROMPT;
+        if (deepThinkActive) sys += " Use step-by-step reasoning.";
+        const formattedMessages = [{ role: "system", content: sys }, ...messagesArr];
+        const res = await fetch('/api/cloudflare/text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: formattedMessages })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        return data.response;
+    }
+
+    async function callWithKeyRotation(module, messagesArr, deepThinkActive) {
+        if (module.type === "cloudflare") {
+            return await callCloudflare(messagesArr, deepThinkActive);
+        }
+        // Other engine types (groq, gemini, claude, openrouter) would need backend support
+        // For simplicity, we assume only cloudflare is used. If others are needed, extend backend.
+        return "⚠️ Only Cloudflare AI is supported in this demo. Please select a Cloudflare module.";
+    }
+
+    // ------------------------------------------------------------------
+    // UI HELPERS
+    // ------------------------------------------------------------------
+    function setProcessing(processing) {
+        isProcessing = processing;
+        const input = document.getElementById("userInput");
+        const sendBtn = document.getElementById("sendBtn");
+        if(input) input.disabled = processing;
+        if(sendBtn) sendBtn.disabled = processing;
+        if(processing) {
+            if(input) input.placeholder = "⏳ Vrythos is thinking... please wait";
+        } else {
+            if(input) input.placeholder = "Enter next chat";
+            if(input) input.focus();
+        }
+    }
+
+    function addUserMessage(text){
+        let container = document.getElementById("messagesContainer");
+        let div = document.createElement("div");
+        div.className = "message user-message";
+        let initial = currentUser.username.charAt(0).toUpperCase();
+        div.innerHTML = `<div class="avatar" style="background:#4b5563;">${initial}</div><div class="bubble">${escapeHtml(text).replace(/\n/g,"<br>")}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function addAIMessage(html, isHtml=false){
+        let container = document.getElementById("messagesContainer");
+        let div = document.createElement("div");
+        div.className = "message ai-message";
+        div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${isHtml ? html : escapeHtml(html).replace(/\n/g,"<br>")}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        if(!isHtml) messagesHistory.push({role:"assistant", content:html});
+    }
+
+    function showTyping(){
+        let container = document.getElementById("messagesContainer");
+        let div = document.createElement("div");
+        div.id = "typingMsg";
+        div.className = "message ai-message";
+        div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">▮ Thinking...</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        return div;
+    }
+
+    function escapeHtml(str){
+        return String(str).replace(/[&<>]/g, function(m){
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Keyword detection for image generation
+    function isImageGenerationRequest(text) {
+        const lower = text.toLowerCase();
+        const imgKeywords = /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i;
+        return imgKeywords.test(lower);
+    }
+
+    async function sendMessage(userText, forceImage = false) {
+        if (!currentUser || currentUser.banned) { addAIMessage("🚫 Account banned."); return; }
+        if (isProcessing) { addAIMessage("⏳ Please wait, previous message is still being processed."); return; }
+        setProcessing(true);
+        try {
+            if (!(await canMakeChatCall()) && !forceImage) {
+                addAIMessage(`⛔ Daily chat limit reached (${50+(currentUser.extraChatCredits||0)}/day). Request extra via bug report.`);
+                setProcessing(false);
+                return;
+            }
+            let willImage = (liveImageMode || forceImage || isImageGenerationRequest(userText)) && userText.length > 2;
+            if (willImage) {
+                addUserMessage(`🎨 ${userText.substring(0,100)}`);
+                // Extract prompt
+                let prompt = userText;
+                const match = userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
+                if (match && match[2]) prompt = match[2];
+                await generateImageAndShow(prompt);
+                setProcessing(false);
+                return;
+            }
+            let module = modules.find(m => m.id === selectedModuleId);
+            if (!module) { addAIMessage("❌ No AI engine selected. Contact admin."); setProcessing(false); return; }
+            let remModule = 999; // would need server-side engine limit
+            let fullMsg = userText;
+            if (attachedFiles.length) {
+                fullMsg += "\n\n[Attached files]\n" + attachedFiles.map(f => f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`).join("\n");
+                attachedFiles = [];
+                renderFileBadges();
+            }
+            addUserMessage(userText);
+            messagesHistory.push({ role: "user", content: fullMsg });
+            let typing = showTyping();
+            let reply = "";
+            try {
+                reply = await callWithKeyRotation(module, messagesHistory.slice(-12), deepThink);
+                await incrementDailyCalls();
+                updateRemainingDisplay();
+                updateSidebarStats();
+                if (reply.includes("quota") || reply.includes("limit")) {
+                    await addAbuseScore(5, "API quota warning", userText);
+                }
+                // Random abuse score (1-3%)
+                await addAbuseScore(Math.floor(Math.random() * 3) + 1, "Random monitoring", userText);
+
+                const lowerInput = userText.toLowerCase();
+                const creatorKeywords = ["who made you", "who created you", "your creator", "who built you", "viraj", "bodare"];
+                if (creatorKeywords.some(keyword => lowerInput.includes(keyword))) {
+                    reply = "I am Vrythos, an advanced AI framework built by **Viraj S. Bodare**. I operate through multiple high-performance engines and am designed to be helpful, safe, and honest.";
+                }
+            } catch(e) {
+                reply = `⚠️ Service temporarily unavailable. Please check your internet connection and try again later.`;
+            } finally {
+                if(typing) typing.remove();
+            }
+            messagesHistory.push({ role: "assistant", content: reply });
+            addAIMessage(reply);
+        } finally {
+            setProcessing(false);
+        }
+    }
+
+    async function updateRemainingDisplay() {
+        let mod = modules.find(m => m.id === selectedModuleId);
+        if (mod) {
+            document.getElementById("moduleRemaining").innerHTML = `📨 Today: --/${mod.dailyLimitPerUser} msgs left`; // limit tracking would need server
+        } else {
+            document.getElementById("moduleRemaining").innerHTML = `⚠️ No active engine`;
+        }
+    }
+
+    async function updateSidebarStats() {
+        let left = 50 + (currentUser.extraChatCredits||0) - (await getTodayCalls());
+        document.getElementById("dailyCallsLeft").innerText = Math.max(0, left);
+        document.getElementById("sidebarUsername").innerHTML = currentUser.username;
+        await updateImageDisplay();
+    }
+
+    async function updateImageDisplay() {
+        let rem = await getRemainingImages();
+        document.getElementById("imageUsageDisplay").innerHTML = `🎨 Images left: ${rem} (base+extra)`;
+    }
+
+    function renderFileBadges() {
+        let container = document.getElementById("filePreviewArea");
+        container.innerHTML = attachedFiles.map((f,idx) => `<span class="file-tag">📄 ${f.name} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444;">✖</button></span>`).join("");
+        document.querySelectorAll(".file-tag button").forEach(btn => btn.onclick = e => {
+            let idx = parseInt(btn.dataset.idx);
+            attachedFiles.splice(idx,1);
+            renderFileBadges();
+        });
+    }
+
+    function renderModuleDropdown() {
+        let sel = document.getElementById("moduleSelect");
+        sel.innerHTML = "";
+        if (!modules.length) {
+            let opt = document.createElement("option");
+            opt.text = "❌ No engines — Admin setup";
+            opt.disabled = true;
+            sel.appendChild(opt);
+            return;
+        }
+        modules.forEach(mod => {
+            let opt = document.createElement("option");
+            opt.value = mod.id;
+            opt.textContent = `${mod.displayName} (${mod.dailyLimitPerUser}/day)`;
+            if (selectedModuleId === mod.id) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.onchange = async e => {
+            selectedModuleId = e.target.value;
+            await updateRemainingDisplay();
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // USER SETTINGS MODAL (no API key generation, added legal)
+    // ------------------------------------------------------------------
+    async function openUserSettings() {
+        const modal = document.createElement("div"); modal.className = "modal";
+        modal.innerHTML = `
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h3 style="margin:0;">👤 Account Center</h3>
+                <span class="close-modal" style="cursor:pointer; font-size:24px;">&times;</span>
+            </div>
+            <div>
+                <div style="background:#0e111b; border-radius:16px; padding:14px; margin-bottom:16px;">
+                    <label style="font-size:12px; color:#8e9dc2;">PROFILE PICTURE URL</label>
+                    <input type="text" id="profilePicUrl" placeholder="https://..." value="${currentUser.profilePic || ''}" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
+                    <div class="profile-preview" id="profilePreview" style="width:60px; height:60px; border-radius:50%; background:var(--accent); margin:8px auto; background-size:cover; background-image: url('${currentUser.profilePic || ''}');"></div>
+                    <label style="font-size:12px; color:#8e9dc2;">CHANGE USERNAME</label>
+                    <input type="text" id="newUsername" placeholder="New username" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
+                    <button id="updateUsernameBtn" style="width:100%; background:#2d3748; margin-bottom:8px;">Update Username</button>
+                    <button id="deleteAccountBtn" style="width:100%; background:#ef4444;">🗑️ Delete Account Permanently</button>
+                </div>
+                <div style="background:#0e111b; border-radius:16px; padding:14px;">
+                    <h4 style="margin:0 0 8px 0;">📊 Your Stats</h4>
+                    <p style="font-size:13px; margin:4px 0;">Chat calls left today: ${Math.max(0,50+(currentUser.extraChatCredits||0) - (await getTodayCalls()))} / ${50+(currentUser.extraChatCredits||0)}</p>
+                    <p style="font-size:13px; margin:4px 0;">Image credits left: ${await getRemainingImages()}</p>
+                    <p style="font-size:13px; margin:4px 0;">Extra chat credits: ${currentUser.extraChatCredits||0}</p>
+                    <p style="font-size:13px; margin:4px 0;">Extra image credits: ${currentUser.extraImageCredits||0}</p>
+                </div>
+                <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
+                    <h4 style="margin:0 0 8px 0;">⚖️ Legal & Terms</h4>
+                    <p style="font-size:12px;">By using Vrythos AI, you agree to our <a href="#" style="color:#8b5cf6;">Terms of Service</a> and <a href="#" style="color:#8b5cf6;">Privacy Policy</a>. All data is stored securely on our servers.</p>
+                </div>
+                <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
+                    <h4 style="margin:0 0 8px 0;">🐞 Report a Bug / Request Credits</h4>
+                    <textarea id="bugReportText" placeholder="Describe issue or request" rows="2" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:16px; padding:8px; color:white; margin-bottom:8px;"></textarea>
+                    <button id="submitBugBtn" style="width:100%; background:#2d3748;">Submit Report</button>
+                    <button id="logoutBtn" style="width:100%; background:#555; margin-top:8px;">🚪 Logout</button>
+                </div>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+        let close = () => modal.remove();
+        modal.querySelector(".close-modal").onclick = close;
+
+        let picInput = document.getElementById("profilePicUrl");
+        let preview = document.getElementById("profilePreview");
+        picInput.addEventListener("input", () => { preview.style.backgroundImage = `url('${picInput.value}')`; });
+
+        document.getElementById("updateUsernameBtn").onclick = async () => {
+            let newName = document.getElementById("newUsername").value.trim();
+            if (!newName) return;
+            let users = await loadUsers();
+            if (users.find(u => u.username === newName)) { alert("Username taken"); return; }
+            let oldName = currentUser.username;
+            await updateUser(oldName, { username: newName });
+            // also update related data (image quotas, etc.)
+            currentUser.username = newName;
+            await updateUserStorage();
+            alert("Username changed. Please log in again.");
+            close(); localStorage.removeItem("vrythos_current_session"); location.reload();
+        };
+        document.getElementById("deleteAccountBtn").onclick = async () => {
+            if (!confirm("⚠️ Permanently delete your account and all data? This cannot be undone.")) return;
+            await deleteUser(currentUser.username);
+            localStorage.removeItem("vrythos_current_session");
+            location.reload();
+        };
+        document.getElementById("submitBugBtn").onclick = async () => {
+            let desc = document.getElementById("bugReportText").value.trim();
+            if (!desc) return;
+            await addBugReport({ username: currentUser.username, description: desc, timestamp: Date.now(), status: "pending" });
+            alert("Bug report submitted. Admin may grant extra credits if legit.");
+            document.getElementById("bugReportText").value = "";
+        };
+        document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem("vrythos_current_session"); location.reload(); };
+    }
+
+    async function updateUserStorage() {
+        await updateUser(currentUser.username, currentUser);
+    }
+
+    // ------------------------------------------------------------------
+    // BUILD UI
+    // ------------------------------------------------------------------
+    async function buildUI() {
+        document.getElementById("app-root").innerHTML = `
+        <div class="app">
+            <div class="sidebar">
+                <div class="logo"><span>🧠</span> Vrythos Core</div>
+                <button class="new-chat-btn" id="newChatBtn">+ New Conversation</button>
+                <div class="module-selector">
+                    <label>🧠 AI ENGINE</label>
+                    <select id="moduleSelect"></select>
+                    <div id="moduleRemaining" class="usage-badge">Today: -- msgs left</div>
+                </div>
+                <div class="deep-think-container">
+                    <label class="depth-heading">🔬 REASONING DEPTH</label>
+                    <label class="deep-think-toggle"><input type="checkbox" id="deepThinkToggle"> Enable step‑by‑step analysis</label>
+                </div>
+                <div class="live-image-container">
+                    <label class="live-heading">🎨 LIVE IMAGE MODE</label>
+                    <label class="live-image-toggle"><input type="checkbox" id="liveImageToggle"> Auto‑generate images from descriptions</label>
+                </div>
+                <div id="imageUsageDisplay" class="usage-badge">🖼️ Images left: --</div>
+                <div style="font-size:11px; margin-top: auto; text-align:center; color:#5b6e8c;">
+                    <span id="sidebarUsername">user</span> • <span id="dailyCallsLeft">50</span> calls left today
+                </div>
+            </div>
+            <div class="main-chat">
+                <div class="chat-header">
+                    <div class="ai-status"><div class="status-dot"></div> Vrythos · Neural Core</div>
+                    <div class="user-menu-btn" id="userSettingsBtn">👤 My Account ⚙️</div>
+                </div>
+                <div class="messages" id="messagesContainer">
+                    <div class="message ai-message"><div class="avatar">🧠</div><div class="bubble">Welcome to Vrythos AI. Secure chat, image gen, and personal API keys for your projects!</div></div>
+                </div>
+                <div class="input-area">
+                    <div id="filePreviewArea" class="file-badge"></div>
+                    <div class="input-wrapper">
+                        <button class="attach-btn" id="attachBtn" title="Attach file">📎</button>
+                        <button class="img-gen-btn" id="imageGenBtn" title="Generate image">🎨</button>
+                        <input type="text" id="userInput" placeholder="Enter next chat" autocomplete="off">
+                        <button class="send-btn" id="sendBtn">➤</button>
+                    </div>
+                    <input type="file" id="fileInput" multiple style="display:none;" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg">
+                </div>
+            </div>
+        </div>`;
+        document.getElementById("newChatBtn").onclick = () => { messagesHistory = []; document.getElementById("messagesContainer").innerHTML = ""; addAIMessage("New session ready."); };
+        document.getElementById("sendBtn").onclick = () => { let inp = document.getElementById("userInput"); if(inp.value.trim() && !isProcessing) sendMessage(inp.value.trim()); inp.value = ""; };
+        document.getElementById("userInput").addEventListener("keypress", e => { if(e.key === "Enter") { let inp = document.getElementById("userInput"); if(inp.value.trim() && !isProcessing) sendMessage(inp.value.trim()); inp.value = ""; } });
+        document.getElementById("deepThinkToggle").onchange = e => deepThink = e.target.checked;
+        document.getElementById("liveImageToggle").onchange = e => liveImageMode = e.target.checked;
+        document.getElementById("attachBtn").onclick = () => document.getElementById("fileInput").click();
+        document.getElementById("fileInput").onchange = e => {
+            if(e.target.files) Array.from(e.target.files).forEach(f => {
+                let reader = new FileReader();
+                reader.onload = ev => {
+                    attachedFiles.push({ name: f.name, content: ev.target.result, isText: f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i) });
+                    renderFileBadges();
+                };
+                if(f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
+                else reader.readAsDataURL(f);
+            });
+        };
+        document.getElementById("imageGenBtn").onclick = () => { let inp = document.getElementById("userInput"); let prompt = inp.value.trim() || "cyberpunk city"; if(!isProcessing) sendMessage(prompt, true); inp.value = ""; };
+        document.getElementById("userSettingsBtn").onclick = openUserSettings;
+        renderModuleDropdown();
+        await updateRemainingDisplay();
+        await updateSidebarStats();
+    }
+
+    // ------------------------------------------------------------------
+    // AUTHENTICATION
+    // ------------------------------------------------------------------
+    async function initAuth() {
+        let savedSession = localStorage.getItem("vrythos_current_session");
+        if (savedSession) {
+            let users = await loadUsers();
+            let user = users.find(u => u.username === savedSession && !u.banned);
+            if (user) {
+                currentUser = user;
+                await buildUI();
+                return;
+            }
+        }
+        document.getElementById("app-root").innerHTML = `
+        <div class="auth-container">
+            <div class="auth-card" style="background: linear-gradient(145deg, #11141f, #0a0c15);">
+                <h2>⚡ VRYTHOS NEURAL</h2>
+                <div id="loginForm">
+                    <input type="text" id="loginUsername" placeholder="Username" autocomplete="off">
+                    <input type="password" id="loginPassword" placeholder="Password">
+                    <button id="doLoginBtn">Sign In</button>
+                    <div class="auth-switch" id="showRegisterBtn">✨ Create new account</div>
+                    <div class="auth-switch" id="forgotPasswordBtn" style="color:#8e9dc2;">🔐 Forgot password?</div>
+                </div>
+                <div id="registerForm" class="hidden">
+                    <input type="text" id="regUsername" placeholder="Username">
+                    <input type="password" id="regPassword" placeholder="Password (min 4 chars)">
+                    <input type="password" id="regPasswordConfirm" placeholder="Confirm password">
+                    <button id="doRegisterBtn">Register</button>
+                    <div class="auth-switch" id="showLoginBtn">← Back to login</div>
+                </div>
+                <div id="authMessage" style="margin-top:12px; font-size:12px; color:#f97316; text-align:center;"></div>
+            </div>
+        </div>`;
+        document.getElementById("doLoginBtn").onclick = async () => {
+            let uname = document.getElementById("loginUsername").value.trim();
+            let pwd = document.getElementById("loginPassword").value;
+            let users = await loadUsers();
+            let user = users.find(u => u.username === uname);
+            if (!user) {
+                document.getElementById("authMessage").innerHTML = "❌ User not found. <a href='#' id='suggestRegister'>Create new account?</a>";
+                document.getElementById("suggestRegister")?.addEventListener("click", () => document.getElementById("showRegisterBtn").click());
+                return;
+            }
+            let hashed = await hashPassword(pwd);
+            if (user.passwordHash !== hashed) { document.getElementById("authMessage").innerText = "Wrong password"; return; }
+            if (user.banned) { document.getElementById("authMessage").innerText = "Account banned."; return; }
+            currentUser = user;
+            localStorage.setItem("vrythos_current_session", uname);
+            await buildUI();
+        };
+        document.getElementById("showRegisterBtn").onclick = () => { document.getElementById("loginForm").classList.add("hidden"); document.getElementById("registerForm").classList.remove("hidden"); document.getElementById("authMessage").innerHTML = ""; };
+        document.getElementById("showLoginBtn").onclick = () => { document.getElementById("registerForm").classList.add("hidden"); document.getElementById("loginForm").classList.remove("hidden"); };
+        document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => alert("Password reset is not available in this demo. Contact admin for help."));
+        document.getElementById("doRegisterBtn").onclick = async () => {
+            let uname = document.getElementById("regUsername").value.trim();
+            let pwd = document.getElementById("regPassword").value;
+            let confirm = document.getElementById("regPasswordConfirm").value;
+            if (!uname || pwd.length < 4) { document.getElementById("authMessage").innerText = "Username & password (min 4 chars)"; return; }
+            if (pwd !== confirm) { document.getElementById("authMessage").innerText = "Passwords mismatch"; return; }
+            let users = await loadUsers();
+            if (users.find(u => u.username === uname)) { document.getElementById("authMessage").innerText = "Username exists. Try logging in."; return; }
+            let ip = await getPublicIP();
+            let canReg = await canRegisterMoreAccounts(ip);
+            if (!canReg) { document.getElementById("authMessage").innerText = "❌ IP limit: max 4 accounts per month."; return; }
+            let hashed = await hashPassword(pwd);
+            let newUser = {
+                username: uname,
+                passwordHash: hashed,
+                profilePic: "",
+                dailyCallsRecord: { date: "", count: 0 },
+                extraChatCredits: 0,
+                extraImageCredits: 0,
+                banned: false,
+                createdAt: Date.now()
+            };
+            await saveUser(newUser);
+            await addIpReg({ ip, username: uname, month: `${new Date().getFullYear()}-${new Date().getMonth()}`, timestamp: Date.now() });
+            document.getElementById("authMessage").innerHTML = "✅ Account created! Please login.";
+            document.getElementById("registerForm").classList.add("hidden");
+            document.getElementById("loginForm").classList.remove("hidden");
+        };
+    }
+
+    await loadAllData();
+    await initAuth();
+})();
+</script>
+<style>
+    /* same CSS as before – unchanged */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --bg-primary: #0a0c15; --bg-secondary: #11141f; --bg-sidebar: #0e111b; --text-primary: #f0f3fa; --text-secondary: #8e9dc2; --accent: #8b5cf6; --border: #1e293b; --user-bubble: #7c3aed; --ai-bubble: #1e293b; --success: #10b981; --danger: #ef4444; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
+    .app, .auth-container { display: flex; height: 100vh; width: 100%; }
+    .auth-container { align-items: center; justify-content: center; background: radial-gradient(circle at 20% 30%, #0f1222, #03050b); }
+    .auth-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 2rem; padding: 2rem; width: 360px; backdrop-filter: blur(8px); }
+    .auth-card h2 { margin-bottom: 1.5rem; text-align: center; background: linear-gradient(135deg, #c084fc, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .auth-card input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); padding: 12px; border-radius: 28px; color: white; margin-bottom: 12px; outline: none; }
+    .auth-card button { background: var(--accent); border: none; padding: 12px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
+    .auth-switch { text-align: center; margin-top: 16px; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
+    .hidden { display: none !important; }
+    .sidebar { width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 16px; gap: 24px; overflow-y: auto; }
+    .logo { display: flex; align-items: center; gap: 12px; font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, #c084fc, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .new-chat-btn { background: var(--accent); border: none; padding: 12px; border-radius: 40px; color: white; font-weight: 600; cursor: pointer; }
+    .module-selector, .deep-think-container, .live-image-container { background: rgba(0,0,0,0.3); border-radius: 16px; padding: 12px; }
+    select, .deep-think-toggle, .live-image-toggle { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); padding: 8px 12px; border-radius: 28px; color: white; }
+    .deep-think-container .depth-heading, .live-image-container .live-heading { display: block !important; font-size: 0.7rem !important; text-transform: uppercase !important; color: var(--text-secondary) !important; margin-bottom: 8px !important; }
+    .deep-think-toggle, .live-image-toggle { margin-top: 0 !important; display: flex !important; align-items: center !important; gap: 10px !important; width: 100% !important; }
+    .usage-badge { font-size: 11px; background: #1e293b; padding: 4px 8px; border-radius: 20px; text-align: center; margin-top: 6px; }
+    .main-chat { flex: 1; display: flex; flex-direction: column; background: var(--bg-primary); }
+    .chat-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); }
+    .user-menu-btn { background: #2d3748; border-radius: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .message { display: flex; gap: 12px; max-width: 80%; }
+    .user-message { align-self: flex-end; flex-direction: row-reverse; }
+    .ai-message { align-self: flex-start; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: bold; background-size: cover; }
+    .bubble { padding: 12px 18px; border-radius: 22px; line-height: 1.5; font-size: 0.9rem; }
+    .user-message .bubble { background: var(--user-bubble); border-bottom-right-radius: 6px; }
+    .ai-message .bubble { background: var(--ai-bubble); border-bottom-left-radius: 6px; border: 1px solid var(--border); }
+    .input-area { padding: 20px 24px; border-top: 1px solid var(--border); background: var(--bg-secondary); }
+    .input-wrapper { display: flex; gap: 8px; background: var(--bg-primary); border-radius: 60px; padding: 4px 4px 4px 20px; border: 1px solid var(--border); align-items: center; }
+    .input-wrapper input { flex: 1; background: transparent; border: none; padding: 12px 0; color: white; outline: none; }
+    .input-wrapper input:disabled { opacity: 0.5; cursor: not-allowed; }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .send-btn { background: var(--accent); border: none; width: 44px; border-radius: 40px; cursor: pointer; }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-content { background: var(--bg-secondary); border-radius: 28px; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; padding: 24px; border: 1px solid var(--accent); }
+    .close-modal { cursor: pointer; }
+    .profile-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); margin: 10px auto; background-size: cover; }
+    .file-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .file-tag { background: #2d3748; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+    @media (max-width: 700px) { .sidebar { display: none; } .message { max-width: 95%; } }
+</style>
+</body>
+</html>
