@@ -8,7 +8,7 @@
 </head>
 <body>
 <!-- ================= FAKE DECOY CODE ================= -->
-<!-- 20+ lines of fake comments and invisible divs (same as before) -->
+<!-- 20+ lines of fake comments (same as before) -->
 <div id="app-root">Loading Vrythos Neural Core...</div>
 
 <script>
@@ -58,7 +58,6 @@
     // Load data from server
     async function loadAllData() {
         modules = await apiGet('/api/modules');
-        // users are only needed for login, not stored globally
     }
 
     // User management
@@ -66,6 +65,20 @@
     async function saveUser(userData) { return await apiPost('/api/users', userData); }
     async function updateUser(username, updates) { return await apiPut(`/api/users/${username}`, updates); }
     async function deleteUser(username) { return await apiDelete(`/api/users/${username}`); }
+
+    // User API keys
+    async function loadUserApiKeys(username) {
+        const allKeys = await apiGet('/api/userApiKeys');
+        const entry = allKeys.find(e => e.username === username);
+        return entry ? entry.keys : [];
+    }
+    async function saveUserApiKeys(username, keys) {
+        let allKeys = await apiGet('/api/userApiKeys');
+        const idx = allKeys.findIndex(e => e.username === username);
+        if (idx !== -1) allKeys[idx].keys = keys;
+        else allKeys.push({ username, keys });
+        await apiPost('/api/userApiKeys', allKeys.find(e => e.username === username));
+    }
 
     // Abuse & pending bans
     async function addAbuseReport(report) { return await apiPost('/api/abuse', report); }
@@ -88,7 +101,7 @@
     // Bug reports
     async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
 
-    // IP registration (used during signup)
+    // IP registration
     async function addIpReg(reg) { return await apiPost('/api/ipRegs', reg); }
     async function getIpRegs() { return await apiGet('/api/ipRegs'); }
 
@@ -123,7 +136,6 @@
         if (!currentUser) return;
         abuseScore = Math.min(100, abuseScore + points);
         console.log(`⚠️ Abuse score +${points} → ${abuseScore}%`);
-        // Record the abuse event for admin review (pending ban)
         await addPendingBan({
             username: currentUser.username,
             score: abuseScore,
@@ -225,7 +237,7 @@
         alert('Image copied to clipboard!');
     };
 
-    // Image quota management (similar to original)
+    // Image quota management
     async function getRemainingImages() {
         const quota = await getImageQuota(currentUser.username);
         const now = Date.now();
@@ -293,8 +305,6 @@
         if (module.type === "cloudflare") {
             return await callCloudflare(messagesArr, deepThinkActive);
         }
-        // Other engine types (groq, gemini, claude, openrouter) would need backend support
-        // For simplicity, we assume only cloudflare is used. If others are needed, extend backend.
         return "⚠️ Only Cloudflare AI is supported in this demo. Please select a Cloudflare module.";
     }
 
@@ -375,7 +385,6 @@
             let willImage = (liveImageMode || forceImage || isImageGenerationRequest(userText)) && userText.length > 2;
             if (willImage) {
                 addUserMessage(`🎨 ${userText.substring(0,100)}`);
-                // Extract prompt
                 let prompt = userText;
                 const match = userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
                 if (match && match[2]) prompt = match[2];
@@ -385,7 +394,6 @@
             }
             let module = modules.find(m => m.id === selectedModuleId);
             if (!module) { addAIMessage("❌ No AI engine selected. Contact admin."); setProcessing(false); return; }
-            let remModule = 999; // would need server-side engine limit
             let fullMsg = userText;
             if (attachedFiles.length) {
                 fullMsg += "\n\n[Attached files]\n" + attachedFiles.map(f => f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`).join("\n");
@@ -404,7 +412,6 @@
                 if (reply.includes("quota") || reply.includes("limit")) {
                     await addAbuseScore(5, "API quota warning", userText);
                 }
-                // Random abuse score (1-3%)
                 await addAbuseScore(Math.floor(Math.random() * 3) + 1, "Random monitoring", userText);
 
                 const lowerInput = userText.toLowerCase();
@@ -427,7 +434,7 @@
     async function updateRemainingDisplay() {
         let mod = modules.find(m => m.id === selectedModuleId);
         if (mod) {
-            document.getElementById("moduleRemaining").innerHTML = `📨 Today: --/${mod.dailyLimitPerUser} msgs left`; // limit tracking would need server
+            document.getElementById("moduleRemaining").innerHTML = `📨 Today: --/${mod.dailyLimitPerUser} msgs left`;
         } else {
             document.getElementById("moduleRemaining").innerHTML = `⚠️ No active engine`;
         }
@@ -479,53 +486,68 @@
     }
 
     // ------------------------------------------------------------------
-    // USER SETTINGS MODAL (no API key generation, added legal)
+    // USER SETTINGS MODAL (with API key management)
     // ------------------------------------------------------------------
     async function openUserSettings() {
+        // Load current user's API keys
+        let userKeys = await loadUserApiKeys(currentUser.username);
         const modal = document.createElement("div"); modal.className = "modal";
         modal.innerHTML = `
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width: 700px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <h3 style="margin:0;">👤 Account Center</h3>
                 <span class="close-modal" style="cursor:pointer; font-size:24px;">&times;</span>
             </div>
-            <div>
-                <div style="background:#0e111b; border-radius:16px; padding:14px; margin-bottom:16px;">
-                    <label style="font-size:12px; color:#8e9dc2;">PROFILE PICTURE URL</label>
-                    <input type="text" id="profilePicUrl" placeholder="https://..." value="${currentUser.profilePic || ''}" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
-                    <div class="profile-preview" id="profilePreview" style="width:60px; height:60px; border-radius:50%; background:var(--accent); margin:8px auto; background-size:cover; background-image: url('${currentUser.profilePic || ''}');"></div>
-                    <label style="font-size:12px; color:#8e9dc2;">CHANGE USERNAME</label>
-                    <input type="text" id="newUsername" placeholder="New username" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
-                    <button id="updateUsernameBtn" style="width:100%; background:#2d3748; margin-bottom:8px;">Update Username</button>
-                    <button id="deleteAccountBtn" style="width:100%; background:#ef4444;">🗑️ Delete Account Permanently</button>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                <div>
+                    <div style="background:#0e111b; border-radius:16px; padding:14px; margin-bottom:16px;">
+                        <label style="font-size:12px; color:#8e9dc2;">PROFILE PICTURE URL</label>
+                        <input type="text" id="profilePicUrl" placeholder="https://..." value="${currentUser.profilePic || ''}" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
+                        <div class="profile-preview" id="profilePreview" style="width:60px; height:60px; border-radius:50%; background:var(--accent); margin:8px auto; background-size:cover; background-image: url('${currentUser.profilePic || ''}');"></div>
+                        <label style="font-size:12px; color:#8e9dc2;">CHANGE USERNAME</label>
+                        <input type="text" id="newUsername" placeholder="New username" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
+                        <button id="updateUsernameBtn" style="width:100%; background:#2d3748; margin-bottom:8px;">Update Username</button>
+                        <button id="deleteAccountBtn" style="width:100%; background:#ef4444;">🗑️ Delete Account Permanently</button>
+                    </div>
+                    <div style="background:#0e111b; border-radius:16px; padding:14px;">
+                        <h4 style="margin:0 0 8px 0;">📊 Your Stats</h4>
+                        <p style="font-size:13px; margin:4px 0;">Chat calls left today: ${Math.max(0,50+(currentUser.extraChatCredits||0) - (await getTodayCalls()))} / ${50+(currentUser.extraChatCredits||0)}</p>
+                        <p style="font-size:13px; margin:4px 0;">Image credits left: ${await getRemainingImages()}</p>
+                        <p style="font-size:13px; margin:4px 0;">Extra chat credits: ${currentUser.extraChatCredits||0}</p>
+                        <p style="font-size:13px; margin:4px 0;">Extra image credits: ${currentUser.extraImageCredits||0}</p>
+                    </div>
                 </div>
-                <div style="background:#0e111b; border-radius:16px; padding:14px;">
-                    <h4 style="margin:0 0 8px 0;">📊 Your Stats</h4>
-                    <p style="font-size:13px; margin:4px 0;">Chat calls left today: ${Math.max(0,50+(currentUser.extraChatCredits||0) - (await getTodayCalls()))} / ${50+(currentUser.extraChatCredits||0)}</p>
-                    <p style="font-size:13px; margin:4px 0;">Image credits left: ${await getRemainingImages()}</p>
-                    <p style="font-size:13px; margin:4px 0;">Extra chat credits: ${currentUser.extraChatCredits||0}</p>
-                    <p style="font-size:13px; margin:4px 0;">Extra image credits: ${currentUser.extraImageCredits||0}</p>
+                <div>
+                    <div style="background:#0e111b; border-radius:16px; padding:14px;">
+                        <h4 style="margin:0 0 8px 0;">🔑 API Keys (for external projects)</h4>
+                        <p style="font-size:12px; color:#8e9dc2;">Max 2 keys. Each key: 20 requests/day.</p>
+                        <div id="apiKeysList" style="max-height:200px; overflow-y:auto; margin-bottom:12px;"></div>
+                        <button id="generateApiKeyBtn" style="width:100%; background:#8b5cf6; margin-bottom:8px;">+ Generate New API Key</button>
+                        <small style="font-size:10px;">Use with Bearer token: <code>Authorization: Bearer YOUR_KEY</code><br>Endpoint: <code>POST /api/external/chat</code></small>
+                    </div>
+                    <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
+                        <h4 style="margin:0 0 8px 0;">🐞 Report a Bug / Request Credits</h4>
+                        <textarea id="bugReportText" placeholder="Describe issue or request" rows="2" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:16px; padding:8px; color:white; margin-bottom:8px;"></textarea>
+                        <button id="submitBugBtn" style="width:100%; background:#2d3748;">Submit Report</button>
+                        <button id="logoutBtn" style="width:100%; background:#555; margin-top:8px;">🚪 Logout</button>
+                    </div>
                 </div>
-                <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
-                    <h4 style="margin:0 0 8px 0;">⚖️ Legal & Terms</h4>
-                    <p style="font-size:12px;">By using Vrythos AI, you agree to our <a href="#" style="color:#8b5cf6;">Terms of Service</a> and <a href="#" style="color:#8b5cf6;">Privacy Policy</a>. All data is stored securely on our servers.</p>
-                </div>
-                <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
-                    <h4 style="margin:0 0 8px 0;">🐞 Report a Bug / Request Credits</h4>
-                    <textarea id="bugReportText" placeholder="Describe issue or request" rows="2" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:16px; padding:8px; color:white; margin-bottom:8px;"></textarea>
-                    <button id="submitBugBtn" style="width:100%; background:#2d3748;">Submit Report</button>
-                    <button id="logoutBtn" style="width:100%; background:#555; margin-top:8px;">🚪 Logout</button>
-                </div>
+            </div>
+            <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
+                <h4 style="margin:0 0 8px 0;">⚖️ Legal & Terms</h4>
+                <p style="font-size:12px;">By using Vrythos AI, you agree to our <a href="#" style="color:#8b5cf6;">Terms of Service</a> and <a href="#" style="color:#8b5cf6;">Privacy Policy</a>. All data is stored securely on our servers.</p>
             </div>
         </div>`;
         document.body.appendChild(modal);
         let close = () => modal.remove();
         modal.querySelector(".close-modal").onclick = close;
 
+        // Profile picture preview
         let picInput = document.getElementById("profilePicUrl");
         let preview = document.getElementById("profilePreview");
         picInput.addEventListener("input", () => { preview.style.backgroundImage = `url('${picInput.value}')`; });
 
+        // Username update
         document.getElementById("updateUsernameBtn").onclick = async () => {
             let newName = document.getElementById("newUsername").value.trim();
             if (!newName) return;
@@ -533,18 +555,19 @@
             if (users.find(u => u.username === newName)) { alert("Username taken"); return; }
             let oldName = currentUser.username;
             await updateUser(oldName, { username: newName });
-            // also update related data (image quotas, etc.)
             currentUser.username = newName;
             await updateUserStorage();
             alert("Username changed. Please log in again.");
             close(); localStorage.removeItem("vrythos_current_session"); location.reload();
         };
+        // Delete account
         document.getElementById("deleteAccountBtn").onclick = async () => {
             if (!confirm("⚠️ Permanently delete your account and all data? This cannot be undone.")) return;
             await deleteUser(currentUser.username);
             localStorage.removeItem("vrythos_current_session");
             location.reload();
         };
+        // Bug report
         document.getElementById("submitBugBtn").onclick = async () => {
             let desc = document.getElementById("bugReportText").value.trim();
             if (!desc) return;
@@ -552,7 +575,53 @@
             alert("Bug report submitted. Admin may grant extra credits if legit.");
             document.getElementById("bugReportText").value = "";
         };
+        // Logout
         document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem("vrythos_current_session"); location.reload(); };
+
+        // API Key management
+        async function refreshApiKeysList() {
+            userKeys = await loadUserApiKeys(currentUser.username);
+            const container = document.getElementById("apiKeysList");
+            if (!container) return;
+            if (userKeys.length === 0) {
+                container.innerHTML = "<i>No API keys generated yet.</i>";
+                return;
+            }
+            container.innerHTML = userKeys.map((key, idx) => `
+                <div style="background:#1e293b; margin:5px; padding:6px; border-radius:12px;">
+                    <b>${escapeHtml(key.name)}</b><br>
+                    <code style="font-size:10px; word-break:break-all;">${key.key}</code><br>
+                    <span style="font-size:10px;">Used today: ${key.used || 0}/20</span>
+                    <button class="revokeKey" data-idx="${idx}" style="float:right; background:#ef4444; border:none; border-radius:20px; padding:2px 8px;">Revoke</button>
+                </div>
+            `).join("");
+            document.querySelectorAll(".revokeKey").forEach(btn => btn.onclick = async () => {
+                let idx = parseInt(btn.dataset.idx);
+                userKeys.splice(idx, 1);
+                await saveUserApiKeys(currentUser.username, userKeys);
+                await refreshApiKeysList();
+            });
+        }
+        await refreshApiKeysList();
+
+        document.getElementById("generateApiKeyBtn").onclick = async () => {
+            if (userKeys.length >= 2) {
+                alert("Maximum 2 API keys per user.");
+                return;
+            }
+            let keyName = prompt("Label for this API key (e.g., MyApp)");
+            if (!keyName) return;
+            let newKey = "vrythos_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 8);
+            userKeys.push({
+                name: keyName,
+                key: newKey,
+                used: 0,
+                date: new Date().toISOString().slice(0, 10)
+            });
+            await saveUserApiKeys(currentUser.username, userKeys);
+            await refreshApiKeysList();
+            alert(`New API Key generated: ${newKey}\nStore it safely. You won't see it again.`);
+        };
     }
 
     async function updateUserStorage() {
@@ -758,7 +827,7 @@
     .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .send-btn { background: var(--accent); border: none; width: 44px; border-radius: 40px; cursor: pointer; }
     .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-content { background: var(--bg-secondary); border-radius: 28px; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; padding: 24px; border: 1px solid var(--accent); }
+    .modal-content { background: var(--bg-secondary); border-radius: 28px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 24px; border: 1px solid var(--accent); }
     .close-modal { cursor: pointer; }
     .profile-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); margin: 10px auto; background-size: cover; }
     .file-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
