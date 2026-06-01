@@ -4,26 +4,24 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const mongoose = require('mongoose');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ========== MongoDB Connection ==========
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://viraj:viraj%402070@vrythos-server.j8tjel4.mongodb.net/vrythos?retryWrites=true&w=majority';
 if (!MONGODB_URI) {
-    console.error('❌ MONGODB_URI environment variable is not set. Please add it in Render.');
-    process.exit(1);
+    console.error('❌ MONGODB_URI environment variable is not set. Using default (hardcoded).');
 }
 
-mongoose.connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => console.log('✅ Connected to MongoDB Atlas'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('✅ Connected to MongoDB Atlas'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // ========== Mongoose Schemas ==========
 
@@ -46,7 +44,7 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// Module schema (AI engines)
+// Module schema
 const moduleSchema = new mongoose.Schema({
     id: { type: String, unique: true, required: true },
     displayName: String,
@@ -320,7 +318,6 @@ app.delete('/api/abuse', async (req, res) => { await Abuse.deleteMany({}); res.j
 // --- Pending bans ---
 app.get('/api/pendingBans', async (req, res) => { res.json(await PendingBan.find({})); });
 app.post('/api/pendingBans', async (req, res) => { await new PendingBan(req.body).save(); res.json({ success: true }); });
-app.delete('/api/pendingBans/:index', async (req, res) => { /* Not used in frontend, optional */ res.json({ success: true }); });
 app.delete('/api/pendingBans', async (req, res) => { await PendingBan.deleteMany({}); res.json({ success: true }); });
 
 // --- IP registrations ---
@@ -370,7 +367,7 @@ app.post('/api/join-tournament', async (req, res) => {
     res.json({ success: true });
 });
 
-// ========== AI PROVIDER HANDLERS (unchanged from previous) ==========
+// ========== AI PROVIDER HANDLERS ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest.`;
 
 async function callGroq(module, messages, deepThink) {
