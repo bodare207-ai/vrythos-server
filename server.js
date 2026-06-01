@@ -173,14 +173,6 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
-// --- Instagram & Telegram placeholders ---
-app.post('/api/auth/instagram', (req, res) => {
-    res.status(501).json({ error: 'Instagram OAuth not configured. Please set INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET.' });
-});
-app.post('/api/auth/telegram', (req, res) => {
-    res.status(501).json({ error: 'Telegram OAuth not configured. Please set TELEGRAM_BOT_TOKEN.' });
-});
-
 // --- User activity tracking ---
 app.post('/api/user-activity', (req, res) => {
     const { email } = req.body;
