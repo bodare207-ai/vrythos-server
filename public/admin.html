@@ -29,6 +29,7 @@
         .user-profile-details pre { background: #0a0c15; padding: 8px; border-radius: 12px; overflow-x: auto; font-size: 11px; }
         .stats-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; margin: 8px 0; }
         .stat-card { background: #0e111b; padding: 8px 12px; border-radius: 12px; flex: 1; text-align: center; }
+        .warning { color: #f97316; }
     </style>
 </head>
 <body>
@@ -108,7 +109,7 @@
             <button id="refreshStatsBtn">🔄 Refresh Stats</button>
         </div>
 
-        <!-- Admin AI Chat Tester (fixed: loads modules) -->
+        <!-- Admin AI Chat Tester -->
         <div class="card">
             <h3>🤖 Admin AI Chat Tester (same as user experience)</h3>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
@@ -176,14 +177,11 @@
     let adminLiveImage = false;
     let adminMessagesHistory = [];
     let adminAttachedFiles = [];
-    let adminEmail = "bodare207@gmail.com";
 
-    // Helper functions
     function escapeHtml(str) {
         return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
     }
 
-    // Load all data from server
     async function loadAllData() {
         modules = await apiGet('/api/modules');
         users = await apiGet('/api/users');
@@ -204,7 +202,7 @@
         } catch(e) { console.warn(e); }
     }
 
-    // Render modules list (admin)
+    // Render modules list
     async function renderModules() {
         const container = document.getElementById("modulesList");
         container.innerHTML = "";
@@ -288,7 +286,8 @@
                 <strong>👤 User Profile: ${escapeHtml(userData.username)}</strong><br>
                 Email: ${escapeHtml(userData.email)}<br>
                 Name: ${escapeHtml(userData.name || 'N/A')}<br>
-                Password Hash (SHA-256): <code>${userData.passwordHash}</code><br>
+                Auth Provider: ${userData.authProvider || 'email'}<br>
+                ${userData.passwordHash ? `Password Hash (SHA-256): <code>${userData.passwordHash}</code><br>` : ''}
                 Created: ${new Date(userData.createdAt).toLocaleString()}<br>
                 Total hours live: ${hoursLive}<br>
                 Extra chat credits: ${userData.extraChatCredits || 0}<br>
@@ -303,11 +302,11 @@
             `;
         } catch(e) {
             console.error(e);
-            document.getElementById("userProfileDetails").innerHTML = `<span style="color:#ef4444;">Error loading profile: ${e.message}</span>`;
+            document.getElementById("userProfileDetails").innerHTML = `<span class="warning">Error loading profile: ${e.message}</span>`;
         }
     }
 
-    // Render bugs, abuse, pending bans (same as before)
+    // Bugs
     async function renderBugs() {
         const container = document.getElementById("bugsList");
         container.innerHTML = "";
@@ -353,6 +352,7 @@
         });
     }
 
+    // Abuse reports
     function renderAbuse() {
         const container = document.getElementById("abuseList");
         container.innerHTML = "";
@@ -365,6 +365,7 @@
         });
     }
 
+    // Pending bans
     async function renderPendingBans() {
         const container = document.getElementById("pendingBansList");
         container.innerHTML = "";
@@ -407,7 +408,7 @@
         });
     }
 
-    // Admin chat tester functions
+    // Admin chat tester
     async function callChatAPI(module_id, messages, deepThink) {
         const res = await fetch('/api/chat', {
             method: 'POST',
@@ -559,7 +560,6 @@
             const res = await apiPost('/api/admin/change-password', { email, newPassword: newPwd });
             if (res.success) {
                 document.getElementById("pwdChangeStatus").innerText = "✅ Password change email sent!";
-                // Update remaining limit display (optional)
                 const limitRes = await apiGet('/api/admin/password-limit');
                 if (limitRes.remaining !== undefined) document.getElementById("pwdLimitStatus").innerText = `${limitRes.remaining} remaining today`;
             } else {
@@ -652,7 +652,8 @@
             abuse: await apiGet('/api/abuse'),
             pendingBans: await apiGet('/api/pendingBans'),
             imageQuotas: await apiGet('/api/imageQuotas'),
-            chatUsage: await apiGet('/api/chatUsage')
+            chatUsage: await apiGet('/api/chatUsage'),
+            userApiKeys: await apiGet('/api/userApiKeys')
         };
         let dataStr = JSON.stringify(exportObj, null, 2);
         let blob = new Blob([dataStr], { type: "application/json" });
@@ -676,6 +677,7 @@
                 await apiDelete('/api/ipRegs');
                 await apiDelete('/api/imageQuotas');
                 await apiDelete('/api/chatUsage');
+                await apiDelete('/api/tournaments');
                 alert("All data erased. Refresh the page.");
                 location.reload();
             }
@@ -683,7 +685,7 @@
     };
     document.getElementById("refreshStatsBtn").onclick = () => refreshStats();
 
-    // Add module presets (using API)
+    // Add module presets
     document.getElementById("addFlash").onclick = async () => {
         let primaryKey = prompt("Groq API Key (gsk_)");
         if (!primaryKey) return;
@@ -729,7 +731,7 @@
         await refreshAll();
     };
 
-    // Refresh all
+    // Refresh everything
     async function refreshAll() {
         await loadAllData();
         renderModules();
@@ -744,7 +746,7 @@
         await refreshStats();
     }
 
-    // ========== Admin right-click protection & password change via email ==========
+    // ========== Admin right-click protection & abuse logging ==========
     let adminAbuseScore = 0;
     function addAdminAbuseScore(points, reason) {
         adminAbuseScore += points;
@@ -752,7 +754,6 @@
         if (adminAbuseScore >= 10) {
             alert("⚠️ Suspicious admin activity detected. Your admin session may be logged.");
         }
-        // Optionally send to server for logging
         fetch('/api/admin/log-abuse', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -774,10 +775,17 @@
         }
     });
 
+    // Helper for image download (for admin chat tester)
+    window.downloadImage = function(dataUrl) {
+        const link = document.createElement('a');
+        link.download = 'vrythos_image.png';
+        link.href = dataUrl;
+        link.click();
+    };
+
     // Login
     document.getElementById("adminLoginBtn").onclick = async () => {
         let pwd = document.getElementById("adminPassword").value;
-        // For simplicity, we check against stored hash via /api/admin/verify
         try {
             const res = await apiPost('/api/admin/verify', { password: pwd });
             if (res.success) {
