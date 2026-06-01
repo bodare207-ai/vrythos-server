@@ -497,7 +497,7 @@
     }
 
     // ------------------------------------------------------------------
-    // USER SETTINGS MODAL (unchanged)
+    // USER SETTINGS MODAL (with API key management)
     // ------------------------------------------------------------------
     async function openUserSettings() {
         let userKeys = await loadUserApiKeys(currentUser.email);
@@ -706,9 +706,8 @@
     }
 
     // ------------------------------------------------------------------
-    // AUTHENTICATION (Google + Email/Password + placeholders for Instagram/Telegram)
+    // GOOGLE OAUTH CALLBACK
     // ------------------------------------------------------------------
-    // Google OAuth callback
     window.handleGoogleLogin = async (response) => {
         try {
             const res = await apiPost('/api/auth/google', { token: response.credential });
@@ -732,16 +731,9 @@
         }
     };
 
-    // Instagram login placeholder
-    async function handleInstagramLogin() {
-        alert("Instagram OAuth not yet configured. Please set INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET on the server.");
-    }
-
-    // Telegram login placeholder
-    async function handleTelegramLogin() {
-        alert("Telegram OAuth not yet configured. Please set TELEGRAM_BOT_TOKEN on the server.");
-    }
-
+    // ------------------------------------------------------------------
+    // AUTHENTICATION (Google + Email/Password)
+    // ------------------------------------------------------------------
     async function initAuth() {
         let savedSession = localStorage.getItem("vrythos_current_session");
         if (savedSession) {
@@ -765,10 +757,6 @@
                     <input type="email" id="loginEmail" placeholder="Email" autocomplete="off">
                     <input type="password" id="loginPassword" placeholder="Password">
                     <button id="doLoginBtn">Sign In</button>
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
-                        <button id="instagramLoginBtn" style="background: #d62976;">📷 Instagram</button>
-                        <button id="telegramLoginBtn" style="background: #0088cc;">📱 Telegram</button>
-                    </div>
                     <div class="auth-switch" id="showRegisterBtn">✨ Create new account</div>
                     <div class="auth-switch" id="forgotPasswordBtn" style="color:#8e9dc2;">🔐 Forgot password?</div>
                 </div>
@@ -796,7 +784,7 @@
                 return;
             }
             if (!user.passwordHash) {
-                document.getElementById("authMessage").innerText = "This account uses social login. Please use Google/Instagram/Telegram.";
+                document.getElementById("authMessage").innerText = "This account uses Google login. Please use Google Sign-In.";
                 return;
             }
             let hashed = await hashPassword(pwd);
@@ -806,8 +794,6 @@
             localStorage.setItem("vrythos_current_session", user.email);
             await buildUI();
         };
-        document.getElementById("instagramLoginBtn").onclick = handleInstagramLogin;
-        document.getElementById("telegramLoginBtn").onclick = handleTelegramLogin;
         document.getElementById("showRegisterBtn").onclick = () => {
             document.getElementById("loginForm").classList.add("hidden");
             document.getElementById("registerForm").classList.remove("hidden");
