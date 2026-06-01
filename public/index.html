@@ -46,8 +46,9 @@
     }
 
     // Global data
-    let currentUser = null;
+    let currentUser = null; // { email, username, name, ... }
     let modules = [];
+    let tournaments = [];
     let selectedModuleId = null;
     let deepThink = false;
     let liveImageMode = false;
@@ -57,52 +58,53 @@
 
     async function loadAllData() {
         modules = await apiGet('/api/modules');
+        tournaments = await apiGet('/api/tournaments');
     }
 
-    // User management
+    // User management (server-side)
     async function loadUsers() { return await apiGet('/api/users'); }
-    async function saveUser(userData) { return await apiPost('/api/users', userData); }
-    async function updateUser(username, updates) { return await apiPut(`/api/users/${username}`, updates); }
-    async function deleteUser(username) { return await apiDelete(`/api/users/${username}`); }
+    async function updateUser(email, updates) { return await apiPut(`/api/users/${email}`, updates); }
+    async function deleteUser(email) { return await apiDelete(`/api/users/${email}`); }
 
     // User API keys
-    async function loadUserApiKeys(username) {
+    async function loadUserApiKeys(email) {
         const allKeys = await apiGet('/api/userApiKeys');
-        const entry = allKeys.find(e => e.username === username);
+        const entry = allKeys.find(e => e.email === email);
         return entry ? entry.keys : [];
     }
-    async function saveUserApiKeys(username, keys) {
+    async function saveUserApiKeys(email, keys) {
         let allKeys = await apiGet('/api/userApiKeys');
-        const idx = allKeys.findIndex(e => e.username === username);
+        const idx = allKeys.findIndex(e => e.email === email);
         if (idx !== -1) allKeys[idx].keys = keys;
-        else allKeys.push({ username, keys });
-        await apiPost('/api/userApiKeys', allKeys.find(e => e.username === username));
+        else allKeys.push({ email, keys });
+        await apiPost('/api/userApiKeys', allKeys.find(e => e.email === email));
     }
 
-    // Abuse & pending bans
+    // Abuse & pending bans (server-side)
     async function addAbuseReport(report) { return await apiPost('/api/abuse', report); }
     async function addPendingBan(ban) { return await apiPost('/api/pendingBans', ban); }
 
     // Image quotas
-    async function getImageQuota(username) {
+    async function getImageQuota(email) {
         const quotas = await apiGet('/api/imageQuotas');
-        return quotas.find(q => q.username === username) || { username, count: 0, windowStart: Date.now() };
+        return quotas.find(q => q.email === email) || { email, count: 0, windowStart: Date.now() };
     }
     async function setImageQuota(quota) { return await apiPost('/api/imageQuotas', quota); }
 
     // Chat usage
-    async function getChatUsage(username, moduleId, date) {
+    async function getChatUsage(email, moduleId, date) {
         const all = await apiGet('/api/chatUsage');
-        return all.find(u => u.username === username && u.moduleId === moduleId && u.date === date) || { username, moduleId, date, count: 0 };
+        return all.find(u => u.email === email && u.moduleId === moduleId && u.date === date) || { email, moduleId, date, count: 0 };
     }
     async function setChatUsage(usage) { return await apiPost('/api/chatUsage', usage); }
 
     // Bug reports
     async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
 
-    // IP registration
-    async function addIpReg(reg) { return await apiPost('/api/ipRegs', reg); }
-    async function getIpRegs() { return await apiGet('/api/ipRegs'); }
+    // Tournaments
+    async function joinTournament(tournamentId) {
+        return await apiPost('/api/join-tournament', { email: currentUser.email, tournamentId });
+    }
 
     // ------------------------------------------------------------------
     // HELPER FUNCTIONS (abuse detection, hashing, etc.)
@@ -113,34 +115,15 @@
         return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
     }
 
-    async function getPublicIP() {
-        try {
-            let res = await fetch('https://api.ipify.org?format=json');
-            let data = await res.json();
-            return data.ip;
-        } catch(e) { return '0.0.0.0'; }
-    }
-
-    async function canRegisterMoreAccounts(ip) {
-        const regs = await getIpRegs();
-        const now = new Date();
-        const currentMonth = `${now.getFullYear()}-${now.getMonth()}`;
-        const countThisMonth = regs.filter(r => r.ip === ip && r.month === currentMonth).length;
-        return countThisMonth < 4;
-    }
-
     // Abuse score (local, but reported to server)
     let abuseScore = 0;
-    let abuseWarningShown = false; // to avoid spamming the user
-
+    let abuseWarningShown = false;
     async function addAbuseScore(points, reason, context, showUserWarning = true) {
         if (!currentUser) return;
-        const oldScore = abuseScore;
         abuseScore = Math.min(100, abuseScore + points);
         console.log(`⚠️ Abuse score +${points} → ${abuseScore}% (${reason})`);
-        
-        // Always report to admin
         await addPendingBan({
+            email: currentUser.email,
             username: currentUser.username,
             score: abuseScore,
             reason: reason,
@@ -148,20 +131,9 @@
             timestamp: Date.now(),
             reviewed: false
         });
-        await addAbuseReport({ username: currentUser.username, reason, context: context.slice(0,100), timestamp: Date.now() });
-
-        // Show warning to user only if:
-        // - The score crossed the 10% threshold for the first time, OR
-        // - The added points are >= 5 (serious action) AND showUserWarning is true
-        // - The current score is >= 10 and we haven't shown a warning yet
-        let shouldWarn = false;
-        if (abuseScore >= 10 && !abuseWarningShown) {
-            shouldWarn = true;
+        await addAbuseReport({ email: currentUser.email, username: currentUser.username, reason, context: context.slice(0,100), timestamp: Date.now() });
+        if ((abuseScore >= 10 && !abuseWarningShown) || (points >= 5 && showUserWarning)) {
             abuseWarningShown = true;
-        } else if (points >= 5 && showUserWarning) {
-            shouldWarn = true;
-        }
-        if (shouldWarn) {
             addAIMessage(`⚠️ Warning: Your account has been flagged for suspicious activity (current abuse score: ${abuseScore}%). Repeated violations may lead to a ban.`);
         }
     }
@@ -173,7 +145,6 @@
         showWarningModal("Right-click is prohibited. Your action has been reported to admin.");
         return false;
     });
-
     function detectDevTools() {
         const threshold = 160;
         const widthDiff = window.outerWidth - window.innerWidth > threshold;
@@ -192,7 +163,6 @@
             return false;
         }
     });
-
     function showWarningModal(msg) {
         let modal = document.createElement("div");
         modal.className = "modal";
@@ -228,7 +198,6 @@
         } catch(e) { console.warn(e); }
         return null;
     }
-
     async function generateImageAndShow(prompt) {
         addAIMessage("🖌️ Generating image...", false);
         let imgData = await generateImageWithCloudflare(prompt);
@@ -242,7 +211,6 @@
             addAIMessage("❌ Image generation failed. Please try again later.");
         }
     }
-
     window.downloadImage = function(dataUrl) {
         const link = document.createElement('a');
         link.download = 'vrythos_image.png';
@@ -254,10 +222,8 @@
         await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
         alert('Image copied to clipboard!');
     };
-
-    // Image quota management
     async function getRemainingImages() {
-        const quota = await getImageQuota(currentUser.username);
+        const quota = await getImageQuota(currentUser.email);
         const now = Date.now();
         const windowMs = 5 * 60 * 60 * 1000;
         let base = (now - quota.windowStart >= windowMs) ? 5 : Math.max(0, 5 - quota.count);
@@ -265,11 +231,11 @@
         return base + extra;
     }
     async function consumeImage() {
-        let quota = await getImageQuota(currentUser.username);
+        let quota = await getImageQuota(currentUser.email);
         const now = Date.now();
         const windowMs = 5 * 60 * 60 * 1000;
         if (now - quota.windowStart >= windowMs) {
-            quota = { username: currentUser.username, count: 0, windowStart: now };
+            quota = { email: currentUser.email, count: 0, windowStart: now };
         }
         if (await getRemainingImages() <= 0) return false;
         quota.count++;
@@ -283,12 +249,12 @@
     // ------------------------------------------------------------------
     async function getTodayCalls() {
         const today = new Date().toDateString();
-        const usage = await getChatUsage(currentUser.username, selectedModuleId, today);
+        const usage = await getChatUsage(currentUser.email, selectedModuleId, today);
         return usage.count || 0;
     }
     async function incrementDailyCalls() {
         const today = new Date().toDateString();
-        let usage = await getChatUsage(currentUser.username, selectedModuleId, today);
+        let usage = await getChatUsage(currentUser.email, selectedModuleId, today);
         usage.count = (usage.count || 0) + 1;
         await setChatUsage(usage);
         updateSidebarStats();
@@ -319,6 +285,19 @@
     }
 
     // ------------------------------------------------------------------
+    // USER ACTIVITY TRACKING (hours live)
+    // ------------------------------------------------------------------
+    let activityInterval = null;
+    function startActivityTracking() {
+        if (activityInterval) clearInterval(activityInterval);
+        activityInterval = setInterval(async () => {
+            if (currentUser) {
+                await apiPost('/api/user-activity', { email: currentUser.email });
+            }
+        }, 5 * 60 * 1000); // every 5 minutes
+    }
+
+    // ------------------------------------------------------------------
     // UI HELPERS
     // ------------------------------------------------------------------
     function setProcessing(processing) {
@@ -334,7 +313,6 @@
             if(input) input.focus();
         }
     }
-
     function addUserMessage(text){
         let container = document.getElementById("messagesContainer");
         let div = document.createElement("div");
@@ -344,7 +322,6 @@
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     }
-
     function addAIMessage(html, isHtml=false){
         let container = document.getElementById("messagesContainer");
         let div = document.createElement("div");
@@ -354,7 +331,6 @@
         container.scrollTop = container.scrollHeight;
         if(!isHtml) messagesHistory.push({role:"assistant", content:html});
     }
-
     function showTyping(){
         let container = document.getElementById("messagesContainer");
         let div = document.createElement("div");
@@ -365,7 +341,6 @@
         container.scrollTop = container.scrollHeight;
         return div;
     }
-
     function escapeHtml(str){
         return String(str).replace(/[&<>]/g, function(m){
             if(m === '&') return '&amp;';
@@ -374,14 +349,11 @@
             return m;
         });
     }
-
-    // Keyword detection for image generation
     function isImageGenerationRequest(text) {
         const lower = text.toLowerCase();
         const imgKeywords = /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i;
         return imgKeywords.test(lower);
     }
-
     async function sendMessage(userText, forceImage = false) {
         if (!currentUser || currentUser.banned) { addAIMessage("🚫 Account banned."); return; }
         if (isProcessing) { addAIMessage("⏳ Please wait, previous message is still being processed."); return; }
@@ -419,13 +391,9 @@
                 await incrementDailyCalls();
                 updateRemainingDisplay();
                 updateSidebarStats();
-                
-                // Check for API quota warnings – add abuse points only if the reply indicates quota/limit
                 if (reply.includes("quota") || reply.includes("limit")) {
                     await addAbuseScore(5, "API quota warning", userText, true);
                 }
-                
-                // Override for creator questions
                 const lowerInput = userText.toLowerCase();
                 const creatorKeywords = ["who made you", "who created you", "your creator", "who built you", "viraj", "bodare"];
                 if (creatorKeywords.some(keyword => lowerInput.includes(keyword))) {
@@ -442,7 +410,6 @@
             setProcessing(false);
         }
     }
-
     async function updateRemainingDisplay() {
         let mod = modules.find(m => m.id === selectedModuleId);
         if (mod) {
@@ -453,19 +420,16 @@
             document.getElementById("moduleRemaining").innerHTML = `⚠️ No active engine`;
         }
     }
-
     async function updateSidebarStats() {
         let left = 50 + (currentUser.extraChatCredits||0) - (await getTodayCalls());
         document.getElementById("dailyCallsLeft").innerText = Math.max(0, left);
         document.getElementById("sidebarUsername").innerHTML = currentUser.username;
         await updateImageDisplay();
     }
-
     async function updateImageDisplay() {
         let rem = await getRemainingImages();
         document.getElementById("imageUsageDisplay").innerHTML = `🎨 Images left: ${rem} (base+extra)`;
     }
-
     function renderFileBadges() {
         let container = document.getElementById("filePreviewArea");
         container.innerHTML = attachedFiles.map((f,idx) => `<span class="file-tag">📄 ${f.name} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444;">✖</button></span>`).join("");
@@ -475,7 +439,6 @@
             renderFileBadges();
         });
     }
-
     function renderModuleDropdown() {
         let sel = document.getElementById("moduleSelect");
         sel.innerHTML = "";
@@ -500,11 +463,39 @@
     }
 
     // ------------------------------------------------------------------
-    // USER SETTINGS MODAL (with API key management) – unchanged
+    // TOURNAMENTS DISPLAY
+    // ------------------------------------------------------------------
+    async function renderTournaments() {
+        const container = document.getElementById("tournamentsContainer");
+        if (!container) return;
+        if (!tournaments.length) {
+            container.innerHTML = "<i>No active tournaments.</i>";
+            return;
+        }
+        container.innerHTML = tournaments.map(t => `
+            <div style="background:#0e111b; border-radius:12px; padding:10px; margin-bottom:10px;">
+                <strong>🏆 ${escapeHtml(t.name)}</strong><br>
+                ${t.description || ''}<br>
+                Prize: ${t.prize || 'None'}<br>
+                ${t.participants?.includes(currentUser.email) ? 
+                    '<span style="color:#10b981;">✓ Joined</span>' : 
+                    `<button class="join-tournament" data-id="${t.id}">Join Tournament</button>`}
+            </div>
+        `).join("");
+        document.querySelectorAll(".join-tournament").forEach(btn => {
+            btn.onclick = async () => {
+                await joinTournament(btn.dataset.id);
+                await loadAllData();
+                renderTournaments();
+            };
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // USER SETTINGS MODAL (with API key management)
     // ------------------------------------------------------------------
     async function openUserSettings() {
-        // Load current user's API keys
-        let userKeys = await loadUserApiKeys(currentUser.username);
+        let userKeys = await loadUserApiKeys(currentUser.email);
         const modal = document.createElement("div"); modal.className = "modal";
         modal.innerHTML = `
         <div class="modal-content" style="max-width: 700px;">
@@ -529,6 +520,7 @@
                         <p style="font-size:13px; margin:4px 0;">Image credits left: ${await getRemainingImages()}</p>
                         <p style="font-size:13px; margin:4px 0;">Extra chat credits: ${currentUser.extraChatCredits||0}</p>
                         <p style="font-size:13px; margin:4px 0;">Extra image credits: ${currentUser.extraImageCredits||0}</p>
+                        <p style="font-size:13px; margin:4px 0;">Total hours live: ${(currentUser.totalHoursLive || 0).toFixed(1)}</p>
                     </div>
                 </div>
                 <div>
@@ -567,17 +559,15 @@
             if (!newName) return;
             let users = await loadUsers();
             if (users.find(u => u.username === newName)) { alert("Username taken"); return; }
-            let oldName = currentUser.username;
-            await updateUser(oldName, { username: newName });
+            await updateUser(currentUser.email, { username: newName });
             currentUser.username = newName;
-            await updateUserStorage();
             alert("Username changed. Please log in again.");
             close(); localStorage.removeItem("vrythos_current_session"); location.reload();
         };
         // Delete account
         document.getElementById("deleteAccountBtn").onclick = async () => {
             if (!confirm("⚠️ Permanently delete your account and all data? This cannot be undone.")) return;
-            await deleteUser(currentUser.username);
+            await deleteUser(currentUser.email);
             localStorage.removeItem("vrythos_current_session");
             location.reload();
         };
@@ -585,7 +575,7 @@
         document.getElementById("submitBugBtn").onclick = async () => {
             let desc = document.getElementById("bugReportText").value.trim();
             if (!desc) return;
-            await addBugReport({ username: currentUser.username, description: desc, timestamp: Date.now(), status: "pending" });
+            await addBugReport({ email: currentUser.email, username: currentUser.username, description: desc, timestamp: Date.now(), status: "pending" });
             alert("Bug report submitted. Admin may grant extra credits if legit.");
             document.getElementById("bugReportText").value = "";
         };
@@ -594,7 +584,7 @@
 
         // API Key management
         async function refreshApiKeysList() {
-            userKeys = await loadUserApiKeys(currentUser.username);
+            userKeys = await loadUserApiKeys(currentUser.email);
             const container = document.getElementById("apiKeysList");
             if (!container) return;
             if (userKeys.length === 0) {
@@ -612,12 +602,11 @@
             document.querySelectorAll(".revokeKey").forEach(btn => btn.onclick = async () => {
                 let idx = parseInt(btn.dataset.idx);
                 userKeys.splice(idx, 1);
-                await saveUserApiKeys(currentUser.username, userKeys);
+                await saveUserApiKeys(currentUser.email, userKeys);
                 await refreshApiKeysList();
             });
         }
         await refreshApiKeysList();
-
         document.getElementById("generateApiKeyBtn").onclick = async () => {
             if (userKeys.length >= 2) {
                 alert("Maximum 2 API keys per user.");
@@ -632,18 +621,14 @@
                 used: 0,
                 date: new Date().toISOString().slice(0, 10)
             });
-            await saveUserApiKeys(currentUser.username, userKeys);
+            await saveUserApiKeys(currentUser.email, userKeys);
             await refreshApiKeysList();
             alert(`New API Key generated: ${newKey}\nStore it safely. You won't see it again.`);
         };
     }
 
-    async function updateUserStorage() {
-        await updateUser(currentUser.username, currentUser);
-    }
-
     // ------------------------------------------------------------------
-    // BUILD UI
+    // BUILD UI (includes tournaments sidebar)
     // ------------------------------------------------------------------
     async function buildUI() {
         document.getElementById("app-root").innerHTML = `
@@ -665,6 +650,12 @@
                     <label class="live-image-toggle"><input type="checkbox" id="liveImageToggle"> Auto‑generate images from descriptions</label>
                 </div>
                 <div id="imageUsageDisplay" class="usage-badge">🖼️ Images left: --</div>
+                <div style="margin-top:16px;">
+                    <div class="module-selector" style="margin-bottom:8px;">
+                        <label>🏆 TOURNAMENTS</label>
+                        <div id="tournamentsContainer" style="max-height:200px; overflow-y:auto;"></div>
+                    </div>
+                </div>
                 <div style="font-size:11px; margin-top: auto; text-align:center; color:#5b6e8c;">
                     <span id="sidebarUsername">user</span> • <span id="dailyCallsLeft">50</span> calls left today
                 </div>
@@ -711,16 +702,18 @@
         renderModuleDropdown();
         await updateRemainingDisplay();
         await updateSidebarStats();
+        await renderTournaments();
+        startActivityTracking();
     }
 
     // ------------------------------------------------------------------
-    // AUTHENTICATION
+    // AUTHENTICATION (email + password)
     // ------------------------------------------------------------------
     async function initAuth() {
         let savedSession = localStorage.getItem("vrythos_current_session");
         if (savedSession) {
             let users = await loadUsers();
-            let user = users.find(u => u.username === savedSession && !u.banned);
+            let user = users.find(u => u.email === savedSession && !u.banned);
             if (user) {
                 currentUser = user;
                 await buildUI();
@@ -732,7 +725,7 @@
             <div class="auth-card" style="background: linear-gradient(145deg, #11141f, #0a0c15);">
                 <h2>⚡ VRYTHOS NEURAL</h2>
                 <div id="loginForm">
-                    <input type="text" id="loginUsername" placeholder="Username" autocomplete="off">
+                    <input type="email" id="loginEmail" placeholder="Email" autocomplete="off">
                     <input type="password" id="loginPassword" placeholder="Password">
                     <button id="doLoginBtn">Sign In</button>
                     <div class="auth-switch" id="showRegisterBtn">✨ Create new account</div>
@@ -740,19 +733,26 @@
                 </div>
                 <div id="registerForm" class="hidden">
                     <input type="text" id="regUsername" placeholder="Username">
+                    <input type="text" id="regName" placeholder="Full Name">
+                    <input type="email" id="regEmail" placeholder="Email">
                     <input type="password" id="regPassword" placeholder="Password (min 4 chars)">
                     <input type="password" id="regPasswordConfirm" placeholder="Confirm password">
+                    <div style="display:flex; gap:8px; margin:10px 0;">
+                        <input type="text" id="regCode" placeholder="Verification code" style="flex:1;">
+                        <button id="sendCodeBtn" style="width:auto;">Send Code</button>
+                    </div>
                     <button id="doRegisterBtn">Register</button>
                     <div class="auth-switch" id="showLoginBtn">← Back to login</div>
                 </div>
                 <div id="authMessage" style="margin-top:12px; font-size:12px; color:#f97316; text-align:center;"></div>
             </div>
         </div>`;
+        let pendingCodeEmail = null;
         document.getElementById("doLoginBtn").onclick = async () => {
-            let uname = document.getElementById("loginUsername").value.trim();
+            let email = document.getElementById("loginEmail").value.trim();
             let pwd = document.getElementById("loginPassword").value;
             let users = await loadUsers();
-            let user = users.find(u => u.username === uname);
+            let user = users.find(u => u.email === email);
             if (!user) {
                 document.getElementById("authMessage").innerHTML = "❌ User not found. <a href='#' id='suggestRegister'>Create new account?</a>";
                 document.getElementById("suggestRegister")?.addEventListener("click", () => document.getElementById("showRegisterBtn").click());
@@ -762,39 +762,62 @@
             if (user.passwordHash !== hashed) { document.getElementById("authMessage").innerText = "Wrong password"; return; }
             if (user.banned) { document.getElementById("authMessage").innerText = "Account banned."; return; }
             currentUser = user;
-            localStorage.setItem("vrythos_current_session", uname);
+            localStorage.setItem("vrythos_current_session", user.email);
             await buildUI();
         };
-        document.getElementById("showRegisterBtn").onclick = () => { document.getElementById("loginForm").classList.add("hidden"); document.getElementById("registerForm").classList.remove("hidden"); document.getElementById("authMessage").innerHTML = ""; };
-        document.getElementById("showLoginBtn").onclick = () => { document.getElementById("registerForm").classList.add("hidden"); document.getElementById("loginForm").classList.remove("hidden"); };
-        document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => alert("Password reset is not available in this demo. Contact admin for help."));
-        document.getElementById("doRegisterBtn").onclick = async () => {
-            let uname = document.getElementById("regUsername").value.trim();
-            let pwd = document.getElementById("regPassword").value;
-            let confirm = document.getElementById("regPasswordConfirm").value;
-            if (!uname || pwd.length < 4) { document.getElementById("authMessage").innerText = "Username & password (min 4 chars)"; return; }
-            if (pwd !== confirm) { document.getElementById("authMessage").innerText = "Passwords mismatch"; return; }
-            let users = await loadUsers();
-            if (users.find(u => u.username === uname)) { document.getElementById("authMessage").innerText = "Username exists. Try logging in."; return; }
-            let ip = await getPublicIP();
-            let canReg = await canRegisterMoreAccounts(ip);
-            if (!canReg) { document.getElementById("authMessage").innerText = "❌ IP limit: max 4 accounts per month."; return; }
-            let hashed = await hashPassword(pwd);
-            let newUser = {
-                username: uname,
-                passwordHash: hashed,
-                profilePic: "",
-                dailyCallsRecord: { date: "", count: 0 },
-                extraChatCredits: 0,
-                extraImageCredits: 0,
-                banned: false,
-                createdAt: Date.now()
-            };
-            await saveUser(newUser);
-            await addIpReg({ ip, username: uname, month: `${new Date().getFullYear()}-${new Date().getMonth()}`, timestamp: Date.now() });
-            document.getElementById("authMessage").innerHTML = "✅ Account created! Please login.";
+        document.getElementById("showRegisterBtn").onclick = () => {
+            document.getElementById("loginForm").classList.add("hidden");
+            document.getElementById("registerForm").classList.remove("hidden");
+            document.getElementById("authMessage").innerHTML = "";
+        };
+        document.getElementById("showLoginBtn").onclick = () => {
             document.getElementById("registerForm").classList.add("hidden");
             document.getElementById("loginForm").classList.remove("hidden");
+        };
+        document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => alert("Password reset is not available in this demo. Contact admin for help."));
+        document.getElementById("sendCodeBtn").onclick = async () => {
+            let username = document.getElementById("regUsername").value.trim();
+            let name = document.getElementById("regName").value.trim();
+            let email = document.getElementById("regEmail").value.trim();
+            let password = document.getElementById("regPassword").value;
+            let confirm = document.getElementById("regPasswordConfirm").value;
+            if (!username || !name || !email || password.length < 4 || password !== confirm) {
+                document.getElementById("authMessage").innerText = "Please fill all fields correctly (password min 4 chars, match)";
+                return;
+            }
+            let users = await loadUsers();
+            if (users.find(u => u.email === email)) {
+                document.getElementById("authMessage").innerText = "Email already registered";
+                return;
+            }
+            if (users.find(u => u.username === username)) {
+                document.getElementById("authMessage").innerText = "Username already taken";
+                return;
+            }
+            let passwordHash = await hashPassword(password);
+            try {
+                await apiPost('/api/send-verification', { email, username, name, passwordHash });
+                pendingCodeEmail = email;
+                document.getElementById("authMessage").innerHTML = "✅ Verification code sent to your email. Valid for 30 minutes.";
+            } catch(e) {
+                document.getElementById("authMessage").innerText = e.error || "Failed to send code.";
+            }
+        };
+        document.getElementById("doRegisterBtn").onclick = async () => {
+            let email = document.getElementById("regEmail").value.trim();
+            let code = document.getElementById("regCode").value.trim();
+            if (!email || !code) {
+                document.getElementById("authMessage").innerText = "Enter the verification code";
+                return;
+            }
+            try {
+                await apiPost('/api/verify-register', { email, code });
+                document.getElementById("authMessage").innerHTML = "✅ Registration successful! Please login.";
+                document.getElementById("registerForm").classList.add("hidden");
+                document.getElementById("loginForm").classList.remove("hidden");
+            } catch(e) {
+                document.getElementById("authMessage").innerText = e.error || "Verification failed.";
+            }
         };
     }
 
@@ -809,7 +832,7 @@
     body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
     .app, .auth-container { display: flex; height: 100vh; width: 100%; }
     .auth-container { align-items: center; justify-content: center; background: radial-gradient(circle at 20% 30%, #0f1222, #03050b); }
-    .auth-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 2rem; padding: 2rem; width: 360px; backdrop-filter: blur(8px); }
+    .auth-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 2rem; padding: 2rem; width: 380px; backdrop-filter: blur(8px); }
     .auth-card h2 { margin-bottom: 1.5rem; text-align: center; background: linear-gradient(135deg, #c084fc, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .auth-card input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); padding: 12px; border-radius: 28px; color: white; margin-bottom: 12px; outline: none; }
     .auth-card button { background: var(--accent); border: none; padding: 12px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
