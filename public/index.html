@@ -27,7 +27,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Request failed');
+        }
         return res.json();
     }
     async function apiPut(endpoint, data) {
@@ -46,7 +49,7 @@
     }
 
     // Global data
-    let currentUser = null; // { email, username, name, ... }
+    let currentUser = null;
     let modules = [];
     let tournaments = [];
     let selectedModuleId = null;
@@ -115,7 +118,7 @@
         return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
     }
 
-    // Abuse score (local, but reported to server)
+    // Abuse score
     let abuseScore = 0;
     let abuseWarningShown = false;
     async function addAbuseScore(points, reason, context, showUserWarning = true) {
@@ -294,7 +297,7 @@
             if (currentUser) {
                 await apiPost('/api/user-activity', { email: currentUser.email });
             }
-        }, 5 * 60 * 1000); // every 5 minutes
+        }, 5 * 60 * 1000);
     }
 
     // ------------------------------------------------------------------
@@ -548,12 +551,10 @@
         let close = () => modal.remove();
         modal.querySelector(".close-modal").onclick = close;
 
-        // Profile picture preview
         let picInput = document.getElementById("profilePicUrl");
         let preview = document.getElementById("profilePreview");
         picInput.addEventListener("input", () => { preview.style.backgroundImage = `url('${picInput.value}')`; });
 
-        // Username update
         document.getElementById("updateUsernameBtn").onclick = async () => {
             let newName = document.getElementById("newUsername").value.trim();
             if (!newName) return;
@@ -564,14 +565,12 @@
             alert("Username changed. Please log in again.");
             close(); localStorage.removeItem("vrythos_current_session"); location.reload();
         };
-        // Delete account
         document.getElementById("deleteAccountBtn").onclick = async () => {
             if (!confirm("⚠️ Permanently delete your account and all data? This cannot be undone.")) return;
             await deleteUser(currentUser.email);
             localStorage.removeItem("vrythos_current_session");
             location.reload();
         };
-        // Bug report
         document.getElementById("submitBugBtn").onclick = async () => {
             let desc = document.getElementById("bugReportText").value.trim();
             if (!desc) return;
@@ -579,10 +578,8 @@
             alert("Bug report submitted. Admin may grant extra credits if legit.");
             document.getElementById("bugReportText").value = "";
         };
-        // Logout
         document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem("vrythos_current_session"); location.reload(); };
 
-        // API Key management
         async function refreshApiKeysList() {
             userKeys = await loadUserApiKeys(currentUser.email);
             const container = document.getElementById("apiKeysList");
@@ -707,8 +704,45 @@
     }
 
     // ------------------------------------------------------------------
-    // AUTHENTICATION (email + password)
+    // AUTHENTICATION (email + password, with verification cooldown)
     // ------------------------------------------------------------------
+    let sendCodeCooldown = false;
+    let cooldownInterval = null;
+
+    function updateSendCodeButton(secondsLeft) {
+        const sendBtn = document.getElementById("sendCodeBtn");
+        if (!sendBtn) return;
+        if (secondsLeft > 0) {
+            sendBtn.disabled = true;
+            sendBtn.textContent = `Send Code (${secondsLeft}s)`;
+        } else {
+            sendBtn.disabled = false;
+            sendBtn.textContent = "Send Code";
+            if (cooldownInterval) {
+                clearInterval(cooldownInterval);
+                cooldownInterval = null;
+            }
+        }
+    }
+
+    function startCooldown() {
+        if (cooldownInterval) clearInterval(cooldownInterval);
+        sendCodeCooldown = true;
+        let secondsLeft = 240; // 4 minutes
+        updateSendCodeButton(secondsLeft);
+        cooldownInterval = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft <= 0) {
+                clearInterval(cooldownInterval);
+                cooldownInterval = null;
+                sendCodeCooldown = false;
+                updateSendCodeButton(0);
+            } else {
+                updateSendCodeButton(secondsLeft);
+            }
+        }, 1000);
+    }
+
     async function initAuth() {
         let savedSession = localStorage.getItem("vrythos_current_session");
         if (savedSession) {
@@ -747,6 +781,7 @@
                 <div id="authMessage" style="margin-top:12px; font-size:12px; color:#f97316; text-align:center;"></div>
             </div>
         </div>`;
+        
         let pendingCodeEmail = null;
         document.getElementById("doLoginBtn").onclick = async () => {
             let email = document.getElementById("loginEmail").value.trim();
@@ -775,7 +810,13 @@
             document.getElementById("loginForm").classList.remove("hidden");
         };
         document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => alert("Password reset is not available in this demo. Contact admin for help."));
+        
+        // Send code button with cooldown
         document.getElementById("sendCodeBtn").onclick = async () => {
+            if (sendCodeCooldown) {
+                document.getElementById("authMessage").innerText = "Please wait before requesting another code.";
+                return;
+            }
             let username = document.getElementById("regUsername").value.trim();
             let name = document.getElementById("regName").value.trim();
             let email = document.getElementById("regEmail").value.trim();
@@ -796,13 +837,19 @@
             }
             let passwordHash = await hashPassword(password);
             try {
-                await apiPost('/api/send-verification', { email, username, name, passwordHash });
-                pendingCodeEmail = email;
-                document.getElementById("authMessage").innerHTML = "✅ Verification code sent to your email. Valid for 30 minutes.";
+                const response = await apiPost('/api/send-verification', { email, username, name, passwordHash });
+                if (response.success) {
+                    pendingCodeEmail = email;
+                    document.getElementById("authMessage").innerHTML = "✅ Verification code sent to your email. Valid for 30 minutes.";
+                    startCooldown();
+                } else {
+                    document.getElementById("authMessage").innerText = response.error || "Failed to send code.";
+                }
             } catch(e) {
-                document.getElementById("authMessage").innerText = e.error || "Failed to send code.";
+                document.getElementById("authMessage").innerText = e.message || "Failed to send code. Check your internet connection.";
             }
         };
+        
         document.getElementById("doRegisterBtn").onclick = async () => {
             let email = document.getElementById("regEmail").value.trim();
             let code = document.getElementById("regCode").value.trim();
@@ -816,7 +863,7 @@
                 document.getElementById("registerForm").classList.add("hidden");
                 document.getElementById("loginForm").classList.remove("hidden");
             } catch(e) {
-                document.getElementById("authMessage").innerText = e.error || "Verification failed.";
+                document.getElementById("authMessage").innerText = e.message || "Verification failed.";
             }
         };
     }
