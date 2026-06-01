@@ -1,7 +1,7 @@
 {
   "name": "vrythos-server",
   "version": "1.0.0",
-  "description": "Vrythos AI backend with email verification, Google OAuth, tournaments, and admin panel",
+  "description": "Vrythos AI backend with Google OAuth, tournaments, admin panel, and persistent storage",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
