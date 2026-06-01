@@ -202,7 +202,7 @@
         } catch(e) { console.warn(e); }
     }
 
-    // Render modules list
+    // Render modules
     async function renderModules() {
         const container = document.getElementById("modulesList");
         container.innerHTML = "";
@@ -306,7 +306,7 @@
         }
     }
 
-    // Bugs
+    // Bugs, Abuse, Pending Bans
     async function renderBugs() {
         const container = document.getElementById("bugsList");
         container.innerHTML = "";
@@ -352,7 +352,6 @@
         });
     }
 
-    // Abuse reports
     function renderAbuse() {
         const container = document.getElementById("abuseList");
         container.innerHTML = "";
@@ -365,7 +364,6 @@
         });
     }
 
-    // Pending bans
     async function renderPendingBans() {
         const container = document.getElementById("pendingBansList");
         container.innerHTML = "";
@@ -731,7 +729,7 @@
         await refreshAll();
     };
 
-    // Refresh everything
+    // Refresh all
     async function refreshAll() {
         await loadAllData();
         renderModules();
@@ -746,7 +744,7 @@
         await refreshStats();
     }
 
-    // ========== Admin right-click protection & abuse logging ==========
+    // Admin right-click protection & abuse logging
     let adminAbuseScore = 0;
     function addAdminAbuseScore(points, reason) {
         adminAbuseScore += points;
@@ -775,7 +773,6 @@
         }
     });
 
-    // Helper for image download (for admin chat tester)
     window.downloadImage = function(dataUrl) {
         const link = document.createElement('a');
         link.download = 'vrythos_image.png';
