@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Vrythos AI · Neural Core</title>
+    <!-- Google Sign-In script -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>/* fake style - real app built by JS */</style>
 </head>
 <body>
@@ -495,7 +497,7 @@
     }
 
     // ------------------------------------------------------------------
-    // USER SETTINGS MODAL (with API key management)
+    // USER SETTINGS MODAL (unchanged)
     // ------------------------------------------------------------------
     async function openUserSettings() {
         let userKeys = await loadUserApiKeys(currentUser.email);
@@ -704,43 +706,40 @@
     }
 
     // ------------------------------------------------------------------
-    // AUTHENTICATION (email + password, with verification cooldown)
+    // AUTHENTICATION (Google + Email/Password + placeholders for Instagram/Telegram)
     // ------------------------------------------------------------------
-    let sendCodeCooldown = false;
-    let cooldownInterval = null;
-
-    function updateSendCodeButton(secondsLeft) {
-        const sendBtn = document.getElementById("sendCodeBtn");
-        if (!sendBtn) return;
-        if (secondsLeft > 0) {
-            sendBtn.disabled = true;
-            sendBtn.textContent = `Send Code (${secondsLeft}s)`;
-        } else {
-            sendBtn.disabled = false;
-            sendBtn.textContent = "Send Code";
-            if (cooldownInterval) {
-                clearInterval(cooldownInterval);
-                cooldownInterval = null;
+    // Google OAuth callback
+    window.handleGoogleLogin = async (response) => {
+        try {
+            const res = await apiPost('/api/auth/google', { token: response.credential });
+            if (res.success) {
+                currentUser = {
+                    email: res.email,
+                    username: res.username,
+                    name: res.name,
+                    profilePic: res.profilePic,
+                    extraChatCredits: 0,
+                    extraImageCredits: 0,
+                    banned: false
+                };
+                localStorage.setItem("vrythos_current_session", res.email);
+                await buildUI();
+            } else {
+                document.getElementById("authMessage").innerText = res.error || "Google login failed";
             }
+        } catch(e) {
+            document.getElementById("authMessage").innerText = "Google login error: " + e.message;
         }
+    };
+
+    // Instagram login placeholder
+    async function handleInstagramLogin() {
+        alert("Instagram OAuth not yet configured. Please set INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET on the server.");
     }
 
-    function startCooldown() {
-        if (cooldownInterval) clearInterval(cooldownInterval);
-        sendCodeCooldown = true;
-        let secondsLeft = 240; // 4 minutes
-        updateSendCodeButton(secondsLeft);
-        cooldownInterval = setInterval(() => {
-            secondsLeft--;
-            if (secondsLeft <= 0) {
-                clearInterval(cooldownInterval);
-                cooldownInterval = null;
-                sendCodeCooldown = false;
-                updateSendCodeButton(0);
-            } else {
-                updateSendCodeButton(secondsLeft);
-            }
-        }, 1000);
+    // Telegram login placeholder
+    async function handleTelegramLogin() {
+        alert("Telegram OAuth not yet configured. Please set TELEGRAM_BOT_TOKEN on the server.");
     }
 
     async function initAuth() {
@@ -759,9 +758,17 @@
             <div class="auth-card" style="background: linear-gradient(145deg, #11141f, #0a0c15);">
                 <h2>⚡ VRYTHOS NEURAL</h2>
                 <div id="loginForm">
+                    <!-- Google Sign-In button -->
+                    <div id="g_id_onload" data-client_id="527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com" data-callback="handleGoogleLogin" data-auto_prompt="false"></div>
+                    <div class="g_id_signin" data-type="standard" data-size="large" data-theme="filled_blue" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+                    <div style="margin: 15px 0; text-align: center; color: #8e9dc2;">──────── or ────────</div>
                     <input type="email" id="loginEmail" placeholder="Email" autocomplete="off">
                     <input type="password" id="loginPassword" placeholder="Password">
                     <button id="doLoginBtn">Sign In</button>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button id="instagramLoginBtn" style="background: #d62976;">📷 Instagram</button>
+                        <button id="telegramLoginBtn" style="background: #0088cc;">📱 Telegram</button>
+                    </div>
                     <div class="auth-switch" id="showRegisterBtn">✨ Create new account</div>
                     <div class="auth-switch" id="forgotPasswordBtn" style="color:#8e9dc2;">🔐 Forgot password?</div>
                 </div>
@@ -771,10 +778,6 @@
                     <input type="email" id="regEmail" placeholder="Email">
                     <input type="password" id="regPassword" placeholder="Password (min 4 chars)">
                     <input type="password" id="regPasswordConfirm" placeholder="Confirm password">
-                    <div style="display:flex; gap:8px; margin:10px 0;">
-                        <input type="text" id="regCode" placeholder="Verification code" style="flex:1;">
-                        <button id="sendCodeBtn" style="width:auto;">Send Code</button>
-                    </div>
                     <button id="doRegisterBtn">Register</button>
                     <div class="auth-switch" id="showLoginBtn">← Back to login</div>
                 </div>
@@ -782,7 +785,6 @@
             </div>
         </div>`;
         
-        let pendingCodeEmail = null;
         document.getElementById("doLoginBtn").onclick = async () => {
             let email = document.getElementById("loginEmail").value.trim();
             let pwd = document.getElementById("loginPassword").value;
@@ -793,6 +795,10 @@
                 document.getElementById("suggestRegister")?.addEventListener("click", () => document.getElementById("showRegisterBtn").click());
                 return;
             }
+            if (!user.passwordHash) {
+                document.getElementById("authMessage").innerText = "This account uses social login. Please use Google/Instagram/Telegram.";
+                return;
+            }
             let hashed = await hashPassword(pwd);
             if (user.passwordHash !== hashed) { document.getElementById("authMessage").innerText = "Wrong password"; return; }
             if (user.banned) { document.getElementById("authMessage").innerText = "Account banned."; return; }
@@ -800,6 +806,8 @@
             localStorage.setItem("vrythos_current_session", user.email);
             await buildUI();
         };
+        document.getElementById("instagramLoginBtn").onclick = handleInstagramLogin;
+        document.getElementById("telegramLoginBtn").onclick = handleTelegramLogin;
         document.getElementById("showRegisterBtn").onclick = () => {
             document.getElementById("loginForm").classList.add("hidden");
             document.getElementById("registerForm").classList.remove("hidden");
@@ -809,14 +817,8 @@
             document.getElementById("registerForm").classList.add("hidden");
             document.getElementById("loginForm").classList.remove("hidden");
         };
-        document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => alert("Password reset is not available in this demo. Contact admin for help."));
-        
-        // Send code button with cooldown
-        document.getElementById("sendCodeBtn").onclick = async () => {
-            if (sendCodeCooldown) {
-                document.getElementById("authMessage").innerText = "Please wait before requesting another code.";
-                return;
-            }
+        document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => alert("Password reset is not available. Use Google login or contact admin."));
+        document.getElementById("doRegisterBtn").onclick = async () => {
             let username = document.getElementById("regUsername").value.trim();
             let name = document.getElementById("regName").value.trim();
             let email = document.getElementById("regEmail").value.trim();
@@ -836,35 +838,25 @@
                 return;
             }
             let passwordHash = await hashPassword(password);
-            try {
-                const response = await apiPost('/api/send-verification', { email, username, name, passwordHash });
-                if (response.success) {
-                    pendingCodeEmail = email;
-                    document.getElementById("authMessage").innerHTML = "✅ Verification code sent to your email. Valid for 30 minutes.";
-                    startCooldown();
-                } else {
-                    document.getElementById("authMessage").innerText = response.error || "Failed to send code.";
-                }
-            } catch(e) {
-                document.getElementById("authMessage").innerText = e.message || "Failed to send code. Check your internet connection.";
-            }
-        };
-        
-        document.getElementById("doRegisterBtn").onclick = async () => {
-            let email = document.getElementById("regEmail").value.trim();
-            let code = document.getElementById("regCode").value.trim();
-            if (!email || !code) {
-                document.getElementById("authMessage").innerText = "Enter the verification code";
-                return;
-            }
-            try {
-                await apiPost('/api/verify-register', { email, code });
-                document.getElementById("authMessage").innerHTML = "✅ Registration successful! Please login.";
-                document.getElementById("registerForm").classList.add("hidden");
-                document.getElementById("loginForm").classList.remove("hidden");
-            } catch(e) {
-                document.getElementById("authMessage").innerText = e.message || "Verification failed.";
-            }
+            let newUser = {
+                email,
+                username,
+                name,
+                passwordHash,
+                profilePic: "",
+                dailyCallsRecord: { date: "", count: 0 },
+                extraChatCredits: 0,
+                extraImageCredits: 0,
+                banned: false,
+                createdAt: Date.now(),
+                totalHoursLive: 0,
+                lastActive: Date.now(),
+                authProvider: 'email'
+            };
+            await apiPost('/api/users', newUser);
+            document.getElementById("authMessage").innerHTML = "✅ Account created! Please login.";
+            document.getElementById("registerForm").classList.add("hidden");
+            document.getElementById("loginForm").classList.remove("hidden");
         };
     }
 
