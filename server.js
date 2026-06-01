@@ -1,83 +1,194 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-
-// Helper: read/write JSON files
-function readJSON(file) {
-    try {
-        const p = path.join(dataDir, file);
-        if (!fs.existsSync(p)) return [];
-        return JSON.parse(fs.readFileSync(p, 'utf8'));
-    } catch { return []; }
-}
-function writeJSON(file, data) {
-    fs.writeFileSync(path.join(dataDir, file), JSON.stringify(data, null, 2));
+// ========== MongoDB Connection ==========
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+    console.error('❌ MONGODB_URI environment variable is not set. Please add it in Render.');
+    process.exit(1);
 }
 
-// ========== Email transporter (free Gmail) ==========
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
+mongoose.connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => console.log('✅ Connected to MongoDB Atlas'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// ========== Mongoose Schemas ==========
+
+// User schema
+const userSchema = new mongoose.Schema({
+    email: { type: String, unique: true, required: true },
+    username: { type: String, unique: true, required: true },
+    name: String,
+    passwordHash: String,
+    profilePic: String,
+    dailyCallsRecord: { date: String, count: Number },
+    extraChatCredits: { type: Number, default: 0 },
+    extraImageCredits: { type: Number, default: 0 },
+    banned: { type: Boolean, default: false },
+    banReason: String,
+    createdAt: { type: Date, default: Date.now },
+    totalHoursLive: { type: Number, default: 0 },
+    lastActive: { type: Date, default: Date.now },
+    authProvider: { type: String, default: 'email' }
 });
+const User = mongoose.model('User', userSchema);
 
-function sendEmail(to, subject, text) {
-    return transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: to,
-        subject: subject,
-        text: text
-    });
-}
+// Module schema (AI engines)
+const moduleSchema = new mongoose.Schema({
+    id: { type: String, unique: true, required: true },
+    displayName: String,
+    type: String,
+    primaryKey: String,
+    secondaryKey: String,
+    accountId: String,
+    apiToken: String,
+    apiUrl: String,
+    model: String,
+    dailyLimitPerUser: Number
+});
+const Module = mongoose.model('Module', moduleSchema);
+
+// Bug reports
+const bugSchema = new mongoose.Schema({
+    email: String,
+    username: String,
+    description: String,
+    timestamp: Date,
+    status: String
+});
+const Bug = mongoose.model('Bug', bugSchema);
+
+// Abuse reports
+const abuseSchema = new mongoose.Schema({
+    email: String,
+    username: String,
+    reason: String,
+    context: String,
+    timestamp: Date
+});
+const Abuse = mongoose.model('Abuse', abuseSchema);
+
+// Pending bans
+const pendingBanSchema = new mongoose.Schema({
+    email: String,
+    username: String,
+    score: Number,
+    reason: String,
+    context: String,
+    timestamp: Date,
+    reviewed: Boolean
+});
+const PendingBan = mongoose.model('PendingBan', pendingBanSchema);
+
+// IP registrations
+const ipRegSchema = new mongoose.Schema({
+    ip: String,
+    username: String,
+    month: String,
+    timestamp: Date
+});
+const IpReg = mongoose.model('IpReg', ipRegSchema);
+
+// Image quotas
+const imageQuotaSchema = new mongoose.Schema({
+    email: { type: String, unique: true },
+    count: Number,
+    windowStart: Date
+});
+const ImageQuota = mongoose.model('ImageQuota', imageQuotaSchema);
+
+// Chat usage
+const chatUsageSchema = new mongoose.Schema({
+    email: String,
+    moduleId: String,
+    date: String,
+    count: Number
+});
+const ChatUsage = mongoose.model('ChatUsage', chatUsageSchema);
+
+// User API keys (external)
+const userApiKeySchema = new mongoose.Schema({
+    email: { type: String, unique: true },
+    keys: [{ name: String, key: String, used: Number, date: String }]
+});
+const UserApiKey = mongoose.model('UserApiKey', userApiKeySchema);
+
+// Tournaments
+const tournamentSchema = new mongoose.Schema({
+    id: String,
+    name: String,
+    description: String,
+    prize: String,
+    participants: [String]
+});
+const Tournament = mongoose.model('Tournament', tournamentSchema);
+
+// Settings (admin password, image credentials)
+const settingSchema = new mongoose.Schema({
+    adminPasswordHash: String,
+    cloudflareImageAccountId: String,
+    cloudflareImageApiToken: String,
+    imageModel: String
+});
+const Setting = mongoose.model('Setting', settingSchema);
+
+// Admin abuse logs
+const adminAbuseLogSchema = new mongoose.Schema({
+    timestamp: Date,
+    reason: String,
+    score: Number
+});
+const AdminAbuseLog = mongoose.model('AdminAbuseLog', adminAbuseLogSchema);
 
 // ========== Helper functions ==========
 function hashPassword(pw) {
     return crypto.createHash('sha256').update(pw).digest('hex');
 }
 
-// ========== Google OAuth client ==========
+// ========== Email transporter ==========
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+});
+function sendEmail(to, subject, text) {
+    return transporter.sendMail({ from: process.env.EMAIL_USER, to, subject, text });
+}
+
+// ========== Google OAuth ==========
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// ========== Settings (admin password, Cloudflare image credentials) ==========
-function loadSettings() {
-    const p = path.join(dataDir, 'settings.json');
-    if (!fs.existsSync(p)) {
-        const defaultSettings = {
+// ========== Initialize default settings ==========
+async function initSettings() {
+    let settings = await Setting.findOne();
+    if (!settings) {
+        settings = new Setting({
             adminPasswordHash: hashPassword('VrythosAdmin@2025'),
             cloudflareImageAccountId: "",
             cloudflareImageApiToken: "",
             imageModel: "@cf/stabilityai/stable-diffusion-xl-base-1.0"
-        };
-        writeJSON('settings.json', defaultSettings);
-        return defaultSettings;
+        });
+        await settings.save();
     }
-    return JSON.parse(fs.readFileSync(p, 'utf8'));
+    return settings;
 }
-function saveSettings(settings) {
-    writeJSON('settings.json', settings);
-}
+initSettings();
 
-// ========== Admin password change counter ==========
+// Admin password change counter (in‑memory, resets daily)
 let adminPasswordChangeCount = 0;
 let lastAdminResetDate = new Date().toDateString();
-
 function resetAdminCountIfNeeded() {
     const today = new Date().toDateString();
     if (today !== lastAdminResetDate) {
@@ -89,82 +200,53 @@ function resetAdminCountIfNeeded() {
 // ========== API ROUTES ==========
 
 // --- Users ---
-app.get('/api/users', (req, res) => { res.json(readJSON('users.json')); });
-
-app.post('/api/users', (req, res) => {
-    let users = readJSON('users.json');
-    if (users.find(u => u.email === req.body.email)) {
-        return res.status(400).json({ error: 'Email already registered' });
-    }
-    if (users.find(u => u.username === req.body.username)) {
-        return res.status(400).json({ error: 'Username taken' });
-    }
-    users.push(req.body);
-    writeJSON('users.json', users);
+app.get('/api/users', async (req, res) => {
+    const users = await User.find({});
+    res.json(users);
+});
+app.post('/api/users', async (req, res) => {
+    const existing = await User.findOne({ email: req.body.email });
+    if (existing) return res.status(400).json({ error: 'Email already registered' });
+    const existingUsername = await User.findOne({ username: req.body.username });
+    if (existingUsername) return res.status(400).json({ error: 'Username taken' });
+    const user = new User(req.body);
+    await user.save();
+    res.json({ success: true });
+});
+app.put('/api/users/:email', async (req, res) => {
+    const user = await User.findOneAndUpdate({ email: req.params.email }, req.body, { new: true });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true });
+});
+app.delete('/api/users/:email', async (req, res) => {
+    await User.deleteOne({ email: req.params.email });
+    await ImageQuota.deleteOne({ email: req.params.email });
+    await UserApiKey.deleteOne({ email: req.params.email });
+    await ChatUsage.deleteMany({ email: req.params.email });
     res.json({ success: true });
 });
 
-app.put('/api/users/:email', (req, res) => {
-    let users = readJSON('users.json');
-    const idx = users.findIndex(u => u.email === req.params.email);
-    if (idx === -1) return res.status(404).json({ error: 'User not found' });
-    users[idx] = { ...users[idx], ...req.body };
-    writeJSON('users.json', users);
-    res.json({ success: true });
-});
-
-app.delete('/api/users/:email', (req, res) => {
-    let users = readJSON('users.json');
-    users = users.filter(u => u.email !== req.params.email);
-    writeJSON('users.json', users);
-    // Clean related data
-    let imgQuotas = readJSON('imageQuotas.json');
-    imgQuotas = imgQuotas.filter(q => q.email !== req.params.email);
-    writeJSON('imageQuotas.json', imgQuotas);
-    let apiKeys = readJSON('userApiKeys.json');
-    apiKeys = apiKeys.filter(k => k.email !== req.params.email);
-    writeJSON('userApiKeys.json', apiKeys);
-    let chatUsage = readJSON('chatUsage.json');
-    chatUsage = chatUsage.filter(c => c.email !== req.params.email);
-    writeJSON('chatUsage.json', chatUsage);
-    res.json({ success: true });
-});
-
-// --- Google OAuth login ---
+// --- Google OAuth ---
 app.post('/api/auth/google', async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ error: 'No token provided' });
     try {
-        const ticket = await googleClient.verifyIdToken({
-            idToken: token,
-            audience: process.env.GOOGLE_CLIENT_ID
-        });
+        const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
         const payload = ticket.getPayload();
         const email = payload.email;
         const name = payload.name;
         const picture = payload.picture;
-        let users = readJSON('users.json');
-        let user = users.find(u => u.email === email);
+        let user = await User.findOne({ email });
         if (!user) {
-            // Auto-register
-            const newUser = {
+            user = new User({
                 email,
                 username: email.split('@')[0],
-                name: name,
+                name,
                 profilePic: picture,
                 passwordHash: null,
-                dailyCallsRecord: { date: "", count: 0 },
-                extraChatCredits: 0,
-                extraImageCredits: 0,
-                banned: false,
-                createdAt: Date.now(),
-                totalHoursLive: 0,
-                lastActive: Date.now(),
                 authProvider: 'google'
-            };
-            users.push(newUser);
-            writeJSON('users.json', users);
-            user = newUser;
+            });
+            await user.save();
         }
         if (user.banned) return res.status(403).json({ error: 'Account banned' });
         res.json({ success: true, email: user.email, username: user.username, name: user.name, profilePic: user.profilePic });
@@ -173,170 +255,122 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
-// --- User activity tracking ---
-app.post('/api/user-activity', (req, res) => {
+// --- User activity ---
+app.post('/api/user-activity', async (req, res) => {
     const { email } = req.body;
-    let users = readJSON('users.json');
-    const idx = users.findIndex(u => u.email === email);
-    if (idx !== -1) {
+    const user = await User.findOne({ email });
+    if (user) {
         const now = Date.now();
-        const last = users[idx].lastActive || now;
+        const last = user.lastActive || now;
         const diff = (now - last) / (1000 * 3600);
-        users[idx].totalHoursLive = (users[idx].totalHoursLive || 0) + diff;
-        users[idx].lastActive = now;
-        writeJSON('users.json', users);
+        user.totalHoursLive += diff;
+        user.lastActive = now;
+        await user.save();
     }
     res.json({ success: true });
 });
 
-// --- User API Keys (external) ---
-app.get('/api/userApiKeys', (req, res) => { res.json(readJSON('userApiKeys.json')); });
-app.post('/api/userApiKeys', (req, res) => {
-    let keys = readJSON('userApiKeys.json');
-    const idx = keys.findIndex(k => k.email === req.body.email);
-    if (idx !== -1) keys[idx] = req.body;
-    else keys.push(req.body);
-    writeJSON('userApiKeys.json', keys);
+// --- User API keys (external) ---
+app.get('/api/userApiKeys', async (req, res) => {
+    const keys = await UserApiKey.find({});
+    res.json(keys);
+});
+app.post('/api/userApiKeys', async (req, res) => {
+    await UserApiKey.findOneAndUpdate({ email: req.body.email }, req.body, { upsert: true });
     res.json({ success: true });
 });
-app.delete('/api/userApiKeys/:email/:keyName', (req, res) => {
-    let keys = readJSON('userApiKeys.json');
-    const idx = keys.findIndex(k => k.email === req.params.email);
-    if (idx !== -1) {
-        keys[idx].keys = keys[idx].keys.filter(k => k.name !== req.params.keyName);
-        writeJSON('userApiKeys.json', keys);
+app.delete('/api/userApiKeys/:email/:keyName', async (req, res) => {
+    const entry = await UserApiKey.findOne({ email: req.params.email });
+    if (entry) {
+        entry.keys = entry.keys.filter(k => k.name !== req.params.keyName);
+        await entry.save();
     }
     res.json({ success: true });
 });
 
-// --- Modules (AI engines) ---
-app.get('/api/modules', (req, res) => { res.json(readJSON('modules.json')); });
-app.post('/api/modules', (req, res) => {
-    let modules = readJSON('modules.json');
-    modules.push(req.body);
-    writeJSON('modules.json', modules);
+// --- Modules ---
+app.get('/api/modules', async (req, res) => {
+    const modules = await Module.find({});
+    res.json(modules);
+});
+app.post('/api/modules', async (req, res) => {
+    const module = new Module(req.body);
+    await module.save();
     res.json({ success: true });
 });
-app.put('/api/modules/:id', (req, res) => {
-    let modules = readJSON('modules.json');
-    const idx = modules.findIndex(m => m.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Module not found' });
-    modules[idx] = { ...modules[idx], ...req.body };
-    writeJSON('modules.json', modules);
+app.put('/api/modules/:id', async (req, res) => {
+    await Module.findOneAndUpdate({ id: req.params.id }, req.body);
     res.json({ success: true });
 });
-app.delete('/api/modules/:id', (req, res) => {
-    let modules = readJSON('modules.json');
-    modules = modules.filter(m => m.id !== req.params.id);
-    writeJSON('modules.json', modules);
+app.delete('/api/modules/:id', async (req, res) => {
+    await Module.deleteOne({ id: req.params.id });
     res.json({ success: true });
 });
 
 // --- Bugs ---
-app.get('/api/bugs', (req, res) => { res.json(readJSON('bugs.json')); });
-app.post('/api/bugs', (req, res) => {
-    let bugs = readJSON('bugs.json');
-    bugs.push(req.body);
-    writeJSON('bugs.json', bugs);
-    res.json({ success: true });
-});
-app.delete('/api/bugs', (req, res) => { writeJSON('bugs.json', []); res.json({ success: true }); });
+app.get('/api/bugs', async (req, res) => { res.json(await Bug.find({})); });
+app.post('/api/bugs', async (req, res) => { await new Bug(req.body).save(); res.json({ success: true }); });
+app.delete('/api/bugs', async (req, res) => { await Bug.deleteMany({}); res.json({ success: true }); });
 
 // --- Abuse reports ---
-app.get('/api/abuse', (req, res) => { res.json(readJSON('abuse.json')); });
-app.post('/api/abuse', (req, res) => {
-    let abuse = readJSON('abuse.json');
-    abuse.push(req.body);
-    writeJSON('abuse.json', abuse);
-    res.json({ success: true });
-});
-app.delete('/api/abuse', (req, res) => { writeJSON('abuse.json', []); res.json({ success: true }); });
+app.get('/api/abuse', async (req, res) => { res.json(await Abuse.find({})); });
+app.post('/api/abuse', async (req, res) => { await new Abuse(req.body).save(); res.json({ success: true }); });
+app.delete('/api/abuse', async (req, res) => { await Abuse.deleteMany({}); res.json({ success: true }); });
 
 // --- Pending bans ---
-app.get('/api/pendingBans', (req, res) => { res.json(readJSON('pendingBans.json')); });
-app.post('/api/pendingBans', (req, res) => {
-    let pending = readJSON('pendingBans.json');
-    pending.push(req.body);
-    writeJSON('pendingBans.json', pending);
-    res.json({ success: true });
-});
-app.delete('/api/pendingBans/:index', (req, res) => {
-    let pending = readJSON('pendingBans.json');
-    const idx = parseInt(req.params.index);
-    if (!isNaN(idx) && idx >= 0 && idx < pending.length) pending.splice(idx, 1);
-    writeJSON('pendingBans.json', pending);
-    res.json({ success: true });
-});
-app.delete('/api/pendingBans', (req, res) => { writeJSON('pendingBans.json', []); res.json({ success: true }); });
+app.get('/api/pendingBans', async (req, res) => { res.json(await PendingBan.find({})); });
+app.post('/api/pendingBans', async (req, res) => { await new PendingBan(req.body).save(); res.json({ success: true }); });
+app.delete('/api/pendingBans/:index', async (req, res) => { /* Not used in frontend, optional */ res.json({ success: true }); });
+app.delete('/api/pendingBans', async (req, res) => { await PendingBan.deleteMany({}); res.json({ success: true }); });
 
-// --- IP registrations (for monthly limit, optional) ---
-app.get('/api/ipRegs', (req, res) => { res.json(readJSON('ipRegs.json')); });
-app.post('/api/ipRegs', (req, res) => {
-    let regs = readJSON('ipRegs.json');
-    regs.push(req.body);
-    writeJSON('ipRegs.json', regs);
-    res.json({ success: true });
-});
-app.delete('/api/ipRegs', (req, res) => { writeJSON('ipRegs.json', []); res.json({ success: true }); });
+// --- IP registrations ---
+app.get('/api/ipRegs', async (req, res) => { res.json(await IpReg.find({})); });
+app.post('/api/ipRegs', async (req, res) => { await new IpReg(req.body).save(); res.json({ success: true }); });
+app.delete('/api/ipRegs', async (req, res) => { await IpReg.deleteMany({}); res.json({ success: true }); });
 
 // --- Image quotas ---
-app.get('/api/imageQuotas', (req, res) => { res.json(readJSON('imageQuotas.json')); });
-app.post('/api/imageQuotas', (req, res) => {
-    let quotas = readJSON('imageQuotas.json');
-    const idx = quotas.findIndex(q => q.email === req.body.email);
-    if (idx !== -1) quotas[idx] = req.body;
-    else quotas.push(req.body);
-    writeJSON('imageQuotas.json', quotas);
+app.get('/api/imageQuotas', async (req, res) => { res.json(await ImageQuota.find({})); });
+app.post('/api/imageQuotas', async (req, res) => {
+    await ImageQuota.findOneAndUpdate({ email: req.body.email }, req.body, { upsert: true });
     res.json({ success: true });
 });
-app.delete('/api/imageQuotas', (req, res) => { writeJSON('imageQuotas.json', []); res.json({ success: true }); });
+app.delete('/api/imageQuotas', async (req, res) => { await ImageQuota.deleteMany({}); res.json({ success: true }); });
 
 // --- Chat usage ---
-app.get('/api/chatUsage', (req, res) => { res.json(readJSON('chatUsage.json')); });
-app.post('/api/chatUsage', (req, res) => {
-    let usage = readJSON('chatUsage.json');
-    const idx = usage.findIndex(u => u.email === req.body.email && u.moduleId === req.body.moduleId && u.date === req.body.date);
-    if (idx !== -1) usage[idx] = req.body;
-    else usage.push(req.body);
-    writeJSON('chatUsage.json', usage);
+app.get('/api/chatUsage', async (req, res) => { res.json(await ChatUsage.find({})); });
+app.post('/api/chatUsage', async (req, res) => {
+    await ChatUsage.findOneAndUpdate(
+        { email: req.body.email, moduleId: req.body.moduleId, date: req.body.date },
+        req.body,
+        { upsert: true }
+    );
     res.json({ success: true });
 });
-app.delete('/api/chatUsage', (req, res) => { writeJSON('chatUsage.json', []); res.json({ success: true }); });
+app.delete('/api/chatUsage', async (req, res) => { await ChatUsage.deleteMany({}); res.json({ success: true }); });
 
 // --- Tournaments ---
-app.get('/api/tournaments', (req, res) => { res.json(readJSON('tournaments.json')); });
-app.post('/api/tournaments', (req, res) => {
-    let tournaments = readJSON('tournaments.json');
-    tournaments.push(req.body);
-    writeJSON('tournaments.json', tournaments);
+app.get('/api/tournaments', async (req, res) => { res.json(await Tournament.find({})); });
+app.post('/api/tournaments', async (req, res) => { await new Tournament(req.body).save(); res.json({ success: true }); });
+app.put('/api/tournaments/:id', async (req, res) => {
+    await Tournament.findOneAndUpdate({ id: req.params.id }, req.body);
     res.json({ success: true });
 });
-app.put('/api/tournaments/:id', (req, res) => {
-    let tournaments = readJSON('tournaments.json');
-    const idx = tournaments.findIndex(t => t.id === req.params.id);
-    if (idx !== -1) tournaments[idx] = { ...tournaments[idx], ...req.body };
-    writeJSON('tournaments.json', tournaments);
+app.delete('/api/tournaments/:id', async (req, res) => {
+    await Tournament.deleteOne({ id: req.params.id });
     res.json({ success: true });
 });
-app.delete('/api/tournaments/:id', (req, res) => {
-    let tournaments = readJSON('tournaments.json');
-    tournaments = tournaments.filter(t => t.id !== req.params.id);
-    writeJSON('tournaments.json', tournaments);
-    res.json({ success: true });
-});
-app.post('/api/join-tournament', (req, res) => {
+app.post('/api/join-tournament', async (req, res) => {
     const { email, tournamentId } = req.body;
-    let tournaments = readJSON('tournaments.json');
-    const tournament = tournaments.find(t => t.id === tournamentId);
+    const tournament = await Tournament.findOne({ id: tournamentId });
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
     if (!tournament.participants) tournament.participants = [];
     if (tournament.participants.includes(email)) return res.json({ success: false, message: 'Already joined' });
     tournament.participants.push(email);
-    writeJSON('tournaments.json', tournaments);
+    await tournament.save();
     res.json({ success: true });
 });
 
-// ========== AI PROVIDER HANDLERS ==========
+// ========== AI PROVIDER HANDLERS (unchanged from previous) ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest.`;
 
 async function callGroq(module, messages, deepThink) {
@@ -395,11 +429,10 @@ async function callCloudflareText(module, messages, deepThink) {
     return data.result.response;
 }
 
-// Main chat endpoint for frontend
+// Main chat endpoint
 app.post('/api/chat', async (req, res) => {
     const { module_id, messages, deep_think } = req.body;
-    const modules = readJSON('modules.json');
-    const module = modules.find(m => m.id === module_id);
+    const module = await Module.findOne({ id: module_id });
     if (!module) return res.status(404).json({ error: 'Module not found' });
     try {
         let reply;
@@ -414,14 +447,14 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// External API endpoint for user API keys (supports all providers)
+// External API endpoint for user API keys
 app.post('/api/external/chat', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Missing or invalid Authorization header' });
     }
     const token = authHeader.split(' ')[1];
-    let allKeys = readJSON('userApiKeys.json');
+    let allKeys = await UserApiKey.find({});
     let found = null, foundUser = null;
     for (const entry of allKeys) {
         const keyObj = entry.keys.find(k => k.key === token);
@@ -442,8 +475,7 @@ app.post('/api/external/chat', async (req, res) => {
     }
     const { module_id, messages, deep_think = false } = req.body;
     if (!module_id) return res.status(400).json({ error: 'module_id required' });
-    const modules = readJSON('modules.json');
-    const module = modules.find(m => m.id === module_id);
+    const module = await Module.findOne({ id: module_id });
     if (!module) return res.status(404).json({ error: 'Module not found' });
     try {
         let reply;
@@ -453,10 +485,10 @@ app.post('/api/external/chat', async (req, res) => {
         else if (module.type === 'cloudflare') reply = await callCloudflareText(module, messages, deep_think);
         else throw new Error('Unsupported module type');
         found.used++;
-        const userEntry = allKeys.find(e => e.email === foundUser);
+        const userEntry = await UserApiKey.findOne({ email: foundUser });
         const keyIndex = userEntry.keys.findIndex(k => k.key === token);
         userEntry.keys[keyIndex] = found;
-        writeJSON('userApiKeys.json', allKeys);
+        await userEntry.save();
         res.json({ success: true, reply, remaining: 20 - found.used });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -466,7 +498,7 @@ app.post('/api/external/chat', async (req, res) => {
 // Image generation (Cloudflare SD)
 app.post('/api/generate/image', async (req, res) => {
     const { prompt } = req.body;
-    const settings = loadSettings();
+    const settings = await Setting.findOne();
     if (!settings.cloudflareImageAccountId || !settings.cloudflareImageApiToken) {
         return res.status(500).json({ success: false, error: 'Cloudflare image credentials not configured' });
     }
@@ -504,9 +536,9 @@ app.post('/api/fallback/image', async (req, res) => {
 // ========== ADMIN ENDPOINTS ==========
 
 // Verify admin password
-app.post('/api/admin/verify', (req, res) => {
+app.post('/api/admin/verify', async (req, res) => {
     const { password } = req.body;
-    const settings = loadSettings();
+    const settings = await Setting.findOne();
     const hash = hashPassword(password);
     if (hash === settings.adminPasswordHash) {
         res.json({ success: true });
@@ -515,9 +547,9 @@ app.post('/api/admin/verify', (req, res) => {
     }
 });
 
-// Get admin settings (image credentials - token masked)
-app.get('/api/admin/settings', (req, res) => {
-    const settings = loadSettings();
+// Get admin settings (mask token)
+app.get('/api/admin/settings', async (req, res) => {
+    const settings = await Setting.findOne();
     res.json({
         cloudflareImageAccountId: settings.cloudflareImageAccountId,
         cloudflareImageApiToken: settings.cloudflareImageApiToken ? '********' : '',
@@ -525,10 +557,10 @@ app.get('/api/admin/settings', (req, res) => {
     });
 });
 
-// Update admin settings (image credentials, password)
-app.post('/api/admin/settings', (req, res) => {
+// Update admin settings
+app.post('/api/admin/settings', async (req, res) => {
     const { adminPassword, newAdminPassword, cloudflareImageAccountId, cloudflareImageApiToken, imageModel } = req.body;
-    const settings = loadSettings();
+    let settings = await Setting.findOne();
     if (adminPassword) {
         if (hashPassword(adminPassword) !== settings.adminPasswordHash) {
             return res.status(401).json({ error: 'Current admin password is incorrect' });
@@ -540,7 +572,7 @@ app.post('/api/admin/settings', (req, res) => {
     if (cloudflareImageAccountId !== undefined) settings.cloudflareImageAccountId = cloudflareImageAccountId;
     if (cloudflareImageApiToken !== undefined && cloudflareImageApiToken !== '********') settings.cloudflareImageApiToken = cloudflareImageApiToken;
     if (imageModel !== undefined) settings.imageModel = imageModel;
-    saveSettings(settings);
+    await settings.save();
     res.json({ success: true });
 });
 
@@ -552,9 +584,9 @@ app.post('/api/admin/change-password', async (req, res) => {
     if (adminPasswordChangeCount >= 3) {
         return res.status(429).json({ error: 'Daily password change limit reached (3 per day).' });
     }
-    const settings = loadSettings();
+    const settings = await Setting.findOne();
     settings.adminPasswordHash = hashPassword(newPassword);
-    saveSettings(settings);
+    await settings.save();
     adminPasswordChangeCount++;
     try {
         await sendEmail(email, 'Vrythos Admin New Password', `Your new admin password is: ${newPassword}\nPlease change it after login.`);
@@ -571,8 +603,8 @@ app.get('/api/admin/password-limit', (req, res) => {
 });
 
 // Admin analytics: user stats
-app.get('/api/admin/stats', (req, res) => {
-    const users = readJSON('users.json');
+app.get('/api/admin/stats', async (req, res) => {
+    const users = await User.find({});
     const now = Date.now();
     const today = new Date().toDateString();
     const weekAgo = now - 7 * 24 * 3600 * 1000;
@@ -586,15 +618,14 @@ app.get('/api/admin/stats', (req, res) => {
 });
 
 // Get user profile (for admin)
-app.get('/api/admin/user/:email', (req, res) => {
-    const users = readJSON('users.json');
-    const user = users.find(u => u.email === req.params.email);
+app.get('/api/admin/user/:email', async (req, res) => {
+    const user = await User.findOne({ email: req.params.email });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const apiKeys = readJSON('userApiKeys.json').find(k => k.email === user.email) || { keys: [] };
-    const imageQuota = readJSON('imageQuotas.json').find(q => q.email === user.email) || { count: 0, windowStart: 0 };
-    const chatUsage = readJSON('chatUsage.json').filter(c => c.email === user.email);
+    const apiKeys = await UserApiKey.findOne({ email: user.email }) || { keys: [] };
+    const imageQuota = await ImageQuota.findOne({ email: user.email }) || { count: 0, windowStart: 0 };
+    const chatUsage = await ChatUsage.find({ email: user.email });
     res.json({
-        ...user,
+        ...user.toObject(),
         apiKeys: apiKeys.keys,
         imageQuota,
         chatUsage,
@@ -603,28 +634,21 @@ app.get('/api/admin/user/:email', (req, res) => {
 });
 
 // Delete user permanently (admin)
-app.delete('/api/admin/user/:email', (req, res) => {
-    let users = readJSON('users.json');
-    users = users.filter(u => u.email !== req.params.email);
-    writeJSON('users.json', users);
-    let apiKeys = readJSON('userApiKeys.json');
-    apiKeys = apiKeys.filter(k => k.email !== req.params.email);
-    writeJSON('userApiKeys.json', apiKeys);
-    let imgQuotas = readJSON('imageQuotas.json');
-    imgQuotas = imgQuotas.filter(q => q.email !== req.params.email);
-    writeJSON('imageQuotas.json', imgQuotas);
-    let chatUsage = readJSON('chatUsage.json');
-    chatUsage = chatUsage.filter(c => c.email !== req.params.email);
-    writeJSON('chatUsage.json', chatUsage);
+app.delete('/api/admin/user/:email', async (req, res) => {
+    await User.deleteOne({ email: req.params.email });
+    await UserApiKey.deleteOne({ email: req.params.email });
+    await ImageQuota.deleteOne({ email: req.params.email });
+    await ChatUsage.deleteMany({ email: req.params.email });
     res.json({ success: true });
 });
 
-// Log admin abuse (optional)
-app.post('/api/admin/log-abuse', (req, res) => {
+// Log admin abuse
+app.post('/api/admin/log-abuse', async (req, res) => {
     const { reason, score } = req.body;
-    let logs = readJSON('adminAbuseLogs.json');
-    logs.push({ timestamp: Date.now(), reason, score });
-    writeJSON('adminAbuseLogs.json', logs.slice(-100));
+    const log = new AdminAbuseLog({ timestamp: Date.now(), reason, score });
+    await log.save();
+    // keep only last 100
+    await AdminAbuseLog.deleteMany({}).sort({ timestamp: -1 }).limit(100);
     res.json({ success: true });
 });
 
