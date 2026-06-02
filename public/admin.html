@@ -19,10 +19,10 @@
         .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
         .chat-container { background: #0a0c15; border-radius: 1rem; padding: 1rem; margin-top: 1rem; max-height: 500px; overflow-y: auto; }
         .message { display: flex; gap: 12px; margin-bottom: 12px; max-width: 80%; }
-        .admin-user-message { justify-content: flex-end; flex-direction: row-reverse; }
+        .admin-user-message { justify-content: flex-end; flex-direction: row-reverse; margin-left: auto; }
         .admin-bubble { padding: 8px 14px; border-radius: 20px; background: #1e293b; }
         .admin-user-bubble { background: #7c3aed; }
-        .avatar-small { width: 28px; height: 28px; border-radius: 50%; background: #8b5cf6; display: inline-flex; align-items: center; justify-content: center; }
+        .avatar-small { width: 28px; height: 28px; border-radius: 50%; background: #8b5cf6; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .file-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
         .file-tag { background: #2d3748; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
         .user-profile-details { background: #0e111b; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 13px; }
@@ -173,13 +173,33 @@
     let abuseReports = [];
     let pendingBans = [];
     let adminSelectedModuleId = null;
-    let adminDeepThink = false;
-    let adminLiveImage = false;
+    let adminDeepThinkFlag = false;
+    let adminLiveImageFlag = false;
     let adminMessagesHistory = [];
     let adminAttachedFiles = [];
 
+    // FIX: imgStore avoids embedding full base64 data URIs in onclick attributes
+    // (identical pattern to the same fix in index.html — large images broke onclick attrs)
+    const imgStore = {};
+    let imgStoreCounter = 0;
+    window.downloadImage = function(imgId) {
+        const dataUrl = imgStore[imgId];
+        if (!dataUrl) return;
+        const link = document.createElement('a');
+        link.download = 'vrythos_image.png';
+        link.href = dataUrl;
+        link.click();
+    };
+
     function escapeHtml(str) {
-        return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+        return String(str).replace(/[&<>"]/g, m => {
+            // FIX: Also escape double-quotes to prevent HTML attribute injection
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            if (m === '"') return '&quot;';
+            return m;
+        });
     }
 
     async function loadAllData() {
@@ -199,27 +219,31 @@
             document.getElementById("weeklyUsers").innerText = stats.weeklyUsers;
             document.getElementById("monthlyUsers").innerText = stats.monthlyUsers;
             document.getElementById("totalAccounts").innerText = stats.totalAccounts;
-        } catch(e) { console.warn(e); }
+        } catch(e) { console.warn('Stats refresh failed:', e.message); }
     }
 
     // Render modules
     async function renderModules() {
         const container = document.getElementById("modulesList");
         container.innerHTML = "";
+        if (!modules.length) {
+            container.innerHTML = "<i style='color:#8e9dc2;'>No engines added yet.</i>";
+            return;
+        }
         modules.forEach((mod, idx) => {
             let keyDisplay = "";
             if (mod.type === "cloudflare") {
-                keyDisplay = `Account ID: ${mod.accountId?.substring(0,12)}... | Token: ${mod.apiToken?.substring(0,12)}...`;
+                keyDisplay = `Account ID: ${(mod.accountId || '').substring(0,12)}... | Token: ${(mod.apiToken || '').substring(0,12)}...`;
             } else {
-                keyDisplay = `Primary: ${mod.primaryKey?.substring(0,12)}... | Secondary: ${mod.secondaryKey?.substring(0,12) || 'none'}`;
+                keyDisplay = `Primary: ${(mod.primaryKey || '').substring(0,12)}... | Secondary: ${(mod.secondaryKey || '').substring(0,12) || 'none'}`;
             }
             const div = document.createElement("div");
             div.className = "module-item";
             div.innerHTML = `
-                <div><strong>${escapeHtml(mod.displayName)}</strong> (${mod.type})<br>
-                ${keyDisplay}<br>
+                <div><strong>${escapeHtml(mod.displayName)}</strong> (${escapeHtml(mod.type)})<br>
+                ${escapeHtml(keyDisplay)}<br>
                 Limit: ${mod.dailyLimitPerUser}/day<br>
-                Model: ${mod.model}</div>
+                Model: ${escapeHtml(mod.model || '')}</div>
                 <div>
                     <button class="editMod" data-idx="${idx}">✏️ Edit</button>
                     <button class="delMod" data-idx="${idx}">🗑️ Delete</button>
@@ -238,23 +262,25 @@
     async function editModule(idx) {
         let m = modules[idx];
         let newName = prompt("Display name", m.displayName);
+        if (!newName) return;
         let newLimit = parseInt(prompt("Daily limit per user", m.dailyLimitPerUser));
+        if (isNaN(newLimit)) return;
         let newModel = prompt("Model name", m.model);
+        if (!newModel) return;
         if (m.type === "cloudflare") {
             let newAccountId = prompt("Cloudflare Account ID", m.accountId || "");
             let newApiToken = prompt("Cloudflare API Token", m.apiToken || "");
-            if (newName && newLimit && newModel && newAccountId && newApiToken) {
+            if (newAccountId && newApiToken) {
                 await apiPut(`/api/modules/${m.id}`, { ...m, displayName: newName, dailyLimitPerUser: newLimit, model: newModel, accountId: newAccountId, apiToken: newApiToken });
                 await refreshAll();
             }
         } else {
             let newPrimary = prompt("Primary API Key", m.primaryKey);
+            if (!newPrimary) return;
             let newSecondary = prompt("Secondary API Key (optional)", m.secondaryKey || "");
             let newApiUrl = prompt("API URL", m.apiUrl || "");
-            if (newName && newPrimary && newLimit) {
-                await apiPut(`/api/modules/${m.id}`, { ...m, displayName: newName, dailyLimitPerUser: newLimit, primaryKey: newPrimary, secondaryKey: newSecondary || "", apiUrl: newApiUrl || m.apiUrl, model: newModel || m.model });
-                await refreshAll();
-            }
+            await apiPut(`/api/modules/${m.id}`, { ...m, displayName: newName, dailyLimitPerUser: newLimit, primaryKey: newPrimary, secondaryKey: newSecondary || "", apiUrl: newApiUrl || m.apiUrl, model: newModel });
+            await refreshAll();
         }
     }
 
@@ -262,6 +288,14 @@
     async function renderUserSelect() {
         const select = document.getElementById("userSelect");
         select.innerHTML = "";
+        if (!users.length) {
+            const opt = document.createElement("option");
+            opt.text = "No users registered";
+            opt.disabled = true;
+            select.appendChild(opt);
+            document.getElementById("userProfileDetails").style.display = "none";
+            return;
+        }
         users.forEach(u => {
             let opt = document.createElement("option");
             opt.value = u.email;
@@ -274,80 +308,90 @@
     }
 
     async function showUserProfile(email) {
+        const container = document.getElementById("userProfileDetails");
+        container.style.display = "block";
+        container.innerHTML = "<i>Loading profile...</i>";
         try {
-            const userData = await apiGet(`/api/admin/user/${email}`);
+            const userData = await apiGet(`/api/admin/user/${encodeURIComponent(email)}`);
             const apiKeys = userData.apiKeys || [];
             const imageQuota = userData.imageQuota || {};
             const chatUsage = userData.chatUsage || [];
             const hoursLive = (userData.totalHoursLive || 0).toFixed(1);
-            const container = document.getElementById("userProfileDetails");
-            container.style.display = "block";
             container.innerHTML = `
                 <strong>👤 User Profile: ${escapeHtml(userData.username)}</strong><br>
                 Email: ${escapeHtml(userData.email)}<br>
                 Name: ${escapeHtml(userData.name || 'N/A')}<br>
-                Auth Provider: ${userData.authProvider || 'email'}<br>
-                ${userData.passwordHash ? `Password Hash (SHA-256): <code>${userData.passwordHash}</code><br>` : ''}
+                Auth Provider: ${escapeHtml(userData.authProvider || 'email')}<br>
+                ${userData.passwordHash ? `Password Hash (SHA-256): <code>${escapeHtml(userData.passwordHash)}</code><br>` : ''}
                 Created: ${new Date(userData.createdAt).toLocaleString()}<br>
                 Total hours live: ${hoursLive}<br>
                 Extra chat credits: ${userData.extraChatCredits || 0}<br>
                 Extra image credits: ${userData.extraImageCredits || 0}<br>
-                Banned: ${userData.banned ? 'Yes' : 'No'}<br>
-                <hr>
+                Banned: ${userData.banned ? '<span style="color:#ef4444;">Yes</span>' : '<span style="color:#10b981;">No</span>'}<br>
+                <hr style="margin:8px 0; border-color:#1e293b;">
                 <strong>🔑 API Keys (${apiKeys.length}/2):</strong><br>
-                ${apiKeys.map(k => `<code>${k.name}: ${k.key}</code> (used ${k.used||0}/20 today)<br>`).join('') || 'None'}<br>
+                ${apiKeys.map(k => `<code>${escapeHtml(k.name)}: ${escapeHtml(k.key)}</code> (used ${k.used||0}/20 today)<br>`).join('') || 'None'}<br>
                 <strong>🖼️ Image Quota:</strong> ${imageQuota.count || 0} used this window (reset every 5h)<br>
                 <strong>💬 Chat Usage (last 7 days):</strong><br>
-                ${chatUsage.slice(-7).map(c => `${c.date}: ${c.count} calls on ${c.moduleId}`).join('<br>') || 'No data'}
+                ${chatUsage.slice(-7).map(c => `${escapeHtml(c.date)}: ${c.count} calls on ${escapeHtml(c.moduleId)}`).join('<br>') || 'No data'}
             `;
         } catch(e) {
-            console.error(e);
-            document.getElementById("userProfileDetails").innerHTML = `<span class="warning">Error loading profile: ${e.message}</span>`;
+            container.innerHTML = `<span class="warning">Error loading profile: ${escapeHtml(e.message)}</span>`;
         }
     }
 
-    // Bugs, Abuse, Pending Bans
+    // ------------------------------------------------------------------
+    // BUGS — FIX: was doing apiPost('/api/bugs', entireArray) which sent the
+    // whole array as one document. Now uses DELETE /api/bugs/:id per record.
+    // ------------------------------------------------------------------
     async function renderBugs() {
         const container = document.getElementById("bugsList");
         container.innerHTML = "";
         if (bugs.length === 0) { container.innerHTML = "<i>No pending bug reports.</i>"; return; }
-        bugs.forEach((bug, idx) => {
+        bugs.forEach((bug) => {
             let div = document.createElement("div");
             div.className = "bug-item";
+            div.dataset.id = bug._id;
             div.innerHTML = `
-                <div><strong>${escapeHtml(bug.username)}</strong> (${escapeHtml(bug.email)})<br>${escapeHtml(bug.description)}<br><small>${new Date(bug.timestamp).toLocaleString()}</small></div>
                 <div>
-                    <button class="realBug" data-idx="${idx}">✅ Real → +10 chat +2 images</button>
-                    <button class="fakeBug" data-idx="${idx}">❌ Fake → -15 chat credits</button>
+                    <strong>${escapeHtml(bug.username)}</strong> (${escapeHtml(bug.email)})<br>
+                    ${escapeHtml(bug.description)}<br>
+                    <small>${new Date(bug.timestamp).toLocaleString()}</small>
+                </div>
+                <div>
+                    <button class="realBug" data-id="${escapeHtml(bug._id)}" data-email="${escapeHtml(bug.email)}">✅ Real → +10 chat +2 images</button>
+                    <button class="fakeBug" data-id="${escapeHtml(bug._id)}" data-email="${escapeHtml(bug.email)}">❌ Fake → -15 chat credits</button>
                 </div>
             `;
             container.appendChild(div);
         });
+
         document.querySelectorAll(".realBug").forEach(btn => btn.onclick = async () => {
-            let idx = parseInt(btn.dataset.idx);
-            let bug = bugs[idx];
-            let user = users.find(u => u.email === bug.email);
+            const bugId = btn.dataset.id;
+            const email = btn.dataset.email;
+            const user = users.find(u => u.email === email);
             if (user) {
                 user.extraChatCredits = (user.extraChatCredits || 0) + 10;
                 user.extraImageCredits = (user.extraImageCredits || 0) + 2;
-                await apiPut(`/api/users/${user.email}`, user);
+                await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             }
-            bugs.splice(idx, 1);
-            await apiPost('/api/bugs', bugs);
+            // FIX: Delete the specific bug by its _id instead of re-POSTing the whole array
+            await apiDelete(`/api/bugs/${bugId}`);
             await refreshAll();
         });
+
         document.querySelectorAll(".fakeBug").forEach(btn => btn.onclick = async () => {
-            let idx = parseInt(btn.dataset.idx);
-            let bug = bugs[idx];
-            let user = users.find(u => u.email === bug.email);
+            const bugId = btn.dataset.id;
+            const email = btn.dataset.email;
+            const user = users.find(u => u.email === email);
             if (user) {
                 let penalty = (user.extraChatCredits || 0) - 15;
                 if (penalty < -10) user.banned = true;
                 user.extraChatCredits = Math.max(-10, penalty);
-                await apiPut(`/api/users/${user.email}`, user);
+                await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             }
-            bugs.splice(idx, 1);
-            await apiPost('/api/bugs', bugs);
+            // FIX: Delete the specific bug by its _id instead of re-POSTing the whole array
+            await apiDelete(`/api/bugs/${bugId}`);
             await refreshAll();
         });
     }
@@ -359,54 +403,63 @@
         abuseReports.forEach(a => {
             let div = document.createElement("div");
             div.className = "bug-item";
-            div.innerHTML = `<strong>${escapeHtml(a.username)}</strong> (${escapeHtml(a.email)}) - ${escapeHtml(a.reason)}<br>${escapeHtml(a.context)}<br><small>${new Date(a.timestamp).toLocaleString()}</small>`;
+            div.innerHTML = `<strong>${escapeHtml(a.username)}</strong> (${escapeHtml(a.email)}) - ${escapeHtml(a.reason)}<br>${escapeHtml(a.context || '')}<br><small>${new Date(a.timestamp).toLocaleString()}</small>`;
             container.appendChild(div);
         });
     }
 
+    // ------------------------------------------------------------------
+    // PENDING BANS — FIX: was doing apiPost('/api/pendingBans', entireArray)
+    // which saved the whole array as one document. Now uses DELETE /api/pendingBans/:id.
+    // ------------------------------------------------------------------
     async function renderPendingBans() {
         const container = document.getElementById("pendingBansList");
         container.innerHTML = "";
         if (pendingBans.length === 0) { container.innerHTML = "<i>No pending abuse reviews.</i>"; return; }
-        pendingBans.forEach((item, idx) => {
+        pendingBans.forEach((item) => {
             let div = document.createElement("div");
             div.className = "bug-item";
             div.innerHTML = `
                 <div><strong>${escapeHtml(item.username)}</strong> (${escapeHtml(item.email)})<br>
                 Abuse score: ${item.score}%<br>
                 Reason: ${escapeHtml(item.reason)}<br>
-                Context: "${escapeHtml(item.context)}"<br>
+                Context: &quot;${escapeHtml(item.context || '')}&quot;<br>
                 <small>${new Date(item.timestamp).toLocaleString()}</small>
                 </div>
                 <div>
-                    <button class="approveBan" data-idx="${idx}" style="background:#ef4444;">🔨 Ban User</button>
-                    <button class="ignoreBan" data-idx="${idx}" style="background:#2d3748;">✅ Ignore</button>
+                    <button class="approveBan" data-id="${escapeHtml(item._id)}" data-email="${escapeHtml(item.email)}" data-reason="${escapeHtml(item.reason)}" style="background:#ef4444;">🔨 Ban User</button>
+                    <button class="ignoreBan" data-id="${escapeHtml(item._id)}" style="background:#2d3748;">✅ Ignore</button>
                 </div>
             `;
             container.appendChild(div);
         });
+
         document.querySelectorAll(".approveBan").forEach(btn => btn.onclick = async () => {
-            let idx = parseInt(btn.dataset.idx);
-            let item = pendingBans[idx];
-            let user = users.find(u => u.email === item.email);
+            const banId = btn.dataset.id;
+            const email = btn.dataset.email;
+            const reason = btn.dataset.reason;
+            const user = users.find(u => u.email === email);
             if (user) {
                 user.banned = true;
-                user.banReason = item.reason;
-                await apiPut(`/api/users/${user.email}`, user);
+                user.banReason = reason;
+                await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             }
-            pendingBans.splice(idx, 1);
-            await apiPost('/api/pendingBans', pendingBans);
+            // FIX: Delete the specific pending ban by its _id instead of re-POSTing the whole array
+            await apiDelete(`/api/pendingBans/${banId}`);
             await refreshAll();
         });
+
         document.querySelectorAll(".ignoreBan").forEach(btn => btn.onclick = async () => {
-            let idx = parseInt(btn.dataset.idx);
-            pendingBans.splice(idx, 1);
-            await apiPost('/api/pendingBans', pendingBans);
+            const banId = btn.dataset.id;
+            // FIX: Delete the specific pending ban by its _id instead of re-POSTing the whole array
+            await apiDelete(`/api/pendingBans/${banId}`);
             await refreshAll();
         });
     }
 
-    // Admin chat tester
+    // ------------------------------------------------------------------
+    // ADMIN CHAT TESTER
+    // ------------------------------------------------------------------
     async function callChatAPI(module_id, messages, deepThink) {
         const res = await fetch('/api/chat', {
             method: 'POST',
@@ -417,19 +470,27 @@
         if (!data.success) throw new Error(data.error);
         return data.reply;
     }
+
     async function generateImage(prompt) {
-        const res = await fetch('/api/generate/image', {
+        try {
+            const res = await fetch('/api/generate/image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
+            const data = await res.json();
+            if (data.success) return data.image;
+        } catch(e) { /* fall through to pollinations */ }
+        const fallback = await fetch('/api/fallback/image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt })
         });
-        const data = await res.json();
-        if (data.success) return data.image;
-        const fallback = await fetch('/api/fallback/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
         const fbData = await fallback.json();
         if (fbData.success) return fbData.image;
         throw new Error('Image generation failed');
     }
+
     function addAdminMessage(text, isUser = false, isHtml = false) {
         const container = document.getElementById("adminMessages");
         const div = document.createElement("div");
@@ -444,37 +505,77 @@
         if (!isUser && !isHtml) adminMessagesHistory.push({ role: "assistant", content: text });
         if (isUser) adminMessagesHistory.push({ role: "user", content: text });
     }
+
     async function adminSendMessage(forceImage = false) {
         let inp = document.getElementById("adminUserInput");
         let text = inp.value.trim();
         if (!text) return;
         inp.value = "";
-        let willImage = (adminLiveImage || forceImage) && text.length > 2;
+        inp.disabled = true;
+
+        let willImage = (adminLiveImageFlag || forceImage) && text.length > 2;
         if (willImage) {
             addAdminMessage(text, true);
             try {
                 let imgData = await generateImage(text);
-                addAdminMessage(`<img src="${imgData}" style="max-width:100%; border-radius:16px;" /><br><button onclick="downloadImage('${imgData}')">⬇️ Download</button>`, false, true);
-            } catch(e) { addAdminMessage("❌ Image generation failed.", false); }
+                // FIX: Store image in imgStore and reference by short id (same fix as index.html)
+                const imgId = 'img_' + (++imgStoreCounter);
+                imgStore[imgId] = imgData;
+                addAdminMessage(
+                    `<img src="${imgData}" style="max-width:100%; border-radius:16px;" /><br>
+                     <button onclick="downloadImage('${imgId}')">⬇️ Download</button>`,
+                    false, true
+                );
+            } catch(e) {
+                addAdminMessage("❌ Image generation failed: " + e.message, false);
+            }
+            inp.disabled = false;
+            inp.focus();
             return;
         }
+
         let module = modules.find(m => m.id === adminSelectedModuleId);
         if (!module) {
             addAdminMessage("❌ No AI engine selected. Please add an engine in the Admin panel.", false);
+            inp.disabled = false;
             return;
         }
+
+        // FIX: Include attached files in the message content (previously adminAttachedFiles was
+        // read but never actually appended to the message, so file content was silently dropped)
+        let fullText = text;
+        if (adminAttachedFiles.length) {
+            fullText += "\n\n[Attached files]\n" + adminAttachedFiles
+                .map(f => f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`)
+                .join("\n");
+            adminAttachedFiles = [];
+            renderAdminFileBadges();
+        }
+
         addAdminMessage(text, true);
+        adminMessagesHistory.push({ role: "user", content: fullText });
+
         let typingDiv = document.createElement("div");
         typingDiv.className = "message";
         typingDiv.innerHTML = `<div class="avatar-small">🧠</div><div class="admin-bubble">▮ Thinking...</div>`;
         document.getElementById("adminMessages").appendChild(typingDiv);
+        document.getElementById("adminMessages").scrollTop = document.getElementById("adminMessages").scrollHeight;
+
         let reply = "";
         try {
-            reply = await callChatAPI(adminSelectedModuleId, adminMessagesHistory.slice(-12), adminDeepThink);
-        } catch(e) { reply = `⚠️ Service error: ${e.message}`; }
+            reply = await callChatAPI(adminSelectedModuleId, adminMessagesHistory.slice(-12), adminDeepThinkFlag);
+        } catch(e) {
+            reply = `⚠️ Service error: ${e.message}`;
+        }
         typingDiv.remove();
         addAdminMessage(reply, false);
+        inp.disabled = false;
+        inp.focus();
     }
+
+    // FIX: renderAdminModuleDropdown now auto-initializes adminSelectedModuleId
+    // to the first module so the chat tester works immediately without requiring
+    // the admin to manually change the select dropdown first.
     function renderAdminModuleDropdown() {
         let sel = document.getElementById("adminModuleSelect");
         sel.innerHTML = "";
@@ -483,6 +584,7 @@
             opt.text = "❌ No engines — add one above";
             opt.disabled = true;
             sel.appendChild(opt);
+            adminSelectedModuleId = null;
             return;
         }
         modules.forEach(mod => {
@@ -492,8 +594,14 @@
             if (adminSelectedModuleId === mod.id) opt.selected = true;
             sel.appendChild(opt);
         });
+        // FIX: Auto-select first module if none has been explicitly chosen yet
+        if (!adminSelectedModuleId || !modules.find(m => m.id === adminSelectedModuleId)) {
+            adminSelectedModuleId = modules[0].id;
+            sel.value = adminSelectedModuleId;
+        }
         sel.onchange = (e) => { adminSelectedModuleId = e.target.value; };
     }
+
     function refreshAdminChat() {
         document.getElementById("adminSendBtn").onclick = () => adminSendMessage(false);
         document.getElementById("adminImageGenBtn").onclick = () => adminSendMessage(true);
@@ -502,15 +610,27 @@
             adminMessagesHistory = [];
             document.getElementById("adminMessages").innerHTML = `<div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">New session started.</div></div>`;
         };
-        document.getElementById("adminUserInput").addEventListener("keypress", (e) => { if (e.key === "Enter") adminSendMessage(false); });
-        document.getElementById("adminDeepThink").onchange = (e) => adminDeepThink = e.target.checked;
-        document.getElementById("adminLiveImage").onchange = (e) => adminLiveImage = e.target.checked;
+
+        // FIX: Enter key now sends message in admin chat tester
+        const adminInput = document.getElementById("adminUserInput");
+        // Remove any existing listener to avoid duplicates on re-render
+        adminInput.replaceWith(adminInput.cloneNode(true));
+        document.getElementById("adminUserInput").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") adminSendMessage(false);
+        });
+
+        document.getElementById("adminDeepThink").onchange = (e) => adminDeepThinkFlag = e.target.checked;
+        document.getElementById("adminLiveImage").onchange = (e) => adminLiveImageFlag = e.target.checked;
         document.getElementById("adminFileInput").onchange = (e) => {
             if (e.target.files) {
                 Array.from(e.target.files).forEach(f => {
                     let reader = new FileReader();
                     reader.onload = ev => {
-                        adminAttachedFiles.push({ name: f.name, content: ev.target.result, isText: f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i) });
+                        adminAttachedFiles.push({
+                            name: f.name,
+                            content: ev.target.result,
+                            isText: f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i)
+                        });
                         renderAdminFileBadges();
                     };
                     if (f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
@@ -520,9 +640,12 @@
         };
         renderAdminFileBadges();
     }
+
     function renderAdminFileBadges() {
         let container = document.getElementById("adminFilePreview");
-        container.innerHTML = adminAttachedFiles.map((f, idx) => `<span class="file-tag">📄 ${f.name} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444; cursor:pointer;">✖</button></span>`).join("");
+        container.innerHTML = adminAttachedFiles.map((f, idx) =>
+            `<span class="file-tag">📄 ${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444; cursor:pointer;">✖</button></span>`
+        ).join("");
         document.querySelectorAll("#adminFilePreview .file-tag button").forEach(btn => {
             btn.onclick = () => {
                 let idx = parseInt(btn.dataset.idx);
@@ -532,49 +655,85 @@
         });
     }
 
-    // Image settings & password change
+    // ------------------------------------------------------------------
+    // IMAGE SETTINGS & PASSWORD CHANGE
+    // ------------------------------------------------------------------
     async function loadImageSettings() {
         try {
             const settings = await apiGet('/api/admin/settings');
             document.getElementById("cfImageAccountId").value = settings.cloudflareImageAccountId || '';
             document.getElementById("cfImageApiToken").value = '';
             document.getElementById("cfImageModel").value = settings.imageModel || '@cf/stabilityai/stable-diffusion-xl-base-1.0';
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error('loadImageSettings:', e); }
     }
+
     document.getElementById("saveImageSettings").onclick = async () => {
-        const accountId = document.getElementById("cfImageAccountId").value;
-        const apiToken = document.getElementById("cfImageApiToken").value;
-        const model = document.getElementById("cfImageModel").value;
-        const res = await apiPost('/api/admin/settings', { cloudflareImageAccountId: accountId, cloudflareImageApiToken: apiToken, imageModel: model });
-        if (res.success) document.getElementById("imageSettingsStatus").innerText = "✅ Saved!";
-        else document.getElementById("imageSettingsStatus").innerText = "❌ Error";
-        setTimeout(() => document.getElementById("imageSettingsStatus").innerText = "", 3000);
+        const accountId = document.getElementById("cfImageAccountId").value.trim();
+        const apiToken = document.getElementById("cfImageApiToken").value.trim();
+        const model = document.getElementById("cfImageModel").value.trim();
+        const statusEl = document.getElementById("imageSettingsStatus");
+        try {
+            // FIX: Pass the stored admin password so the server's auth check passes.
+            // Previously no adminPassword was sent, which technically bypassed the check
+            // (server skips the check when adminPassword is absent — security gap).
+            // Now we prompt for the password before saving sensitive credentials.
+            const adminPwd = prompt("Confirm admin password to save image settings:");
+            if (!adminPwd) return;
+            const res = await apiPost('/api/admin/settings', {
+                adminPassword: adminPwd,
+                cloudflareImageAccountId: accountId,
+                cloudflareImageApiToken: apiToken || undefined,
+                imageModel: model
+            });
+            if (res.success) {
+                statusEl.style.color = "#10b981";
+                statusEl.innerText = "✅ Saved!";
+            } else {
+                statusEl.style.color = "#ef4444";
+                statusEl.innerText = "❌ " + (res.error || "Failed");
+            }
+        } catch(e) {
+            statusEl.style.color = "#ef4444";
+            statusEl.innerText = "❌ " + e.message;
+        }
+        setTimeout(() => statusEl.innerText = "", 3000);
     };
+
     document.getElementById("requestAdminPwdChange").onclick = async () => {
         const email = document.getElementById("adminEmail").value.trim();
         const newPwd = document.getElementById("newAdminPwd").value;
         if (!email || !newPwd) { alert("Enter email and new password"); return; }
+        const statusEl = document.getElementById("pwdChangeStatus");
         try {
             const res = await apiPost('/api/admin/change-password', { email, newPassword: newPwd });
             if (res.success) {
-                document.getElementById("pwdChangeStatus").innerText = "✅ Password change email sent!";
+                statusEl.style.color = "#10b981";
+                statusEl.innerText = "✅ Password change email sent!";
                 const limitRes = await apiGet('/api/admin/password-limit');
-                if (limitRes.remaining !== undefined) document.getElementById("pwdLimitStatus").innerText = `${limitRes.remaining} remaining today`;
+                if (limitRes.remaining !== undefined) {
+                    document.getElementById("pwdLimitStatus").innerText = `${limitRes.remaining} remaining today`;
+                }
             } else {
-                document.getElementById("pwdChangeStatus").innerText = "❌ " + (res.error || "Failed");
+                statusEl.style.color = "#ef4444";
+                statusEl.innerText = "❌ " + (res.error || "Failed");
             }
-        } catch(e) { document.getElementById("pwdChangeStatus").innerText = "❌ " + e.message; }
-        setTimeout(() => document.getElementById("pwdChangeStatus").innerText = "", 3000);
+        } catch(e) {
+            statusEl.style.color = "#ef4444";
+            statusEl.innerText = "❌ " + e.message;
+        }
+        setTimeout(() => statusEl.innerText = "", 3000);
     };
 
-    // User management actions
+    // ------------------------------------------------------------------
+    // USER MANAGEMENT ACTIONS
+    // ------------------------------------------------------------------
     document.getElementById("grantChat10").onclick = async () => {
         let sel = document.getElementById("userSelect").value;
         if (!sel) return;
         let user = users.find(u => u.email === sel);
         if (user) {
             user.extraChatCredits = (user.extraChatCredits || 0) + 10;
-            await apiPut(`/api/users/${user.email}`, user);
+            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             await refreshAll();
         }
     };
@@ -584,7 +743,7 @@
         let user = users.find(u => u.email === sel);
         if (user) {
             user.extraChatCredits = (user.extraChatCredits || 0) + 50;
-            await apiPut(`/api/users/${user.email}`, user);
+            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             await refreshAll();
         }
     };
@@ -594,7 +753,7 @@
         let user = users.find(u => u.email === sel);
         if (user) {
             user.extraImageCredits = (user.extraImageCredits || 0) + 5;
-            await apiPut(`/api/users/${user.email}`, user);
+            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             await refreshAll();
         }
     };
@@ -604,7 +763,7 @@
         let user = users.find(u => u.email === sel);
         if (user) {
             user.banned = true;
-            await apiPut(`/api/users/${user.email}`, user);
+            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             await refreshAll();
         }
     };
@@ -614,7 +773,8 @@
         let user = users.find(u => u.email === sel);
         if (user) {
             user.banned = false;
-            await apiPut(`/api/users/${user.email}`, user);
+            user.banReason = "";
+            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             await refreshAll();
         }
     };
@@ -622,68 +782,84 @@
         let sel = document.getElementById("userSelect").value;
         if (!sel) return;
         if (!confirm(`⚠️ Permanently delete user ${sel} and ALL their data? This cannot be undone.`)) return;
-        await apiDelete(`/api/admin/user/${sel}`);
+        await apiDelete(`/api/admin/user/${encodeURIComponent(sel)}`);
         await refreshAll();
     };
+
+    // ------------------------------------------------------------------
+    // SYSTEM ACTIONS
+    // ------------------------------------------------------------------
     document.getElementById("resetAllChatUsage").onclick = async () => {
-        if (confirm("Reset daily chat usage counters for ALL users?")) {
-            for (let user of users) {
-                user.dailyCallsRecord = { date: "", count: 0 };
-                await apiPut(`/api/users/${user.email}`, user);
-            }
-            await refreshAll();
+        if (!confirm("Reset daily chat usage counters for ALL users?")) return;
+        // Reset via server — update each user's dailyCallsRecord and wipe ChatUsage collection
+        await apiDelete('/api/chatUsage');
+        for (let user of users) {
+            user.dailyCallsRecord = { date: "", count: 0 };
+            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
         }
+        await refreshAll();
+        alert("✅ Chat usage reset for all users.");
     };
+
     document.getElementById("clearAllReports").onclick = async () => {
-        if (confirm("Clear all bug and abuse reports?")) {
+        if (!confirm("Clear all bug and abuse reports?")) return;
+        await apiDelete('/api/bugs');
+        await apiDelete('/api/abuse');
+        await apiDelete('/api/pendingBans');
+        await refreshAll();
+    };
+
+    document.getElementById("exportData").onclick = async () => {
+        try {
+            let exportObj = {
+                users: await apiGet('/api/users'),
+                modules: await apiGet('/api/modules'),
+                bugs: await apiGet('/api/bugs'),
+                abuse: await apiGet('/api/abuse'),
+                pendingBans: await apiGet('/api/pendingBans'),
+                imageQuotas: await apiGet('/api/imageQuotas'),
+                chatUsage: await apiGet('/api/chatUsage'),
+                userApiKeys: await apiGet('/api/userApiKeys')
+            };
+            let dataStr = JSON.stringify(exportObj, null, 2);
+            let blob = new Blob([dataStr], { type: "application/json" });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement("a");
+            a.href = url;
+            a.download = `vrythos_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch(e) { alert("Export failed: " + e.message); }
+    };
+
+    // FIX: Hard reset now uses the correct bulk DELETE routes that were added to server.js.
+    // Previously it called DELETE /api/users, DELETE /api/modules etc. which didn't exist
+    // (only DELETE /api/users/:email existed), so the factory reset silently did nothing.
+    document.getElementById("hardReset").onclick = async () => {
+        if (!confirm("⚠️ FACTORY RESET: This will delete ALL users, modules, reports, API keys. Type 'RESET' to confirm.")) return;
+        let check = prompt("Type RESET to proceed");
+        if (check !== "RESET") return;
+        try {
+            await apiDelete('/api/users');      // now exists: deletes all users + their quotas/keys/usage
+            await apiDelete('/api/modules');    // now exists: deletes all modules
             await apiDelete('/api/bugs');
             await apiDelete('/api/abuse');
             await apiDelete('/api/pendingBans');
-            await refreshAll();
-        }
+            await apiDelete('/api/userApiKeys');
+            await apiDelete('/api/ipRegs');
+            await apiDelete('/api/imageQuotas');
+            await apiDelete('/api/chatUsage');
+            await apiDelete('/api/tournaments');
+            alert("✅ All data erased. Refresh the page.");
+            location.reload();
+        } catch(e) { alert("Factory reset failed: " + e.message); }
     };
-    document.getElementById("exportData").onclick = async () => {
-        let exportObj = {
-            users: await apiGet('/api/users'),
-            modules: await apiGet('/api/modules'),
-            bugs: await apiGet('/api/bugs'),
-            abuse: await apiGet('/api/abuse'),
-            pendingBans: await apiGet('/api/pendingBans'),
-            imageQuotas: await apiGet('/api/imageQuotas'),
-            chatUsage: await apiGet('/api/chatUsage'),
-            userApiKeys: await apiGet('/api/userApiKeys')
-        };
-        let dataStr = JSON.stringify(exportObj, null, 2);
-        let blob = new Blob([dataStr], { type: "application/json" });
-        let url = URL.createObjectURL(blob);
-        let a = document.createElement("a");
-        a.href = url;
-        a.download = "vrythos_backup.json";
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-    document.getElementById("hardReset").onclick = async () => {
-        if (confirm("⚠️ FACTORY RESET: This will delete ALL users, modules, reports, API keys. Type 'RESET' to confirm.")) {
-            let check = prompt("Type RESET to proceed");
-            if (check === "RESET") {
-                await apiDelete('/api/users');
-                await apiDelete('/api/modules');
-                await apiDelete('/api/bugs');
-                await apiDelete('/api/abuse');
-                await apiDelete('/api/pendingBans');
-                await apiDelete('/api/userApiKeys');
-                await apiDelete('/api/ipRegs');
-                await apiDelete('/api/imageQuotas');
-                await apiDelete('/api/chatUsage');
-                await apiDelete('/api/tournaments');
-                alert("All data erased. Refresh the page.");
-                location.reload();
-            }
-        }
-    };
+
     document.getElementById("refreshStatsBtn").onclick = () => refreshStats();
 
-    // Add module presets
+    // ------------------------------------------------------------------
+    // ADD MODULE PRESETS
+    // ------------------------------------------------------------------
     document.getElementById("addFlash").onclick = async () => {
         let primaryKey = prompt("Groq API Key (gsk_)");
         if (!primaryKey) return;
@@ -711,12 +887,14 @@
     };
     document.getElementById("addCustom").onclick = async () => {
         let displayName = prompt("Engine name");
+        if (!displayName) return;
         let type = prompt("Type (groq/gemini/openrouter/cloudflare)");
+        if (!type) return;
         let apiUrl = prompt("API URL");
         let model = prompt("Model");
         let primaryKey = prompt("Primary API Key");
-        let dailyLimit = parseInt(prompt("Daily limit", 20));
-        if (!displayName || !type || !apiUrl || !model || !primaryKey) return;
+        let dailyLimit = parseInt(prompt("Daily limit", "20"));
+        if (!apiUrl || !model || !primaryKey || isNaN(dailyLimit)) return;
         let modObj = { id: "mod_"+Date.now(), displayName, type, primaryKey, secondaryKey: "", apiUrl, model, dailyLimitPerUser: dailyLimit };
         if (type === "cloudflare") {
             modObj.accountId = primaryKey;
@@ -729,22 +907,25 @@
         await refreshAll();
     };
 
-    // Refresh all
+    // ------------------------------------------------------------------
+    // REFRESH ALL
+    // ------------------------------------------------------------------
     async function refreshAll() {
         await loadAllData();
-        renderModules();
-        renderUserSelect();
-        renderBugs();
+        await renderModules();
+        await renderUserSelect();
+        await renderBugs();
         renderAbuse();
-        renderPendingBans();
+        await renderPendingBans();
         renderAdminModuleDropdown();
-        if (modules.length && !adminSelectedModuleId) adminSelectedModuleId = modules[0].id;
         refreshAdminChat();
         await loadImageSettings();
         await refreshStats();
     }
 
-    // Admin right-click protection & abuse logging
+    // ------------------------------------------------------------------
+    // ADMIN ABUSE DETECTION (right-click / devtools in admin panel)
+    // ------------------------------------------------------------------
     let adminAbuseScore = 0;
     function addAdminAbuseScore(points, reason) {
         adminAbuseScore += points;
@@ -756,7 +937,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reason, score: adminAbuseScore })
-        }).catch(e=>console.warn);
+        }).catch(e => console.warn('log-abuse failed:', e));
     }
     document.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -773,27 +954,46 @@
         }
     });
 
-    window.downloadImage = function(dataUrl) {
-        const link = document.createElement('a');
-        link.download = 'vrythos_image.png';
-        link.href = dataUrl;
-        link.click();
-    };
+    // ------------------------------------------------------------------
+    // FIX: Auto-refresh stats every 30 seconds while admin panel is open
+    // (previously stats only updated on manual button click)
+    // ------------------------------------------------------------------
+    let statsInterval = null;
 
-    // Login
+    // ------------------------------------------------------------------
+    // LOGIN
+    // ------------------------------------------------------------------
+    // FIX: Enter key on password field triggers login button
+    document.getElementById("adminPassword").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") document.getElementById("adminLoginBtn").click();
+    });
+
     document.getElementById("adminLoginBtn").onclick = async () => {
         let pwd = document.getElementById("adminPassword").value;
+        const msgEl = document.getElementById("adminMsg");
         try {
             const res = await apiPost('/api/admin/verify', { password: pwd });
             if (res.success) {
                 document.getElementById("authArea").style.display = "none";
                 document.getElementById("adminContent").style.display = "block";
                 await refreshAll();
+
+                // FIX: Start auto-refresh of stats every 30s after login
+                if (statsInterval) clearInterval(statsInterval);
+                statsInterval = setInterval(() => refreshStats(), 30000);
+
+                // Load password limit on login
+                try {
+                    const limitRes = await apiGet('/api/admin/password-limit');
+                    if (limitRes.remaining !== undefined) {
+                        document.getElementById("pwdLimitStatus").innerText = `${limitRes.remaining} remaining today`;
+                    }
+                } catch(e) { /* non-critical */ }
             } else {
-                document.getElementById("adminMsg").innerText = "Wrong password.";
+                msgEl.innerText = "Wrong password.";
             }
         } catch(e) {
-            document.getElementById("adminMsg").innerText = "Login failed.";
+            msgEl.innerText = "Login failed: " + e.message;
         }
     };
 </script>
