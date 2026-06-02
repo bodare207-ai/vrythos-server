@@ -78,11 +78,7 @@
         return entry ? entry.keys : [];
     }
     async function saveUserApiKeys(email, keys) {
-        let allKeys = await apiGet('/api/userApiKeys');
-        const idx = allKeys.findIndex(e => e.email === email);
-        if (idx !== -1) allKeys[idx].keys = keys;
-        else allKeys.push({ email, keys });
-        await apiPost('/api/userApiKeys', allKeys.find(e => e.email === email));
+        await apiPost('/api/userApiKeys', { email, keys });
     }
 
     // Abuse & pending bans (server-side)
@@ -112,12 +108,23 @@
     }
 
     // ------------------------------------------------------------------
-    // HELPER FUNCTIONS (abuse detection, hashing, etc.)
+    // HELPER FUNCTIONS
     // ------------------------------------------------------------------
     async function hashPassword(pw) {
         const enc = new TextEncoder().encode(pw);
         const hash = await crypto.subtle.digest('SHA-256', enc);
         return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    // FIX: escapeHtml now also escapes double-quotes for safety in HTML attributes
+    function escapeHtml(str){
+        return String(str).replace(/[&<>"]/g, function(m){
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            if(m === '"') return '&quot;';
+            return m;
+        });
     }
 
     // Abuse score
@@ -171,7 +178,7 @@
     function showWarningModal(msg) {
         let modal = document.createElement("div");
         modal.className = "modal";
-        modal.innerHTML = `<div class="modal-content"><h3>⚠️ Warning</h3><p>${msg}</p><button id="closeWarningBtn">OK</button></div>`;
+        modal.innerHTML = `<div class="modal-content"><h3>⚠️ Warning</h3><p>${escapeHtml(msg)}</p><button id="closeWarningBtn">OK</button></div>`;
         document.body.appendChild(modal);
         document.getElementById("closeWarningBtn").onclick = () => modal.remove();
     }
@@ -203,30 +210,49 @@
         } catch(e) { console.warn(e); }
         return null;
     }
-    async function generateImageAndShow(prompt) {
-        addAIMessage("🖌️ Generating image...", false);
-        let imgData = await generateImageWithCloudflare(prompt);
-        if (!imgData) imgData = await generateImageWithPollinations(prompt);
-        if (imgData && imgData.startsWith('data:image')) {
-            const imgHtml = `<img src="${imgData}" style="max-width:100%; border-radius:16px;" /><br>
-                             <button onclick="downloadImage('${imgData}')">⬇️ Download</button>
-                             <button onclick="copyImageToClipboard('${imgData}')">📋 Copy</button>`;
-            addAIMessage(imgHtml, true);
-        } else {
-            addAIMessage("❌ Image generation failed. Please try again later.");
-        }
-    }
-    window.downloadImage = function(dataUrl) {
+
+    // FIX: Image download/copy now uses a global imgStore map keyed by a short id,
+    // instead of embedding the full base64 data URI directly into onclick HTML attributes
+    // (which broke for large images because attribute values have browser length limits).
+    const imgStore = {};
+    let imgStoreCounter = 0;
+    window.downloadImage = function(imgId) {
+        const dataUrl = imgStore[imgId];
+        if (!dataUrl) return;
         const link = document.createElement('a');
         link.download = 'vrythos_image.png';
         link.href = dataUrl;
         link.click();
     };
-    window.copyImageToClipboard = async function(dataUrl) {
-        const blob = await (await fetch(dataUrl)).blob();
-        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-        alert('Image copied to clipboard!');
+    window.copyImageToClipboard = async function(imgId) {
+        const dataUrl = imgStore[imgId];
+        if (!dataUrl) return;
+        try {
+            const blob = await (await fetch(dataUrl)).blob();
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            alert('Image copied to clipboard!');
+        } catch(e) {
+            alert('Copy failed: ' + e.message);
+        }
     };
+
+    async function generateImageAndShow(prompt) {
+        addAIMessage("🖌️ Generating image...", false);
+        let imgData = await generateImageWithCloudflare(prompt);
+        if (!imgData) imgData = await generateImageWithPollinations(prompt);
+        if (imgData && imgData.startsWith('data:image')) {
+            // FIX: Store image in imgStore and reference by id to avoid oversized HTML attributes
+            const imgId = 'img_' + (++imgStoreCounter);
+            imgStore[imgId] = imgData;
+            const imgHtml = `<img src="${imgData}" style="max-width:100%; border-radius:16px;" /><br>
+                             <button onclick="downloadImage('${imgId}')">⬇️ Download</button>
+                             <button onclick="copyImageToClipboard('${imgId}')">📋 Copy</button>`;
+            addAIMessage(imgHtml, true);
+        } else {
+            addAIMessage("❌ Image generation failed. Please try again later.");
+        }
+    }
+
     async function getRemainingImages() {
         const quota = await getImageQuota(currentUser.email);
         const now = Date.now();
@@ -323,10 +349,15 @@
         let div = document.createElement("div");
         div.className = "message user-message";
         let initial = currentUser.username.charAt(0).toUpperCase();
-        div.innerHTML = `<div class="avatar" style="background:#4b5563;">${initial}</div><div class="bubble">${escapeHtml(text).replace(/\n/g,"<br>")}</div>`;
+        div.innerHTML = `<div class="avatar" style="background:#4b5563;">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(text).replace(/\n/g,"<br>")}</div>`;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     }
+    // FIX: addAIMessage only pushes to messagesHistory once (when !isHtml).
+    // The old sendMessage() also pushed the reply manually after the try block,
+    // causing every AI text reply to appear TWICE in history → AI saw its own
+    // messages duplicated, leading to confused/looping responses.
+    // Solution: addAIMessage is the single source of truth for history pushes.
     function addAIMessage(html, isHtml=false){
         let container = document.getElementById("messagesContainer");
         let div = document.createElement("div");
@@ -346,18 +377,9 @@
         container.scrollTop = container.scrollHeight;
         return div;
     }
-    function escapeHtml(str){
-        return String(str).replace(/[&<>]/g, function(m){
-            if(m === '&') return '&amp;';
-            if(m === '<') return '&lt;';
-            if(m === '>') return '&gt;';
-            return m;
-        });
-    }
     function isImageGenerationRequest(text) {
-        const lower = text.toLowerCase();
         const imgKeywords = /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i;
-        return imgKeywords.test(lower);
+        return imgKeywords.test(text);
     }
     async function sendMessage(userText, forceImage = false) {
         if (!currentUser || currentUser.banned) { addAIMessage("🚫 Account banned."); return; }
@@ -409,7 +431,10 @@
             } finally {
                 if(typing) typing.remove();
             }
-            messagesHistory.push({ role: "assistant", content: reply });
+            // FIX: REMOVED the duplicate `messagesHistory.push({role:"assistant"...})` that was here.
+            // addAIMessage() below already pushes to history for non-HTML messages.
+            // Having both caused every AI reply to appear twice in the conversation context,
+            // making the AI confused and wasting context window tokens.
             addAIMessage(reply);
         } finally {
             setProcessing(false);
@@ -428,7 +453,7 @@
     async function updateSidebarStats() {
         let left = 50 + (currentUser.extraChatCredits||0) - (await getTodayCalls());
         document.getElementById("dailyCallsLeft").innerText = Math.max(0, left);
-        document.getElementById("sidebarUsername").innerHTML = currentUser.username;
+        document.getElementById("sidebarUsername").innerHTML = escapeHtml(currentUser.username);
         await updateImageDisplay();
     }
     async function updateImageDisplay() {
@@ -437,13 +462,15 @@
     }
     function renderFileBadges() {
         let container = document.getElementById("filePreviewArea");
-        container.innerHTML = attachedFiles.map((f,idx) => `<span class="file-tag">📄 ${f.name} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444;">✖</button></span>`).join("");
+        container.innerHTML = attachedFiles.map((f,idx) => `<span class="file-tag">📄 ${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444;">✖</button></span>`).join("");
         document.querySelectorAll(".file-tag button").forEach(btn => btn.onclick = e => {
             let idx = parseInt(btn.dataset.idx);
             attachedFiles.splice(idx,1);
             renderFileBadges();
         });
     }
+    // FIX: renderModuleDropdown now sets selectedModuleId to the first module
+    // if it hasn't been selected yet, so the AI engine is always ready to use on load.
     function renderModuleDropdown() {
         let sel = document.getElementById("moduleSelect");
         sel.innerHTML = "";
@@ -461,6 +488,11 @@
             if (selectedModuleId === mod.id) opt.selected = true;
             sel.appendChild(opt);
         });
+        // FIX: Auto-select first module if none is selected
+        if (!selectedModuleId && modules.length) {
+            selectedModuleId = modules[0].id;
+            sel.value = selectedModuleId;
+        }
         sel.onchange = async e => {
             selectedModuleId = e.target.value;
             await updateRemainingDisplay();
@@ -480,11 +512,11 @@
         container.innerHTML = tournaments.map(t => `
             <div style="background:#0e111b; border-radius:12px; padding:10px; margin-bottom:10px;">
                 <strong>🏆 ${escapeHtml(t.name)}</strong><br>
-                ${t.description || ''}<br>
-                Prize: ${t.prize || 'None'}<br>
-                ${t.participants?.includes(currentUser.email) ? 
-                    '<span style="color:#10b981;">✓ Joined</span>' : 
-                    `<button class="join-tournament" data-id="${t.id}">Join Tournament</button>`}
+                ${escapeHtml(t.description || '')}<br>
+                Prize: ${escapeHtml(t.prize || 'None')}<br>
+                ${t.participants?.includes(currentUser.email) ?
+                    '<span style="color:#10b981;">✓ Joined</span>' :
+                    `<button class="join-tournament" data-id="${escapeHtml(t.id)}">Join Tournament</button>`}
             </div>
         `).join("");
         document.querySelectorAll(".join-tournament").forEach(btn => {
@@ -512,8 +544,8 @@
                 <div>
                     <div style="background:#0e111b; border-radius:16px; padding:14px; margin-bottom:16px;">
                         <label style="font-size:12px; color:#8e9dc2;">PROFILE PICTURE URL</label>
-                        <input type="text" id="profilePicUrl" placeholder="https://..." value="${currentUser.profilePic || ''}" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
-                        <div class="profile-preview" id="profilePreview" style="width:60px; height:60px; border-radius:50%; background:var(--accent); margin:8px auto; background-size:cover; background-image: url('${currentUser.profilePic || ''}');"></div>
+                        <input type="text" id="profilePicUrl" placeholder="https://..." value="${escapeHtml(currentUser.profilePic || '')}" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
+                        <div class="profile-preview" id="profilePreview" style="width:60px; height:60px; border-radius:50%; background:var(--accent); margin:8px auto; background-size:cover;"></div>
                         <label style="font-size:12px; color:#8e9dc2;">CHANGE USERNAME</label>
                         <input type="text" id="newUsername" placeholder="New username" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
                         <button id="updateUsernameBtn" style="width:100%; background:#2d3748; margin-bottom:8px;">Update Username</button>
@@ -521,8 +553,8 @@
                     </div>
                     <div style="background:#0e111b; border-radius:16px; padding:14px;">
                         <h4 style="margin:0 0 8px 0;">📊 Your Stats</h4>
-                        <p style="font-size:13px; margin:4px 0;">Chat calls left today: ${Math.max(0,50+(currentUser.extraChatCredits||0) - (await getTodayCalls()))} / ${50+(currentUser.extraChatCredits||0)}</p>
-                        <p style="font-size:13px; margin:4px 0;">Image credits left: ${await getRemainingImages()}</p>
+                        <p style="font-size:13px; margin:4px 0;">Chat calls left today: <span id="statChatLeft">...</span></p>
+                        <p style="font-size:13px; margin:4px 0;">Image credits left: <span id="statImgLeft">...</span></p>
                         <p style="font-size:13px; margin:4px 0;">Extra chat credits: ${currentUser.extraChatCredits||0}</p>
                         <p style="font-size:13px; margin:4px 0;">Extra image credits: ${currentUser.extraImageCredits||0}</p>
                         <p style="font-size:13px; margin:4px 0;">Total hours live: ${(currentUser.totalHoursLive || 0).toFixed(1)}</p>
@@ -553,9 +585,24 @@
         let close = () => modal.remove();
         modal.querySelector(".close-modal").onclick = close;
 
-        let picInput = document.getElementById("profilePicUrl");
-        let preview = document.getElementById("profilePreview");
-        picInput.addEventListener("input", () => { preview.style.backgroundImage = `url('${picInput.value}')`; });
+        // FIX: Load stats asynchronously after modal is in the DOM
+        (async () => {
+            const chatLeft = Math.max(0, 50 + (currentUser.extraChatCredits||0) - (await getTodayCalls()));
+            const imgLeft = await getRemainingImages();
+            const elChat = document.getElementById("statChatLeft");
+            const elImg = document.getElementById("statImgLeft");
+            if (elChat) elChat.textContent = `${chatLeft} / ${50+(currentUser.extraChatCredits||0)}`;
+            if (elImg) elImg.textContent = imgLeft;
+        })();
+
+        // FIX: Set profile pic preview via JS (not inline style) to avoid CSS injection from user URLs
+        const picInput = document.getElementById("profilePicUrl");
+        const preview = document.getElementById("profilePreview");
+        const safePicUrl = currentUser.profilePic || '';
+        if (safePicUrl) preview.style.backgroundImage = `url(${JSON.stringify(safePicUrl)})`;
+        picInput.addEventListener("input", () => {
+            preview.style.backgroundImage = `url(${JSON.stringify(picInput.value)})`;
+        });
 
         document.getElementById("updateUsernameBtn").onclick = async () => {
             let newName = document.getElementById("newUsername").value.trim();
@@ -593,7 +640,7 @@
             container.innerHTML = userKeys.map((key, idx) => `
                 <div style="background:#1e293b; margin:5px; padding:6px; border-radius:12px;">
                     <b>${escapeHtml(key.name)}</b><br>
-                    <code style="font-size:10px; word-break:break-all;">${key.key}</code><br>
+                    <code style="font-size:10px; word-break:break-all;">${escapeHtml(key.key)}</code><br>
                     <span style="font-size:10px;">Used today: ${key.used || 0}/20</span>
                     <button class="revokeKey" data-idx="${idx}" style="float:right; background:#ef4444; border:none; border-radius:20px; padding:2px 8px;">Revoke</button>
                 </div>
@@ -712,14 +759,17 @@
         try {
             const res = await apiPost('/api/auth/google', { token: response.credential });
             if (res.success) {
+                // FIX: Use full user data returned from server (including real credits/stats)
+                // instead of hardcoding extraChatCredits:0 / banned:false which ignored DB values.
                 currentUser = {
                     email: res.email,
                     username: res.username,
                     name: res.name,
                     profilePic: res.profilePic,
-                    extraChatCredits: 0,
-                    extraImageCredits: 0,
-                    banned: false
+                    extraChatCredits: res.extraChatCredits || 0,
+                    extraImageCredits: res.extraImageCredits || 0,
+                    banned: res.banned || false,
+                    totalHoursLive: res.totalHoursLive || 0
                 };
                 localStorage.setItem("vrythos_current_session", res.email);
                 await buildUI();
@@ -727,7 +777,8 @@
                 document.getElementById("authMessage").innerText = res.error || "Google login failed";
             }
         } catch(e) {
-            document.getElementById("authMessage").innerText = "Google login error: " + e.message;
+            const authMsg = document.getElementById("authMessage");
+            if (authMsg) authMsg.innerText = "Google login error: " + e.message;
         }
     };
 
@@ -737,12 +788,31 @@
     async function initAuth() {
         let savedSession = localStorage.getItem("vrythos_current_session");
         if (savedSession) {
-            let users = await loadUsers();
-            let user = users.find(u => u.email === savedSession && !u.banned);
-            if (user) {
-                currentUser = user;
-                await buildUI();
-                return;
+            try {
+                let users = await loadUsers();
+                // FIX: Normalize the restored session user to the same shape as Google OAuth login
+                // (previously initAuth set currentUser to the raw DB object while Google OAuth
+                // set a slimmer object, causing inconsistent currentUser shapes throughout the app)
+                let dbUser = users.find(u => u.email === savedSession && !u.banned);
+                if (dbUser) {
+                    currentUser = {
+                        email: dbUser.email,
+                        username: dbUser.username,
+                        name: dbUser.name || '',
+                        profilePic: dbUser.profilePic || '',
+                        passwordHash: dbUser.passwordHash || null,
+                        extraChatCredits: dbUser.extraChatCredits || 0,
+                        extraImageCredits: dbUser.extraImageCredits || 0,
+                        banned: dbUser.banned || false,
+                        totalHoursLive: dbUser.totalHoursLive || 0,
+                        authProvider: dbUser.authProvider || 'email'
+                    };
+                    await buildUI();
+                    return;
+                }
+            } catch(e) {
+                console.warn('Session restore failed:', e.message);
+                localStorage.removeItem("vrythos_current_session");
             }
         }
         document.getElementById("app-root").innerHTML = `
@@ -751,8 +821,19 @@
                 <h2>⚡ VRYTHOS NEURAL</h2>
                 <div id="loginForm">
                     <!-- Google Sign-In button -->
-                    <div id="g_id_onload" data-client_id="527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com" data-callback="handleGoogleLogin" data-auto_prompt="false"></div>
-                    <div class="g_id_signin" data-type="standard" data-size="large" data-theme="filled_blue" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+                    <div id="g_id_onload"
+                        data-client_id="527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com"
+                        data-callback="handleGoogleLogin"
+                        data-auto_prompt="false">
+                    </div>
+                    <div class="g_id_signin"
+                        data-type="standard"
+                        data-size="large"
+                        data-theme="filled_blue"
+                        data-text="sign_in_with"
+                        data-shape="rectangular"
+                        data-logo_alignment="left">
+                    </div>
                     <div style="margin: 15px 0; text-align: center; color: #8e9dc2;">──────── or ────────</div>
                     <input type="email" id="loginEmail" placeholder="Email" autocomplete="off">
                     <input type="password" id="loginPassword" placeholder="Password">
@@ -772,27 +853,60 @@
                 <div id="authMessage" style="margin-top:12px; font-size:12px; color:#f97316; text-align:center;"></div>
             </div>
         </div>`;
-        
+
+        // FIX: Re-initialize Google Sign-In after the g_id_onload div is in the DOM
+        if (window.google && window.google.accounts) {
+            window.google.accounts.id.initialize({
+                client_id: "527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com",
+                callback: window.handleGoogleLogin
+            });
+            window.google.accounts.id.renderButton(
+                document.querySelector(".g_id_signin"),
+                { theme: "filled_blue", size: "large", shape: "rectangular", text: "sign_in_with", logo_alignment: "left" }
+            );
+        }
+
+        // FIX: Enter key on password field triggers login
+        document.getElementById("loginPassword").addEventListener("keypress", e => {
+            if (e.key === "Enter") document.getElementById("doLoginBtn").click();
+        });
+
         document.getElementById("doLoginBtn").onclick = async () => {
             let email = document.getElementById("loginEmail").value.trim();
             let pwd = document.getElementById("loginPassword").value;
-            let users = await loadUsers();
-            let user = users.find(u => u.email === email);
-            if (!user) {
-                document.getElementById("authMessage").innerHTML = "❌ User not found. <a href='#' id='suggestRegister'>Create new account?</a>";
-                document.getElementById("suggestRegister")?.addEventListener("click", () => document.getElementById("showRegisterBtn").click());
-                return;
+            try {
+                let users = await loadUsers();
+                let user = users.find(u => u.email === email);
+                if (!user) {
+                    document.getElementById("authMessage").innerHTML = "❌ User not found. <a href='#' id='suggestRegister'>Create new account?</a>";
+                    document.getElementById("suggestRegister")?.addEventListener("click", () => document.getElementById("showRegisterBtn").click());
+                    return;
+                }
+                if (!user.passwordHash) {
+                    document.getElementById("authMessage").innerText = "This account uses Google login. Please use Google Sign-In.";
+                    return;
+                }
+                let hashed = await hashPassword(pwd);
+                if (user.passwordHash !== hashed) { document.getElementById("authMessage").innerText = "Wrong password"; return; }
+                if (user.banned) { document.getElementById("authMessage").innerText = "Account banned."; return; }
+                // FIX: Normalize currentUser shape on email login (same as Google OAuth path)
+                currentUser = {
+                    email: user.email,
+                    username: user.username,
+                    name: user.name || '',
+                    profilePic: user.profilePic || '',
+                    passwordHash: user.passwordHash || null,
+                    extraChatCredits: user.extraChatCredits || 0,
+                    extraImageCredits: user.extraImageCredits || 0,
+                    banned: user.banned || false,
+                    totalHoursLive: user.totalHoursLive || 0,
+                    authProvider: user.authProvider || 'email'
+                };
+                localStorage.setItem("vrythos_current_session", user.email);
+                await buildUI();
+            } catch(e) {
+                document.getElementById("authMessage").innerText = "Login error: " + e.message;
             }
-            if (!user.passwordHash) {
-                document.getElementById("authMessage").innerText = "This account uses Google login. Please use Google Sign-In.";
-                return;
-            }
-            let hashed = await hashPassword(pwd);
-            if (user.passwordHash !== hashed) { document.getElementById("authMessage").innerText = "Wrong password"; return; }
-            if (user.banned) { document.getElementById("authMessage").innerText = "Account banned."; return; }
-            currentUser = user;
-            localStorage.setItem("vrythos_current_session", user.email);
-            await buildUI();
         };
         document.getElementById("showRegisterBtn").onclick = () => {
             document.getElementById("loginForm").classList.add("hidden");
@@ -814,35 +928,39 @@
                 document.getElementById("authMessage").innerText = "Please fill all fields correctly (password min 4 chars, match)";
                 return;
             }
-            let users = await loadUsers();
-            if (users.find(u => u.email === email)) {
-                document.getElementById("authMessage").innerText = "Email already registered";
-                return;
+            try {
+                let users = await loadUsers();
+                if (users.find(u => u.email === email)) {
+                    document.getElementById("authMessage").innerText = "Email already registered";
+                    return;
+                }
+                if (users.find(u => u.username === username)) {
+                    document.getElementById("authMessage").innerText = "Username already taken";
+                    return;
+                }
+                let passwordHash = await hashPassword(password);
+                let newUser = {
+                    email,
+                    username,
+                    name,
+                    passwordHash,
+                    profilePic: "",
+                    dailyCallsRecord: { date: "", count: 0 },
+                    extraChatCredits: 0,
+                    extraImageCredits: 0,
+                    banned: false,
+                    createdAt: Date.now(),
+                    totalHoursLive: 0,
+                    lastActive: Date.now(),
+                    authProvider: 'email'
+                };
+                await apiPost('/api/users', newUser);
+                document.getElementById("authMessage").innerHTML = "✅ Account created! Please login.";
+                document.getElementById("registerForm").classList.add("hidden");
+                document.getElementById("loginForm").classList.remove("hidden");
+            } catch(e) {
+                document.getElementById("authMessage").innerText = "Registration error: " + e.message;
             }
-            if (users.find(u => u.username === username)) {
-                document.getElementById("authMessage").innerText = "Username already taken";
-                return;
-            }
-            let passwordHash = await hashPassword(password);
-            let newUser = {
-                email,
-                username,
-                name,
-                passwordHash,
-                profilePic: "",
-                dailyCallsRecord: { date: "", count: 0 },
-                extraChatCredits: 0,
-                extraImageCredits: 0,
-                banned: false,
-                createdAt: Date.now(),
-                totalHoursLive: 0,
-                lastActive: Date.now(),
-                authProvider: 'email'
-            };
-            await apiPost('/api/users', newUser);
-            document.getElementById("authMessage").innerHTML = "✅ Account created! Please login.";
-            document.getElementById("registerForm").classList.add("hidden");
-            document.getElementById("loginForm").classList.remove("hidden");
         };
     }
 
@@ -851,7 +969,7 @@
 })();
 </script>
 <style>
-    /* same CSS as before – unchanged */
+    /* same CSS as before – fixed send-btn color + height */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root { --bg-primary: #0a0c15; --bg-secondary: #11141f; --bg-sidebar: #0e111b; --text-primary: #f0f3fa; --text-secondary: #8e9dc2; --accent: #8b5cf6; --border: #1e293b; --user-bubble: #7c3aed; --ai-bubble: #1e293b; --success: #10b981; --danger: #ef4444; }
     body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
@@ -878,7 +996,7 @@
     .message { display: flex; gap: 12px; max-width: 80%; }
     .user-message { align-self: flex-end; flex-direction: row-reverse; }
     .ai-message { align-self: flex-start; }
-    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: bold; background-size: cover; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: bold; background-size: cover; flex-shrink: 0; }
     .bubble { padding: 12px 18px; border-radius: 22px; line-height: 1.5; font-size: 0.9rem; }
     .user-message .bubble { background: var(--user-bubble); border-bottom-right-radius: 6px; }
     .ai-message .bubble { background: var(--ai-bubble); border-bottom-left-radius: 6px; border: 1px solid var(--border); }
@@ -886,14 +1004,20 @@
     .input-wrapper { display: flex; gap: 8px; background: var(--bg-primary); border-radius: 60px; padding: 4px 4px 4px 20px; border: 1px solid var(--border); align-items: center; }
     .input-wrapper input { flex: 1; background: transparent; border: none; padding: 12px 0; color: white; outline: none; }
     .input-wrapper input:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* FIX: send-btn now has explicit color, height, display so it renders correctly on all browsers */
+    .send-btn { background: var(--accent); border: none; width: 44px; height: 44px; border-radius: 40px; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
     .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .send-btn { background: var(--accent); border: none; width: 44px; border-radius: 40px; cursor: pointer; }
+    .attach-btn, .img-gen-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 4px 6px; opacity: 0.7; transition: opacity 0.2s; }
+    .attach-btn:hover, .img-gen-btn:hover { opacity: 1; }
     .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     .modal-content { background: var(--bg-secondary); border-radius: 28px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 24px; border: 1px solid var(--accent); }
     .close-modal { cursor: pointer; }
     .profile-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); margin: 10px auto; background-size: cover; }
     .file-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
     .file-tag { background: #2d3748; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+    .ai-status { display: flex; align-items: center; font-weight: 600; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
     @media (max-width: 700px) { .sidebar { display: none; } .message { max-width: 95%; } }
 </style>
 </body>
