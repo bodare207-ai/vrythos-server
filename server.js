@@ -5,24 +5,24 @@ const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const mongoose = require('mongoose');
 const path = require('path');
- 
+
 const app = express();
 const PORT = process.env.PORT || 3000;
- 
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
- 
+
 // ========== MongoDB Connection ==========
 // FIX: Removed misleading dead-code error log (MONGODB_URI always has a fallback value, so !MONGODB_URI was never true)
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://viraj:viraj%402070@vrythos-server.j8tjel4.mongodb.net/vrythos?retryWrites=true&w=majority';
- 
+
 mongoose.connect(MONGODB_URI)
     .then(() => console.log('✅ Connected to MongoDB Atlas'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
- 
+
 // ========== Mongoose Schemas ==========
- 
+
 // User schema
 const userSchema = new mongoose.Schema({
     email: { type: String, unique: true, required: true },
@@ -41,7 +41,7 @@ const userSchema = new mongoose.Schema({
     authProvider: { type: String, default: 'email' }
 });
 const User = mongoose.model('User', userSchema);
- 
+
 // Module schema
 const moduleSchema = new mongoose.Schema({
     id: { type: String, unique: true, required: true },
@@ -56,7 +56,7 @@ const moduleSchema = new mongoose.Schema({
     dailyLimitPerUser: Number
 });
 const Module = mongoose.model('Module', moduleSchema);
- 
+
 // Bug reports
 const bugSchema = new mongoose.Schema({
     email: String,
@@ -66,7 +66,7 @@ const bugSchema = new mongoose.Schema({
     status: String
 });
 const Bug = mongoose.model('Bug', bugSchema);
- 
+
 // Abuse reports
 const abuseSchema = new mongoose.Schema({
     email: String,
@@ -76,7 +76,7 @@ const abuseSchema = new mongoose.Schema({
     timestamp: Date
 });
 const Abuse = mongoose.model('Abuse', abuseSchema);
- 
+
 // Pending bans
 const pendingBanSchema = new mongoose.Schema({
     email: String,
@@ -88,7 +88,7 @@ const pendingBanSchema = new mongoose.Schema({
     reviewed: Boolean
 });
 const PendingBan = mongoose.model('PendingBan', pendingBanSchema);
- 
+
 // IP registrations
 const ipRegSchema = new mongoose.Schema({
     ip: String,
@@ -97,7 +97,7 @@ const ipRegSchema = new mongoose.Schema({
     timestamp: Date
 });
 const IpReg = mongoose.model('IpReg', ipRegSchema);
- 
+
 // Image quotas
 const imageQuotaSchema = new mongoose.Schema({
     email: { type: String, unique: true },
@@ -105,7 +105,7 @@ const imageQuotaSchema = new mongoose.Schema({
     windowStart: Date
 });
 const ImageQuota = mongoose.model('ImageQuota', imageQuotaSchema);
- 
+
 // Chat usage
 const chatUsageSchema = new mongoose.Schema({
     email: String,
@@ -114,14 +114,14 @@ const chatUsageSchema = new mongoose.Schema({
     count: Number
 });
 const ChatUsage = mongoose.model('ChatUsage', chatUsageSchema);
- 
+
 // User API keys (external)
 const userApiKeySchema = new mongoose.Schema({
     email: { type: String, unique: true },
     keys: [{ name: String, key: String, used: Number, date: String }]
 });
 const UserApiKey = mongoose.model('UserApiKey', userApiKeySchema);
- 
+
 // Tournaments
 const tournamentSchema = new mongoose.Schema({
     id: String,
@@ -131,7 +131,7 @@ const tournamentSchema = new mongoose.Schema({
     participants: [String]
 });
 const Tournament = mongoose.model('Tournament', tournamentSchema);
- 
+
 // Settings (admin password, image credentials)
 const settingSchema = new mongoose.Schema({
     adminPasswordHash: String,
@@ -140,7 +140,7 @@ const settingSchema = new mongoose.Schema({
     imageModel: String
 });
 const Setting = mongoose.model('Setting', settingSchema);
- 
+
 // Admin abuse logs
 const adminAbuseLogSchema = new mongoose.Schema({
     timestamp: Date,
@@ -148,12 +148,12 @@ const adminAbuseLogSchema = new mongoose.Schema({
     score: Number
 });
 const AdminAbuseLog = mongoose.model('AdminAbuseLog', adminAbuseLogSchema);
- 
+
 // ========== Helper functions ==========
 function hashPassword(pw) {
     return crypto.createHash('sha256').update(pw).digest('hex');
 }
- 
+
 // ========== Email transporter ==========
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -162,10 +162,10 @@ const transporter = nodemailer.createTransport({
 function sendEmail(to, subject, text) {
     return transporter.sendMail({ from: process.env.EMAIL_USER, to, subject, text });
 }
- 
+
 // ========== Google OAuth ==========
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
- 
+
 // ========== Initialize default settings ==========
 async function initSettings() {
     let settings = await Setting.findOne();
@@ -181,7 +181,7 @@ async function initSettings() {
     return settings;
 }
 initSettings().catch(err => console.error('❌ initSettings error:', err));
- 
+
 // Admin password change counter (in-memory, resets daily)
 let adminPasswordChangeCount = 0;
 let lastAdminResetDate = new Date().toDateString();
@@ -192,7 +192,7 @@ function resetAdminCountIfNeeded() {
         lastAdminResetDate = today;
     }
 }
- 
+
 // ========== Global async error wrapper ==========
 // FIX: All async routes are now wrapped to prevent unhandled rejections crashing the server
 function asyncHandler(fn) {
@@ -200,9 +200,9 @@ function asyncHandler(fn) {
         Promise.resolve(fn(req, res, next)).catch(next);
     };
 }
- 
+
 // ========== API ROUTES ==========
- 
+
 // --- Users ---
 app.get('/api/users', asyncHandler(async (req, res) => {
     const users = await User.find({});
@@ -237,7 +237,7 @@ app.delete('/api/users', asyncHandler(async (req, res) => {
     await ChatUsage.deleteMany({});
     res.json({ success: true });
 }));
- 
+
 // --- Google OAuth ---
 app.post('/api/auth/google', asyncHandler(async (req, res) => {
     const { token } = req.body;
@@ -286,7 +286,7 @@ app.post('/api/auth/google', asyncHandler(async (req, res) => {
         res.status(401).json({ error: 'Invalid token' });
     }
 }));
- 
+
 // --- User activity ---
 app.post('/api/user-activity', asyncHandler(async (req, res) => {
     const { email } = req.body;
@@ -304,7 +304,7 @@ app.post('/api/user-activity', asyncHandler(async (req, res) => {
     }
     res.json({ success: true });
 }));
- 
+
 // --- User API keys (external) ---
 app.get('/api/userApiKeys', asyncHandler(async (req, res) => {
     const keys = await UserApiKey.find({});
@@ -327,7 +327,7 @@ app.delete('/api/userApiKeys', asyncHandler(async (req, res) => {
     await UserApiKey.deleteMany({});
     res.json({ success: true });
 }));
- 
+
 // --- Modules ---
 app.get('/api/modules', asyncHandler(async (req, res) => {
     const modules = await Module.find({});
@@ -351,7 +351,7 @@ app.delete('/api/modules', asyncHandler(async (req, res) => {
     await Module.deleteMany({});
     res.json({ success: true });
 }));
- 
+
 // --- Bugs ---
 app.get('/api/bugs', asyncHandler(async (req, res) => { res.json(await Bug.find({})); }));
 app.post('/api/bugs', asyncHandler(async (req, res) => { await new Bug(req.body).save(); res.json({ success: true }); }));
@@ -361,12 +361,12 @@ app.delete('/api/bugs/:id', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 app.delete('/api/bugs', asyncHandler(async (req, res) => { await Bug.deleteMany({}); res.json({ success: true }); }));
- 
+
 // --- Abuse reports ---
 app.get('/api/abuse', asyncHandler(async (req, res) => { res.json(await Abuse.find({})); }));
 app.post('/api/abuse', asyncHandler(async (req, res) => { await new Abuse(req.body).save(); res.json({ success: true }); }));
 app.delete('/api/abuse', asyncHandler(async (req, res) => { await Abuse.deleteMany({}); res.json({ success: true }); }));
- 
+
 // --- Pending bans ---
 app.get('/api/pendingBans', asyncHandler(async (req, res) => { res.json(await PendingBan.find({})); }));
 app.post('/api/pendingBans', asyncHandler(async (req, res) => { await new PendingBan(req.body).save(); res.json({ success: true }); }));
@@ -376,12 +376,12 @@ app.delete('/api/pendingBans/:id', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 app.delete('/api/pendingBans', asyncHandler(async (req, res) => { await PendingBan.deleteMany({}); res.json({ success: true }); }));
- 
+
 // --- IP registrations ---
 app.get('/api/ipRegs', asyncHandler(async (req, res) => { res.json(await IpReg.find({})); }));
 app.post('/api/ipRegs', asyncHandler(async (req, res) => { await new IpReg(req.body).save(); res.json({ success: true }); }));
 app.delete('/api/ipRegs', asyncHandler(async (req, res) => { await IpReg.deleteMany({}); res.json({ success: true }); }));
- 
+
 // --- Image quotas ---
 app.get('/api/imageQuotas', asyncHandler(async (req, res) => { res.json(await ImageQuota.find({})); }));
 app.post('/api/imageQuotas', asyncHandler(async (req, res) => {
@@ -389,7 +389,7 @@ app.post('/api/imageQuotas', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 app.delete('/api/imageQuotas', asyncHandler(async (req, res) => { await ImageQuota.deleteMany({}); res.json({ success: true }); }));
- 
+
 // --- Chat usage ---
 app.get('/api/chatUsage', asyncHandler(async (req, res) => { res.json(await ChatUsage.find({})); }));
 app.post('/api/chatUsage', asyncHandler(async (req, res) => {
@@ -401,7 +401,7 @@ app.post('/api/chatUsage', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 app.delete('/api/chatUsage', asyncHandler(async (req, res) => { await ChatUsage.deleteMany({}); res.json({ success: true }); }));
- 
+
 // --- Tournaments ---
 app.get('/api/tournaments', asyncHandler(async (req, res) => { res.json(await Tournament.find({})); }));
 app.post('/api/tournaments', asyncHandler(async (req, res) => { await new Tournament(req.body).save(); res.json({ success: true }); }));
@@ -428,10 +428,10 @@ app.post('/api/join-tournament', asyncHandler(async (req, res) => {
     await tournament.save();
     res.json({ success: true });
 }));
- 
+
 // ========== AI PROVIDER HANDLERS ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest.`;
- 
+
 async function callGroq(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
     if (deepThink) sys += " Use step-by-step reasoning.";
@@ -445,7 +445,7 @@ async function callGroq(module, messages, deepThink) {
     if (!response.ok) throw new Error(data.error?.message || 'Groq API error');
     return data.choices?.[0]?.message?.content || "No response";
 }
- 
+
 async function callGemini(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
     if (deepThink) sys += " Use step-by-step reasoning.";
@@ -458,7 +458,7 @@ async function callGemini(module, messages, deepThink) {
     if (!response.ok) throw new Error(data.error?.message || 'Gemini API error');
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response";
 }
- 
+
 async function callOpenRouter(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
     if (deepThink) sys += " Use step-by-step reasoning.";
@@ -472,7 +472,7 @@ async function callOpenRouter(module, messages, deepThink) {
     if (!response.ok) throw new Error(data.error?.message || 'OpenRouter API error');
     return data.choices?.[0]?.message?.content || "No response";
 }
- 
+
 async function callCloudflareText(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
     if (deepThink) sys += " Use step-by-step reasoning.";
@@ -487,7 +487,7 @@ async function callCloudflareText(module, messages, deepThink) {
     if (!response.ok || !data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare text error');
     return data.result.response;
 }
- 
+
 // Main chat endpoint
 app.post('/api/chat', asyncHandler(async (req, res) => {
     const { module_id, messages, deep_think } = req.body;
@@ -505,7 +505,7 @@ app.post('/api/chat', asyncHandler(async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 }));
- 
+
 // External API endpoint for user API keys
 app.post('/api/external/chat', asyncHandler(async (req, res) => {
     const authHeader = req.headers.authorization;
@@ -554,7 +554,7 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 }));
- 
+
 // Image generation (Cloudflare SD)
 app.post('/api/generate/image', asyncHandler(async (req, res) => {
     const { prompt } = req.body;
@@ -577,7 +577,7 @@ app.post('/api/generate/image', asyncHandler(async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 }));
- 
+
 // Fallback image generation (Pollinations)
 app.post('/api/fallback/image', asyncHandler(async (req, res) => {
     const { prompt } = req.body;
@@ -592,9 +592,9 @@ app.post('/api/fallback/image', asyncHandler(async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 }));
- 
+
 // ========== ADMIN ENDPOINTS ==========
- 
+
 // Verify admin password
 app.post('/api/admin/verify', asyncHandler(async (req, res) => {
     const { password } = req.body;
@@ -607,7 +607,7 @@ app.post('/api/admin/verify', asyncHandler(async (req, res) => {
         res.status(401).json({ error: 'Invalid password' });
     }
 }));
- 
+
 // Get admin settings (mask token)
 app.get('/api/admin/settings', asyncHandler(async (req, res) => {
     const settings = await Setting.findOne();
@@ -618,7 +618,7 @@ app.get('/api/admin/settings', asyncHandler(async (req, res) => {
         imageModel: settings.imageModel
     });
 }));
- 
+
 // Update admin settings
 app.post('/api/admin/settings', asyncHandler(async (req, res) => {
     const { adminPassword, newAdminPassword, cloudflareImageAccountId, cloudflareImageApiToken, imageModel } = req.body;
@@ -638,7 +638,7 @@ app.post('/api/admin/settings', asyncHandler(async (req, res) => {
     await settings.save();
     res.json({ success: true });
 }));
- 
+
 // Change admin password via email (max 3 per day)
 app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
     const { email, newPassword } = req.body;
@@ -659,13 +659,13 @@ app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Failed to send email' });
     }
 }));
- 
+
 // Get remaining password change limit
 app.get('/api/admin/password-limit', (req, res) => {
     resetAdminCountIfNeeded();
     res.json({ remaining: 3 - adminPasswordChangeCount });
 });
- 
+
 // Admin analytics: user stats
 // FIX: Convert lastActive Date objects to timestamps for correct numeric comparison
 app.get('/api/admin/stats', asyncHandler(async (req, res) => {
@@ -690,7 +690,7 @@ app.get('/api/admin/stats', asyncHandler(async (req, res) => {
     const totalAccounts = users.length;
     res.json({ liveUsers, dailyUsers, weeklyUsers, monthlyUsers, totalAccounts });
 }));
- 
+
 // Get user profile (for admin)
 app.get('/api/admin/user/:email', asyncHandler(async (req, res) => {
     const user = await User.findOne({ email: req.params.email });
@@ -706,7 +706,7 @@ app.get('/api/admin/user/:email', asyncHandler(async (req, res) => {
         totalHoursLive: user.totalHoursLive || 0
     });
 }));
- 
+
 // Delete user permanently (admin)
 app.delete('/api/admin/user/:email', asyncHandler(async (req, res) => {
     await User.deleteOne({ email: req.params.email });
@@ -715,7 +715,7 @@ app.delete('/api/admin/user/:email', asyncHandler(async (req, res) => {
     await ChatUsage.deleteMany({ email: req.params.email });
     res.json({ success: true });
 }));
- 
+
 // Log admin abuse
 // FIX: Replaced invalid deleteMany().sort().limit() with proper query to keep only last 100 logs
 app.post('/api/admin/log-abuse', asyncHandler(async (req, res) => {
@@ -731,24 +731,24 @@ app.post('/api/admin/log-abuse', asyncHandler(async (req, res) => {
     }
     res.json({ success: true });
 }));
- 
+
 // ========== Global Error Handler ==========
 // FIX: Catches all unhandled async errors from asyncHandler() and returns JSON instead of crashing
 app.use((err, req, res, next) => {
     console.error('❌ Server error:', err.stack || err.message);
     res.status(500).json({ error: err.message || 'Internal server error' });
 });
- 
+
 // ========== Unhandled Rejection Safety Net ==========
 // FIX: Prevents the process from crashing on unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 });
- 
+
 // ========== FALLBACK ROUTE ==========
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
- 
+
 // ========== START SERVER ==========
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
