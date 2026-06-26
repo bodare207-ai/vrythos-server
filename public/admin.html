@@ -37,6 +37,8 @@
         .modal-box button { width: 100%; }
         .forgot-link { color: #8e9dc2; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 8px; display: inline-block; }
         .forgot-link:hover { color: #c084fc; }
+        /* new video settings inline style */
+        .video-settings-card input { width: 100%; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -90,6 +92,16 @@
             <button id="saveImageSettings">Save Image Settings</button>
             <div id="imageSettingsStatus" style="font-size:12px; margin-top:8px;"></div>
         </div>
+
+        <!-- ===== NEW: Video Generation Settings ===== -->
+        <div class="card video-settings-card">
+            <h3>🎬 Video Generation Settings (Agnes AI)</h3>
+            <input type="password" id="agnesApiKey" placeholder="Agnes API Key (sk-...)" style="width:100%;">
+            <input type="text" id="agnesModel" placeholder="Model (default: agnes-video-v2.0)" value="agnes-video-v2.0" style="width:100%; margin-top:8px;">
+            <button id="saveVideoSettings" style="width:100%; margin-top:8px;">Save Video Settings</button>
+            <div id="videoSettingsStatus" style="font-size:12px; margin-top:8px;"></div>
+        </div>
+
         <div class="card">
             <h3>🔐 Admin Password Management</h3>
             <p>Daily password change limit: <span id="pwdLimitStatus">3 remaining</span></p>
@@ -691,6 +703,41 @@
         setTimeout(() => statusEl.innerText = "", 3000);
     };
 
+    // ===== NEW: Video Settings =====
+    async function loadVideoSettings() {
+        try {
+            const settings = await apiGet('/api/admin/settings');
+            document.getElementById("agnesApiKey").value = '';
+            document.getElementById("agnesModel").value = settings.agnesModel || 'agnes-video-v2.0';
+        } catch(e) { console.error('loadVideoSettings:', e); }
+    }
+
+    document.getElementById("saveVideoSettings").onclick = async () => {
+        const apiKey = document.getElementById("agnesApiKey").value.trim();
+        const model = document.getElementById("agnesModel").value.trim() || 'agnes-video-v2.0';
+        const statusEl = document.getElementById("videoSettingsStatus");
+        try {
+            const adminPwd = prompt("Confirm admin password to save video settings:");
+            if (!adminPwd) return;
+            const res = await apiPost('/api/admin/settings', {
+                adminPassword: adminPwd,
+                agnesApiKey: apiKey || undefined,
+                agnesModel: model
+            });
+            if (res.success) {
+                statusEl.style.color = "#10b981";
+                statusEl.innerText = "✅ Video settings saved!";
+            } else {
+                statusEl.style.color = "#ef4444";
+                statusEl.innerText = "❌ " + (res.error || "Failed");
+            }
+        } catch(e) {
+            statusEl.style.color = "#ef4444";
+            statusEl.innerText = "❌ " + e.message;
+        }
+        setTimeout(() => statusEl.innerText = "", 3000);
+    };
+
     document.getElementById("requestAdminPwdChange").onclick = async () => {
         const email = document.getElementById("adminEmail").value.trim();
         const newPwd = document.getElementById("newAdminPwd").value;
@@ -900,6 +947,7 @@
         renderAdminModuleDropdown();
         refreshAdminChat();
         await loadImageSettings();
+        await loadVideoSettings();
         await refreshStats();
     }
 
@@ -949,7 +997,6 @@
         forgotNewPwd.value = '';
     };
     forgotCloseBtn.onclick = () => { forgotModal.style.display = 'none'; };
-    // Click outside modal closes it
     forgotModal.addEventListener('click', (e) => {
         if (e.target === forgotModal) forgotModal.style.display = 'none';
     });
