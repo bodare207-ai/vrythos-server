@@ -30,6 +30,13 @@
         .stats-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; margin: 8px 0; }
         .stat-card { background: #0e111b; padding: 8px 12px; border-radius: 12px; flex: 1; text-align: center; }
         .warning { color: #f97316; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-box { background: #11141f; border: 1px solid #8b5cf6; border-radius: 2rem; padding: 2rem; max-width: 450px; width: 90%; }
+        .modal-box h2 { margin-top: 0; }
+        .modal-box input { width: 100%; margin-bottom: 1rem; }
+        .modal-box button { width: 100%; }
+        .forgot-link { color: #8e9dc2; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 8px; display: inline-block; }
+        .forgot-link:hover { color: #c084fc; }
     </style>
 </head>
 <body>
@@ -38,7 +45,10 @@
     <div id="authArea">
         <input type="password" id="adminPassword" placeholder="Master Password">
         <button id="adminLoginBtn">Login</button>
-        <div id="adminMsg" style="color:#f97316;"></div>
+        <div style="margin-top: 8px;">
+            <span class="forgot-link" id="forgotPwdLink">🔑 Forgot admin password?</span>
+        </div>
+        <div id="adminMsg" style="color:#f97316; margin-top: 8px;"></div>
     </div>
     <div id="adminContent" style="display:none;">
         <!-- Stats cards -->
@@ -133,6 +143,18 @@
     </div>
 </div>
 
+<!-- Forgot password modal -->
+<div id="forgotModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+        <h2>🔑 Reset Admin Password</h2>
+        <p style="color:#8e9dc2; margin-bottom: 1rem;">A new password will be sent to <strong>bodare207@gmail.com</strong></p>
+        <input type="password" id="forgotNewPwd" placeholder="Enter new password">
+        <button id="forgotSendBtn">Send Reset Email</button>
+        <button id="forgotCloseBtn" style="background:#555; margin-top: 8px;">Cancel</button>
+        <div id="forgotStatus" style="margin-top: 8px; font-size: 14px;"></div>
+    </div>
+</div>
+
 <script>
     // ------------------------------------------------------------------
     // BACKEND API HELPERS
@@ -179,7 +201,6 @@
     let adminAttachedFiles = [];
 
     // FIX: imgStore avoids embedding full base64 data URIs in onclick attributes
-    // (identical pattern to the same fix in index.html — large images broke onclick attrs)
     const imgStore = {};
     let imgStoreCounter = 0;
     window.downloadImage = function(imgId) {
@@ -193,7 +214,6 @@
 
     function escapeHtml(str) {
         return String(str).replace(/[&<>"]/g, m => {
-            // FIX: Also escape double-quotes to prevent HTML attribute injection
             if (m === '&') return '&amp;';
             if (m === '<') return '&lt;';
             if (m === '>') return '&gt;';
@@ -340,10 +360,7 @@
         }
     }
 
-    // ------------------------------------------------------------------
-    // BUGS — FIX: was doing apiPost('/api/bugs', entireArray) which sent the
-    // whole array as one document. Now uses DELETE /api/bugs/:id per record.
-    // ------------------------------------------------------------------
+    // BUGS
     async function renderBugs() {
         const container = document.getElementById("bugsList");
         container.innerHTML = "";
@@ -375,7 +392,6 @@
                 user.extraImageCredits = (user.extraImageCredits || 0) + 2;
                 await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             }
-            // FIX: Delete the specific bug by its _id instead of re-POSTing the whole array
             await apiDelete(`/api/bugs/${bugId}`);
             await refreshAll();
         });
@@ -390,7 +406,6 @@
                 user.extraChatCredits = Math.max(-10, penalty);
                 await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             }
-            // FIX: Delete the specific bug by its _id instead of re-POSTing the whole array
             await apiDelete(`/api/bugs/${bugId}`);
             await refreshAll();
         });
@@ -408,10 +423,6 @@
         });
     }
 
-    // ------------------------------------------------------------------
-    // PENDING BANS — FIX: was doing apiPost('/api/pendingBans', entireArray)
-    // which saved the whole array as one document. Now uses DELETE /api/pendingBans/:id.
-    // ------------------------------------------------------------------
     async function renderPendingBans() {
         const container = document.getElementById("pendingBansList");
         container.innerHTML = "";
@@ -444,22 +455,18 @@
                 user.banReason = reason;
                 await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
             }
-            // FIX: Delete the specific pending ban by its _id instead of re-POSTing the whole array
             await apiDelete(`/api/pendingBans/${banId}`);
             await refreshAll();
         });
 
         document.querySelectorAll(".ignoreBan").forEach(btn => btn.onclick = async () => {
             const banId = btn.dataset.id;
-            // FIX: Delete the specific pending ban by its _id instead of re-POSTing the whole array
             await apiDelete(`/api/pendingBans/${banId}`);
             await refreshAll();
         });
     }
 
-    // ------------------------------------------------------------------
     // ADMIN CHAT TESTER
-    // ------------------------------------------------------------------
     async function callChatAPI(module_id, messages, deepThink) {
         const res = await fetch('/api/chat', {
             method: 'POST',
@@ -518,7 +525,6 @@
             addAdminMessage(text, true);
             try {
                 let imgData = await generateImage(text);
-                // FIX: Store image in imgStore and reference by short id (same fix as index.html)
                 const imgId = 'img_' + (++imgStoreCounter);
                 imgStore[imgId] = imgData;
                 addAdminMessage(
@@ -541,8 +547,6 @@
             return;
         }
 
-        // FIX: Include attached files in the message content (previously adminAttachedFiles was
-        // read but never actually appended to the message, so file content was silently dropped)
         let fullText = text;
         if (adminAttachedFiles.length) {
             fullText += "\n\n[Attached files]\n" + adminAttachedFiles
@@ -573,9 +577,6 @@
         inp.focus();
     }
 
-    // FIX: renderAdminModuleDropdown now auto-initializes adminSelectedModuleId
-    // to the first module so the chat tester works immediately without requiring
-    // the admin to manually change the select dropdown first.
     function renderAdminModuleDropdown() {
         let sel = document.getElementById("adminModuleSelect");
         sel.innerHTML = "";
@@ -594,7 +595,6 @@
             if (adminSelectedModuleId === mod.id) opt.selected = true;
             sel.appendChild(opt);
         });
-        // FIX: Auto-select first module if none has been explicitly chosen yet
         if (!adminSelectedModuleId || !modules.find(m => m.id === adminSelectedModuleId)) {
             adminSelectedModuleId = modules[0].id;
             sel.value = adminSelectedModuleId;
@@ -611,9 +611,7 @@
             document.getElementById("adminMessages").innerHTML = `<div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">New session started.</div></div>`;
         };
 
-        // FIX: Enter key now sends message in admin chat tester
         const adminInput = document.getElementById("adminUserInput");
-        // Remove any existing listener to avoid duplicates on re-render
         adminInput.replaceWith(adminInput.cloneNode(true));
         document.getElementById("adminUserInput").addEventListener("keypress", (e) => {
             if (e.key === "Enter") adminSendMessage(false);
@@ -655,9 +653,7 @@
         });
     }
 
-    // ------------------------------------------------------------------
     // IMAGE SETTINGS & PASSWORD CHANGE
-    // ------------------------------------------------------------------
     async function loadImageSettings() {
         try {
             const settings = await apiGet('/api/admin/settings');
@@ -673,10 +669,6 @@
         const model = document.getElementById("cfImageModel").value.trim();
         const statusEl = document.getElementById("imageSettingsStatus");
         try {
-            // FIX: Pass the stored admin password so the server's auth check passes.
-            // Previously no adminPassword was sent, which technically bypassed the check
-            // (server skips the check when adminPassword is absent — security gap).
-            // Now we prompt for the password before saving sensitive credentials.
             const adminPwd = prompt("Confirm admin password to save image settings:");
             if (!adminPwd) return;
             const res = await apiPost('/api/admin/settings', {
@@ -724,9 +716,7 @@
         setTimeout(() => statusEl.innerText = "", 3000);
     };
 
-    // ------------------------------------------------------------------
     // USER MANAGEMENT ACTIONS
-    // ------------------------------------------------------------------
     document.getElementById("grantChat10").onclick = async () => {
         let sel = document.getElementById("userSelect").value;
         if (!sel) return;
@@ -786,12 +776,9 @@
         await refreshAll();
     };
 
-    // ------------------------------------------------------------------
     // SYSTEM ACTIONS
-    // ------------------------------------------------------------------
     document.getElementById("resetAllChatUsage").onclick = async () => {
         if (!confirm("Reset daily chat usage counters for ALL users?")) return;
-        // Reset via server — update each user's dailyCallsRecord and wipe ChatUsage collection
         await apiDelete('/api/chatUsage');
         for (let user of users) {
             user.dailyCallsRecord = { date: "", count: 0 };
@@ -832,16 +819,13 @@
         } catch(e) { alert("Export failed: " + e.message); }
     };
 
-    // FIX: Hard reset now uses the correct bulk DELETE routes that were added to server.js.
-    // Previously it called DELETE /api/users, DELETE /api/modules etc. which didn't exist
-    // (only DELETE /api/users/:email existed), so the factory reset silently did nothing.
     document.getElementById("hardReset").onclick = async () => {
         if (!confirm("⚠️ FACTORY RESET: This will delete ALL users, modules, reports, API keys. Type 'RESET' to confirm.")) return;
         let check = prompt("Type RESET to proceed");
         if (check !== "RESET") return;
         try {
-            await apiDelete('/api/users');      // now exists: deletes all users + their quotas/keys/usage
-            await apiDelete('/api/modules');    // now exists: deletes all modules
+            await apiDelete('/api/users');
+            await apiDelete('/api/modules');
             await apiDelete('/api/bugs');
             await apiDelete('/api/abuse');
             await apiDelete('/api/pendingBans');
@@ -857,9 +841,7 @@
 
     document.getElementById("refreshStatsBtn").onclick = () => refreshStats();
 
-    // ------------------------------------------------------------------
     // ADD MODULE PRESETS
-    // ------------------------------------------------------------------
     document.getElementById("addFlash").onclick = async () => {
         let primaryKey = prompt("Groq API Key (gsk_)");
         if (!primaryKey) return;
@@ -907,9 +889,7 @@
         await refreshAll();
     };
 
-    // ------------------------------------------------------------------
     // REFRESH ALL
-    // ------------------------------------------------------------------
     async function refreshAll() {
         await loadAllData();
         await renderModules();
@@ -923,9 +903,7 @@
         await refreshStats();
     }
 
-    // ------------------------------------------------------------------
-    // ADMIN ABUSE DETECTION (right-click / devtools in admin panel)
-    // ------------------------------------------------------------------
+    // ADMIN ABUSE DETECTION (right-click / devtools)
     let adminAbuseScore = 0;
     function addAdminAbuseScore(points, reason) {
         adminAbuseScore += points;
@@ -954,16 +932,58 @@
         }
     });
 
-    // ------------------------------------------------------------------
-    // FIX: Auto-refresh stats every 30 seconds while admin panel is open
-    // (previously stats only updated on manual button click)
-    // ------------------------------------------------------------------
+    // AUTO-REFRESH STATS
     let statsInterval = null;
 
-    // ------------------------------------------------------------------
+    // ======== FORGOT PASSWORD MODAL ========
+    const forgotModal = document.getElementById('forgotModal');
+    const forgotLink = document.getElementById('forgotPwdLink');
+    const forgotCloseBtn = document.getElementById('forgotCloseBtn');
+    const forgotSendBtn = document.getElementById('forgotSendBtn');
+    const forgotNewPwd = document.getElementById('forgotNewPwd');
+    const forgotStatus = document.getElementById('forgotStatus');
+
+    forgotLink.onclick = () => {
+        forgotModal.style.display = 'flex';
+        forgotStatus.innerText = '';
+        forgotNewPwd.value = '';
+    };
+    forgotCloseBtn.onclick = () => { forgotModal.style.display = 'none'; };
+    // Click outside modal closes it
+    forgotModal.addEventListener('click', (e) => {
+        if (e.target === forgotModal) forgotModal.style.display = 'none';
+    });
+
+    forgotSendBtn.onclick = async () => {
+        const newPwd = forgotNewPwd.value.trim();
+        if (!newPwd || newPwd.length < 4) {
+            forgotStatus.style.color = '#f97316';
+            forgotStatus.innerText = 'Password must be at least 4 characters.';
+            return;
+        }
+        forgotStatus.innerText = 'Sending...';
+        forgotSendBtn.disabled = true;
+        try {
+            const res = await apiPost('/api/admin/change-password', {
+                email: 'bodare207@gmail.com',
+                newPassword: newPwd
+            });
+            if (res.success) {
+                forgotStatus.style.color = '#10b981';
+                forgotStatus.innerText = `✅ Password reset email sent! Check bodare207@gmail.com. Remaining today: ${res.remaining || '?'}`;
+                setTimeout(() => forgotModal.style.display = 'none', 4000);
+            } else {
+                forgotStatus.style.color = '#ef4444';
+                forgotStatus.innerText = '❌ ' + (res.error || 'Failed');
+            }
+        } catch(e) {
+            forgotStatus.style.color = '#ef4444';
+            forgotStatus.innerText = '❌ Error: ' + e.message;
+        }
+        forgotSendBtn.disabled = false;
+    };
+
     // LOGIN
-    // ------------------------------------------------------------------
-    // FIX: Enter key on password field triggers login button
     document.getElementById("adminPassword").addEventListener("keypress", (e) => {
         if (e.key === "Enter") document.getElementById("adminLoginBtn").click();
     });
@@ -978,11 +998,9 @@
                 document.getElementById("adminContent").style.display = "block";
                 await refreshAll();
 
-                // FIX: Start auto-refresh of stats every 30s after login
                 if (statsInterval) clearInterval(statsInterval);
                 statsInterval = setInterval(() => refreshStats(), 30000);
 
-                // Load password limit on login
                 try {
                     const limitRes = await apiGet('/api/admin/password-limit');
                     if (limitRes.remaining !== undefined) {
