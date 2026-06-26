@@ -12,5 +12,17 @@
     "nodemailer": "^6.9.7",
     "google-auth-library": "^9.0.0",
     "mongoose": "^8.0.0"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Viraj S. Bodare",
+  "license": "MIT",
+  "keywords": [
+    "vrythos",
+    "ai",
+    "chat",
+    "image",
+    "generation"
+  ]
 }
