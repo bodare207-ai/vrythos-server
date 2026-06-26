@@ -57,17 +57,20 @@
     let selectedModuleId = null;
     let deepThink = false;
     let liveImageMode = false;
-    let liveVideoMode = false;               // NEW: video mode toggle
+    let liveVideoMode = false;
     let messagesHistory = [];
     let attachedFiles = [];
     let isProcessing = false;
+
+    // Default video duration (in seconds)
+    const DEFAULT_VIDEO_DURATION = 5;
 
     async function loadAllData() {
         modules = await apiGet('/api/modules');
         tournaments = await apiGet('/api/tournaments');
     }
 
-    // User management (server-side)
+    // User management
     async function loadUsers() { return await apiGet('/api/users'); }
     async function updateUser(email, updates) { return await apiPut(`/api/users/${email}`, updates); }
     async function deleteUser(email) { return await apiDelete(`/api/users/${email}`); }
@@ -82,7 +85,7 @@
         await apiPost('/api/userApiKeys', { email, keys });
     }
 
-    // Abuse & pending bans (server-side)
+    // Abuse & pending bans
     async function addAbuseReport(report) { return await apiPost('/api/abuse', report); }
     async function addPendingBan(ban) { return await apiPost('/api/pendingBans', ban); }
 
@@ -117,7 +120,6 @@
         return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
     }
 
-    // FIX: escapeHtml now also escapes double-quotes for safety in HTML attributes
     function escapeHtml(str){
         return String(str).replace(/[&<>"]/g, function(m){
             if(m === '&') return '&amp;';
@@ -185,7 +187,7 @@
     }
 
     // ------------------------------------------------------------------
-    // IMAGE GENERATION (Cloudflare SD + fallback)
+    // IMAGE GENERATION
     // ------------------------------------------------------------------
     async function generateImageWithCloudflare(prompt) {
         try {
@@ -212,9 +214,6 @@
         return null;
     }
 
-    // FIX: Image download/copy now uses a global imgStore map keyed by a short id,
-    // instead of embedding the full base64 data URI directly into onclick HTML attributes
-    // (which broke for large images because attribute values have browser length limits).
     const imgStore = {};
     let imgStoreCounter = 0;
     window.downloadImage = function(imgId) {
@@ -278,7 +277,6 @@
     // ------------------------------------------------------------------
     // VIDEO GENERATION
     // ------------------------------------------------------------------
-    // Video store for download/copy (similar to image store)
     const videoStore = {};
     let videoStoreCounter = 0;
     window.downloadVideo = function(videoId) {
@@ -307,7 +305,7 @@
             const res = await apiPost('/api/generate/video', {
                 email: currentUser.email,
                 prompt: prompt,
-                duration: duration
+                duration: duration || DEFAULT_VIDEO_DURATION
             });
             if (res.success) {
                 const vidId = 'vid_' + (++videoStoreCounter);
@@ -328,7 +326,6 @@
         }
     }
 
-    // Detect if user wants a video based on keywords
     function isVideoGenerationRequest(text) {
         const videoKeywords = /(video|animate|animation|make a video|create a video|generate a video|render a video|cinematic|short film|motion|sequence|clip|movie)/i;
         return videoKeywords.test(text);
@@ -357,7 +354,7 @@
     }
 
     // ------------------------------------------------------------------
-    // AI ENGINE CALLS (using backend /api/chat)
+    // AI ENGINE CALLS
     // ------------------------------------------------------------------
     async function callChatAPI(module_id, messages, deepThinkActive) {
         const res = await fetch('/api/chat', {
@@ -375,7 +372,7 @@
     }
 
     // ------------------------------------------------------------------
-    // USER ACTIVITY TRACKING (hours live)
+    // USER ACTIVITY TRACKING
     // ------------------------------------------------------------------
     let activityInterval = null;
     function startActivityTracking() {
@@ -412,7 +409,6 @@
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     }
-    // FIX: addAIMessage only pushes to messagesHistory once (when !isHtml).
     function addAIMessage(html, isHtml=false){
         let container = document.getElementById("messagesContainer");
         let div = document.createElement("div");
@@ -438,32 +434,27 @@
     }
 
     // ------------------------------------------------------------------
-    // MAIN SEND MESSAGE (with video and image support)
+    // MAIN SEND MESSAGE
     // ------------------------------------------------------------------
     async function sendMessage(userText, forceImage = false, forceVideo = false) {
         if (!currentUser || currentUser.banned) { addAIMessage("🚫 Account banned."); return; }
         if (isProcessing) { addAIMessage("⏳ Please wait, previous message is still being processed."); return; }
         setProcessing(true);
         try {
-            // Determine if we should generate video or image or chat
             let willVideo = forceVideo || (liveVideoMode && isVideoGenerationRequest(userText));
             let willImage = (forceImage || (liveImageMode && isImageGenerationRequest(userText))) && !willVideo;
 
             if (willVideo) {
-                // Video generation path
                 let prompt = userText;
-                // Try to extract subject if possible
                 const videoMatch = userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
                 if (videoMatch && videoMatch[2]) prompt = videoMatch[2];
-                const duration = parseInt(document.getElementById("videoDuration").value) || 5;
                 addUserMessage(`🎬 ${userText.substring(0,100)}`);
-                await generateVideo(prompt, duration);
+                await generateVideo(prompt, DEFAULT_VIDEO_DURATION);
                 setProcessing(false);
                 return;
             }
 
             if (willImage) {
-                // Image generation path
                 addUserMessage(`🎨 ${userText.substring(0,100)}`);
                 let prompt = userText;
                 const match = userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
@@ -473,7 +464,7 @@
                 return;
             }
 
-            // --- Normal chat path ---
+            // Normal chat
             if (!(await canMakeChatCall())) {
                 addAIMessage(`⛔ Daily chat limit reached (${50+(currentUser.extraChatCredits||0)}/day). Request extra via bug report.`);
                 setProcessing(false);
@@ -544,7 +535,6 @@
             renderFileBadges();
         });
     }
-    // renderModuleDropdown with auto-select
     function renderModuleDropdown() {
         let sel = document.getElementById("moduleSelect");
         sel.innerHTML = "";
@@ -573,7 +563,7 @@
     }
 
     // ------------------------------------------------------------------
-    // TOURNAMENTS DISPLAY
+    // TOURNAMENTS
     // ------------------------------------------------------------------
     async function renderTournaments() {
         const container = document.getElementById("tournamentsContainer");
@@ -797,7 +787,7 @@
     }
 
     // ------------------------------------------------------------------
-    // BUILD UI (includes video mode toggle and video controls)
+    // BUILD UI (clean input area: only 📎 🎨 🎬 ➤)
     // ------------------------------------------------------------------
     async function buildUI() {
         document.getElementById("app-root").innerHTML = `
@@ -818,7 +808,7 @@
                     <label class="live-heading">🎨 LIVE IMAGE MODE</label>
                     <label class="live-image-toggle"><input type="checkbox" id="liveImageToggle"> Auto‑generate images from descriptions</label>
                 </div>
-                <!-- NEW: LIVE VIDEO MODE -->
+                <!-- LIVE VIDEO MODE -->
                 <div class="live-image-container" style="margin-top:8px;">
                     <label class="live-heading">🎬 LIVE VIDEO MODE</label>
                     <label class="live-image-toggle"><input type="checkbox" id="liveVideoToggle"> Auto‑generate videos from descriptions</label>
@@ -847,16 +837,7 @@
                     <div class="input-wrapper">
                         <button class="attach-btn" id="attachBtn" title="Attach file">📎</button>
                         <button class="img-gen-btn" id="imageGenBtn" title="Generate image">🎨</button>
-                        <!-- VIDEO CONTROLS -->
-                        <select id="videoDuration" style="background:var(--bg-primary); border:1px solid var(--border); border-radius:28px; padding:6px 10px; color:white; margin:0 4px; font-size:0.8rem;">
-                            <option value="1">1s</option>
-                            <option value="5" selected>5s</option>
-                            <option value="10">10s</option>
-                            <option value="15">15s</option>
-                            <option value="20">20s</option>
-                        </select>
-                        <button class="video-gen-btn" id="videoGenBtn" title="Generate video">🎬</button>
-                        <!-- END VIDEO CONTROLS -->
+                        <button class="video-gen-btn" id="videoGenBtn" title="Generate video (default 5s)">🎬</button>
                         <input type="text" id="userInput" placeholder="Enter next chat" autocomplete="off">
                         <button class="send-btn" id="sendBtn">➤</button>
                     </div>
@@ -891,7 +872,7 @@
             let prompt = inp.value.trim();
             if (!prompt) { prompt = "A cinematic scene with vibrant colors"; }
             if (!isProcessing) {
-                sendMessage(prompt, false, true);  // force video
+                sendMessage(prompt, false, true);
                 inp.value = "";
             }
         };
@@ -932,7 +913,7 @@
     };
 
     // ------------------------------------------------------------------
-    // AUTHENTICATION (Google + Email/Password)
+    // AUTHENTICATION
     // ------------------------------------------------------------------
     async function initAuth() {
         let savedSession = localStorage.getItem("vrythos_current_session");
@@ -1160,9 +1141,8 @@
     .ai-status { display: flex; align-items: center; font-weight: 600; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
     @media (max-width: 700px) { .sidebar { display: none; } .message { max-width: 95%; } }
-    /* Video controls */
+    /* Video button style */
     .video-gen-btn { font-size: 1.2rem; padding: 4px 6px; }
-    #videoDuration { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 28px; padding: 6px 10px; color: white; margin: 0 4px; font-size: 0.8rem; }
 </style>
 </body>
 </html>
