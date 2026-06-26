@@ -529,7 +529,7 @@
     }
 
     // ------------------------------------------------------------------
-    // USER SETTINGS MODAL (with API key management)
+    // USER SETTINGS MODAL (with API key management + Free API Key)
     // ------------------------------------------------------------------
     async function openUserSettings() {
         let userKeys = await loadUserApiKeys(currentUser.email);
@@ -568,6 +568,19 @@
                         <button id="generateApiKeyBtn" style="width:100%; background:#8b5cf6; margin-bottom:8px;">+ Generate New API Key</button>
                         <small style="font-size:10px;">Use with Bearer token: <code>Authorization: Bearer YOUR_KEY</code><br>Endpoint: <code>POST /api/external/chat</code></small>
                     </div>
+                    <!-- ===== NEW FREE API KEY BLOCK ===== -->
+                    <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
+                        <h4 style="margin:0 0 8px 0;">🔓 Free API Key (100 requests/day)</h4>
+                        <p style="font-size:12px; color:#8e9dc2;">One key per user – works with both chat & image generation.</p>
+                        <div id="freeKeyInfo" style="font-size:12px; margin-bottom:8px;"></div>
+                        <button id="generateFreeKeyBtn" style="width:100%; background:#10b981; margin-bottom:8px;">✨ Generate / Regenerate Free Key</button>
+                        <button id="revokeFreeKeyBtn" style="width:100%; background:#ef4444; display:none;">🗑️ Revoke Free Key</button>
+                        <div id="freeKeyDisplay" style="background:#0a0c15; border-radius:12px; padding:8px; margin-top:8px; word-break:break-all; display:none;">
+                            <strong>Your API Key:</strong> <code id="freeKeyValue"></code><br>
+                            <strong>Endpoint:</strong> <code id="freeKeyUrl">https://vrythos-server.onrender.com/api/external/chat</code>
+                        </div>
+                    </div>
+                    <!-- ================================= -->
                     <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
                         <h4 style="margin:0 0 8px 0;">🐞 Report a Bug / Request Credits</h4>
                         <textarea id="bugReportText" placeholder="Describe issue or request" rows="2" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:16px; padding:8px; color:white; margin-bottom:8px;"></textarea>
@@ -671,6 +684,51 @@
             await refreshApiKeysList();
             alert(`New API Key generated: ${newKey}\nStore it safely. You won't see it again.`);
         };
+
+        // ===== FREE API KEY FUNCTIONS =====
+        async function refreshFreeKeyInfo() {
+            try {
+                const info = await apiGet(`/api/free-api-key/info?email=${encodeURIComponent(currentUser.email)}`);
+                const infoDiv = document.getElementById('freeKeyInfo');
+                const displayDiv = document.getElementById('freeKeyDisplay');
+                const revokeBtn = document.getElementById('revokeFreeKeyBtn');
+                if (info.exists) {
+                    infoDiv.innerHTML = `✅ Active key (${info.used}/${info.limit} used today)`;
+                    document.getElementById('freeKeyValue').textContent = info.key;
+                    document.getElementById('freeKeyUrl').textContent = 'https://vrythos-server.onrender.com/api/external/chat';
+                    displayDiv.style.display = 'block';
+                    revokeBtn.style.display = 'block';
+                } else {
+                    infoDiv.innerHTML = 'No free key generated yet.';
+                    displayDiv.style.display = 'none';
+                    revokeBtn.style.display = 'none';
+                }
+            } catch(e) { console.warn(e); }
+        }
+
+        await refreshFreeKeyInfo();
+
+        document.getElementById('generateFreeKeyBtn').onclick = async () => {
+            try {
+                const res = await apiPost('/api/free-api-key/generate', { email: currentUser.email });
+                if (res.success) {
+                    alert(`Free API Key generated!\n\nKey: ${res.key}\nEndpoint: ${res.apiUrl}\nLimit: ${res.limit}/day`);
+                    await refreshFreeKeyInfo();
+                } else {
+                    alert('Failed: ' + (res.error || 'Unknown error'));
+                }
+            } catch(e) { alert('Error: ' + e.message); }
+        };
+
+        document.getElementById('revokeFreeKeyBtn').onclick = async () => {
+            if (!confirm('Revoke your free API key? This cannot be undone.')) return;
+            try {
+                await apiPost('/api/free-api-key/revoke', { email: currentUser.email });
+                await refreshFreeKeyInfo();
+                alert('Key revoked.');
+            } catch(e) { alert('Error: ' + e.message); }
+        };
+        // ===== END FREE API KEY =====
     }
 
     // ------------------------------------------------------------------
