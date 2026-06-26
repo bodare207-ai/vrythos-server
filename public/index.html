@@ -381,6 +381,60 @@
         const imgKeywords = /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i;
         return imgKeywords.test(text);
     }
+
+    // ------------------------------------------------------------------
+    // VIDEO GENERATION
+    // ------------------------------------------------------------------
+    // Video store for download/copy (similar to image store)
+    const videoStore = {};
+    let videoStoreCounter = 0;
+    window.downloadVideo = function(videoId) {
+        const dataUrl = videoStore[videoId];
+        if (!dataUrl) return;
+        const link = document.createElement('a');
+        link.download = 'vrythos_video.mp4';
+        link.href = dataUrl;
+        link.click();
+    };
+    window.copyVideoToClipboard = async function(videoId) {
+        const dataUrl = videoStore[videoId];
+        if (!dataUrl) return;
+        try {
+            const blob = await (await fetch(dataUrl)).blob();
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            alert('Video copied to clipboard!');
+        } catch(e) {
+            alert('Copy failed: ' + e.message);
+        }
+    };
+
+    async function generateVideo(prompt, duration) {
+        addAIMessage("🎬 Generating video... (may take 30-60 seconds)", false);
+        try {
+            const res = await apiPost('/api/generate/video', {
+                email: currentUser.email,
+                prompt: prompt,
+                duration: duration
+            });
+            if (res.success) {
+                const vidId = 'vid_' + (++videoStoreCounter);
+                videoStore[vidId] = res.video;
+                const vidHtml = `<video controls autoplay loop style="max-width:100%; border-radius:16px; max-height:400px;">
+                                    <source src="${res.video}" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video><br>
+                                <button onclick="downloadVideo('${vidId}')">⬇️ Download</button>
+                                <button onclick="copyVideoToClipboard('${vidId}')">📋 Copy</button>
+                                <span style="font-size:12px; color:#8e9dc2; margin-left:8px;">Remaining today: ${res.remaining || '?'}</span>`;
+                addAIMessage(vidHtml, true);
+            } else {
+                addAIMessage("❌ Video generation failed: " + (res.error || 'Unknown error'));
+            }
+        } catch(e) {
+            addAIMessage("❌ Video generation error: " + e.message);
+        }
+    }
+
     async function sendMessage(userText, forceImage = false) {
         if (!currentUser || currentUser.banned) { addAIMessage("🚫 Account banned."); return; }
         if (isProcessing) { addAIMessage("⏳ Please wait, previous message is still being processed."); return; }
@@ -431,10 +485,6 @@
             } finally {
                 if(typing) typing.remove();
             }
-            // FIX: REMOVED the duplicate `messagesHistory.push({role:"assistant"...})` that was here.
-            // addAIMessage() below already pushes to history for non-HTML messages.
-            // Having both caused every AI reply to appear twice in the conversation context,
-            // making the AI confused and wasting context window tokens.
             addAIMessage(reply);
         } finally {
             setProcessing(false);
@@ -732,7 +782,7 @@
     }
 
     // ------------------------------------------------------------------
-    // BUILD UI (includes tournaments sidebar)
+    // BUILD UI (includes tournaments sidebar and video controls)
     // ------------------------------------------------------------------
     async function buildUI() {
         document.getElementById("app-root").innerHTML = `
@@ -777,6 +827,16 @@
                     <div class="input-wrapper">
                         <button class="attach-btn" id="attachBtn" title="Attach file">📎</button>
                         <button class="img-gen-btn" id="imageGenBtn" title="Generate image">🎨</button>
+                        <!-- NEW VIDEO CONTROLS -->
+                        <select id="videoDuration" style="background:var(--bg-primary); border:1px solid var(--border); border-radius:28px; padding:6px 10px; color:white; margin:0 4px; font-size:0.8rem;">
+                            <option value="1">1s</option>
+                            <option value="5" selected>5s</option>
+                            <option value="10">10s</option>
+                            <option value="15">15s</option>
+                            <option value="20">20s</option>
+                        </select>
+                        <button class="video-gen-btn" id="videoGenBtn" title="Generate video">🎬</button>
+                        <!-- END NEW -->
                         <input type="text" id="userInput" placeholder="Enter next chat" autocomplete="off">
                         <button class="send-btn" id="sendBtn">➤</button>
                     </div>
@@ -802,6 +862,17 @@
             });
         };
         document.getElementById("imageGenBtn").onclick = () => { let inp = document.getElementById("userInput"); let prompt = inp.value.trim() || "cyberpunk city"; if(!isProcessing) sendMessage(prompt, true); inp.value = ""; };
+        // NEW: Video button handler
+        document.getElementById("videoGenBtn").onclick = () => {
+            let inp = document.getElementById("userInput");
+            let prompt = inp.value.trim();
+            if (!prompt) { prompt = "A cinematic scene with vibrant colors"; }
+            let duration = parseInt(document.getElementById("videoDuration").value) || 5;
+            if (!isProcessing) {
+                generateVideo(prompt, duration);
+                inp.value = "";
+            }
+        };
         document.getElementById("userSettingsBtn").onclick = openUserSettings;
         renderModuleDropdown();
         await updateRemainingDisplay();
@@ -1065,8 +1136,8 @@
     /* FIX: send-btn now has explicit color, height, display so it renders correctly on all browsers */
     .send-btn { background: var(--accent); border: none; width: 44px; height: 44px; border-radius: 40px; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
     .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .attach-btn, .img-gen-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 4px 6px; opacity: 0.7; transition: opacity 0.2s; }
-    .attach-btn:hover, .img-gen-btn:hover { opacity: 1; }
+    .attach-btn, .img-gen-btn, .video-gen-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 4px 6px; opacity: 0.7; transition: opacity 0.2s; }
+    .attach-btn:hover, .img-gen-btn:hover, .video-gen-btn:hover { opacity: 1; }
     .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     .modal-content { background: var(--bg-secondary); border-radius: 28px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 24px; border: 1px solid var(--accent); }
     .close-modal { cursor: pointer; }
@@ -1077,6 +1148,9 @@
     .ai-status { display: flex; align-items: center; font-weight: 600; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
     @media (max-width: 700px) { .sidebar { display: none; } .message { max-width: 95%; } }
+    /* Video button style */
+    .video-gen-btn { font-size: 1.2rem; padding: 4px 6px; }
+    #videoDuration { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 28px; padding: 6px 10px; color: white; margin: 0 4px; font-size: 0.8rem; }
 </style>
 </body>
 </html>
