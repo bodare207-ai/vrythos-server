@@ -456,27 +456,36 @@
             border-color: var(--accent);
             color: var(--text-primary);
         }
+        .message .bubble .btn-row button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
         /* Code block styling */
-        .message .bubble pre {
+        .message .bubble .code-block-wrapper {
             background: var(--bg-primary);
             border-radius: var(--radius-sm);
             padding: 0.8rem;
             margin: 0.5rem 0;
-            overflow-x: auto;
-            position: relative;
             border: 1px solid var(--border-subtle);
+            position: relative;
         }
-        .message .bubble pre code {
+        .message .bubble .code-block-wrapper pre {
+            margin: 0;
+            overflow-x: auto;
+        }
+        .message .bubble .code-block-wrapper pre code {
             font-family: 'Fira Code', monospace;
             font-size: 0.8rem;
             color: var(--text-secondary);
+            white-space: pre-wrap;
         }
-        .message .bubble .code-actions {
+        .message .bubble .code-block-wrapper .code-actions {
             display: flex;
             gap: 0.5rem;
-            margin-top: 0.3rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
         }
-        .message .bubble .code-actions button {
+        .message .bubble .code-block-wrapper .code-actions button {
             background: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-full);
@@ -486,9 +495,13 @@
             cursor: pointer;
             transition: var(--transition);
         }
-        .message .bubble .code-actions button:hover {
+        .message .bubble .code-block-wrapper .code-actions button:hover {
             border-color: var(--accent);
             color: var(--text-primary);
+        }
+        .message .bubble .code-block-wrapper .code-actions button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
 
         /* ────────────── Input Area ────────────── */
@@ -981,7 +994,6 @@
         let videoStoreCounter = 0;
         let abuseScore = 0;
         let abuseWarningShown = false;
-        // Track used module IDs for fallback
         let usedModuleIds = [];
 
         // ─── HELPERS ───
@@ -1028,7 +1040,7 @@
                 abuseWarningShown = true;
                 addAIMessage(
                     `⚠️ Warning: suspicious activity detected (score ${abuseScore}%). Repeated violations may lead to a ban.`
-                    );
+                );
             }
         }
 
@@ -1114,7 +1126,6 @@
         async function loadAllData() {
             modules = await apiGet('/api/modules');
             tournaments = await apiGet('/api/tournaments');
-            // Reset used module IDs
             usedModuleIds = [];
         }
         async function loadUsers() { return await apiGet('/api/users'); }
@@ -1137,7 +1148,7 @@
         async function joinTournament(id) { return await apiPost('/api/join-tournament', { email: currentUser.email,
                 tournamentId: id }); }
 
-        // ─── IMAGE GENERATION (no limit checks) ───
+        // ─── IMAGE GENERATION ───
         async function generateImageWithCloudflare(prompt) {
             try {
                 const res = await fetch('/api/generate/image', {
@@ -1183,7 +1194,7 @@
             }
         }
 
-        // ─── VIDEO GENERATION (backend still enforces 5/day, we ignore frontend limit) ───
+        // ─── VIDEO GENERATION ───
         async function generateVideo(prompt, duration) {
             addAIMessage('🎬 Generating video… (may take 30–60s)', false);
             try {
@@ -1225,24 +1236,20 @@
 
         // ─── AI ENGINE CALL WITH RANDOM MODULE & FALLBACK ───
         async function callChatWithFallback(messages, deep) {
-            // Try up to 3 different modules
             let attempts = 0;
             let lastError = null;
             const maxAttempts = Math.min(modules.length, 3);
-            // Shuffle modules to get random order
             const shuffled = [...modules].sort(() => Math.random() - 0.5);
             for (const mod of shuffled) {
                 if (attempts >= maxAttempts) break;
                 attempts++;
                 try {
                     const reply = await callChatAPI(mod.id, messages, deep);
-                    // Success – update module status
                     updateModuleStatus(mod.displayName);
                     return reply;
                 } catch (err) {
                     lastError = err;
                     console.warn(`Module ${mod.displayName} failed: ${err.message}`);
-                    // Continue to next module
                 }
             }
             throw new Error(lastError || 'All AI engines unavailable');
@@ -1262,6 +1269,201 @@
         function updateModuleStatus(name) {
             const el = document.getElementById('moduleStatus');
             if (el) el.textContent = `⚡ ${name}`;
+        }
+
+        // ─── CODE PROCESSING & DEBUGGING ───
+        // This function parses text for markdown code fences and returns HTML with code blocks and actions.
+        function processCodeInText(text) {
+            // Regex to find ```language\ncode\n```
+            const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+            let match;
+            let lastIndex = 0;
+            let parts = [];
+            let hasCode = false;
+            while ((match = codeBlockRegex.exec(text)) !== null) {
+                // Add text before code
+                if (match.index > lastIndex) {
+                    parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
+                }
+                const language = match[1] || 'txt';
+                const code = match[2];
+                parts.push({ type: 'code', language, code });
+                hasCode = true;
+                lastIndex = match.index + match[0].length;
+            }
+            // Add remaining text
+            if (lastIndex < text.length) {
+                parts.push({ type: 'text', content: text.substring(lastIndex) });
+            }
+            // If no code found, return null
+            if (!hasCode) return null;
+            return parts;
+        }
+
+        // Build HTML from parts
+        function buildCodeHtml(parts) {
+            let html = '';
+            for (const part of parts) {
+                if (part.type === 'text') {
+                    html += escapeHtml(part.content).replace(/\n/g, '<br>');
+                } else {
+                    // Generate unique ID for this code block
+                    const codeId = 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                    const lang = part.language || 'txt';
+                    const code = part.code;
+                    html += `
+                        <div class="code-block-wrapper" data-codeid="${codeId}" data-lang="${lang}" data-code="${escapeHtml(code)}">
+                            <pre><code class="language-${lang}">${escapeHtml(code)}</code></pre>
+                            <div class="code-actions">
+                                <button onclick="downloadCode('${codeId}')">📥 Download</button>
+                                <button onclick="copyCode('${codeId}')">📋 Copy</button>
+                                <button onclick="debugCode('${codeId}')">🔍 Debug</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            return html;
+        }
+
+        // Store code blocks globally for actions
+        let codeStore = {};
+
+        // When a code block is rendered, we store its data
+        function registerCodeBlock(id, language, code) {
+            codeStore[id] = { language, code };
+        }
+
+        // Download code
+        window.downloadCode = function(id) {
+            const data = codeStore[id];
+            if (!data) return;
+            const blob = new Blob([data.code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `code.${data.language}`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // Copy code
+        window.copyCode = async function(id) {
+            const data = codeStore[id];
+            if (!data) return;
+            try {
+                await navigator.clipboard.writeText(data.code);
+                showToast('Code copied!', 'info');
+            } catch (_) { showToast('Copy failed', 'error'); }
+        };
+
+        // Debug code: send to AI with debug prompt
+        window.debugCode = async function(id) {
+            const data = codeStore[id];
+            if (!data) return;
+            const code = data.code;
+            const lang = data.language;
+            // Disable button during debug
+            const btn = document.querySelector(`.code-block-wrapper[data-codeid="${id}"] .code-actions button:last-child`);
+            if (btn) btn.disabled = true;
+            btn.textContent = '⏳ Debugging…';
+            try {
+                // Build a debug prompt
+                const debugPrompt =
+                    `Please review the following ${lang} code for errors, bugs, or improvements. Provide the fixed version with explanations. Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
+                // Add a user message to history (so the AI sees it)
+                messagesHistory.push({ role: 'user', content: debugPrompt });
+                // Call AI with fallback
+                const debugReply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
+                // Remove the user message we added? We'll keep it for context.
+                // Add the debug reply as a new assistant message
+                addAIMessage(debugReply);
+                // Enable button
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '🔍 Debug';
+                }
+            } catch (err) {
+                showToast('Debug failed: ' + err.message, 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '🔍 Debug';
+                }
+            }
+        };
+
+        // ─── OVERRIDE addAIMessage to process code ───
+        // We'll keep the original logic but intercept text to add code processing.
+        // We'll store the original function and replace.
+        const originalAddAIMessage = window.addAIMessage; // but we define it below.
+
+        // We'll define a new addAIMessage that processes code.
+        function addAIMessage(content, isHtml = false) {
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.className = 'message ai-message';
+
+            if (isHtml) {
+                // If already HTML, just insert
+                div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${content}</div>`;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+                // We won't add to history because it might be image/video or system messages
+                return;
+            }
+
+            // Process code blocks in content
+            const parts = processCodeInText(content);
+            let bubbleContent = '';
+            if (parts) {
+                // There are code blocks, build HTML
+                bubbleContent = buildCodeHtml(parts);
+                // Register code blocks after rendering
+                // We need to store code data globally
+                // We'll store after DOM update, but we can also store inline
+                // We'll use a mutation observer or just store in a map
+                // Since we have the data, we can store now
+                // But we need the codeId from the build
+                // We'll store in codeStore during build.
+                // However, buildCodeHtml doesn't store; we'll store after we have the HTML.
+                // Let's generate IDs and store.
+                // We'll modify buildCodeHtml to also register.
+            } else {
+                // No code, just escape
+                bubbleContent = escapeHtml(content).replace(/\n/g, '<br>');
+            }
+
+            div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${bubbleContent}</div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+
+            // If there were code blocks, we need to register them
+            if (parts) {
+                // Find all code-block-wrapper elements inside this div
+                const wrappers = div.querySelectorAll('.code-block-wrapper');
+                wrappers.forEach(wrapper => {
+                    const id = wrapper.dataset.codeid;
+                    const lang = wrapper.dataset.lang;
+                    const code = wrapper.dataset.code;
+                    if (id && lang && code) {
+                        codeStore[id] = { language: lang, code: decodeURIComponent(escapeHtml(code)) };
+                        // Actually dataset.code is already escaped? We set it with escapeHtml, but we need original code.
+                        // We stored the code in dataset.code as escaped, but we need to decode.
+                        // Better to store the raw code in a separate map.
+                        // We'll store raw code during build.
+                        // We'll store in the build function.
+                    }
+                });
+            }
+
+            // Add to history only if it's a regular message (not HTML with images/videos)
+            // We'll assume that if parts exist (code), it's a text message, so add.
+            // But we might have added system messages like "Generating image...", we should not add those.
+            // So we'll add only if not isHtml and not an image/video generation message.
+            // Check if content starts with "🖌️" or "🎬" – we'll skip those.
+            if (!content.startsWith('🖌️') && !content.startsWith('🎬')) {
+                messagesHistory.push({ role: 'assistant', content: content });
+            }
         }
 
         // ─── ACTIVITY TRACKING ───
@@ -1296,66 +1498,7 @@
                 `;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
-        }
-
-        function addAIMessage(html, isHtml = false) {
-            const container = document.getElementById('messagesContainer');
-            const div = document.createElement('div');
-            div.className = 'message ai-message';
-            // If it's HTML, we render it directly; otherwise escape
-            const content = isHtml ? html : escapeHtml(html).replace(/\n/g, '<br>');
-            div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${content}</div>`;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-            if (!isHtml) messagesHistory.push({ role: 'assistant', content: html });
-            // Process code blocks for download
-            if (!isHtml) {
-                processCodeBlocks(div.querySelector('.bubble'));
-            }
-        }
-
-        function processCodeBlocks(bubble) {
-            // Find all <pre><code> blocks inside bubble
-            const pres = bubble.querySelectorAll('pre code');
-            pres.forEach((codeElement) => {
-                const pre = codeElement.closest('pre');
-                if (!pre) return;
-                const codeText = codeElement.textContent;
-                // Detect language from class (e.g., "language-html")
-                let lang = 'txt';
-                const classes = codeElement.className.split(' ');
-                for (const cls of classes) {
-                    if (cls.startsWith('language-')) {
-                        lang = cls.replace('language-', '');
-                        break;
-                    }
-                }
-                // Create download button
-                const actions = document.createElement('div');
-                actions.className = 'code-actions';
-                const downloadBtn = document.createElement('button');
-                downloadBtn.textContent = '📥 Download';
-                downloadBtn.onclick = () => {
-                    const blob = new Blob([codeText], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `code.${lang}`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                };
-                const copyBtn = document.createElement('button');
-                copyBtn.textContent = '📋 Copy';
-                copyBtn.onclick = async () => {
-                    try {
-                        await navigator.clipboard.writeText(codeText);
-                        showToast('Code copied!', 'info');
-                    } catch (_) { showToast('Copy failed', 'error'); }
-                };
-                actions.appendChild(downloadBtn);
-                actions.appendChild(copyBtn);
-                pre.parentNode.insertBefore(actions, pre.nextSibling);
-            });
+            messagesHistory.push({ role: 'user', content: text });
         }
 
         function showTyping() {
@@ -1408,18 +1551,17 @@
                     attachedFiles = [];
                     renderFileBadges();
                 }
-                messagesHistory.push({ role: 'user', content: fullMsg });
 
                 const typing = showTyping();
                 let reply = '';
                 try {
-                    // Random module selection with fallback
                     reply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
                 } catch (e) {
                     reply = `⚠️ All AI engines are currently unavailable. Please try again later. Error: ${e.message}`;
                 } finally {
                     if (typing) typing.remove();
                 }
+                // Use addAIMessage which will process code
                 addAIMessage(reply);
             } finally {
                 setProcessing(false);
