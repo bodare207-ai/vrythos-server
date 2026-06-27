@@ -1,1148 +1,2088 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
     <title>Vrythos AI · Neural Core</title>
-    <!-- Google Sign-In script -->
+    <!-- Google Sign‑In -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <style>/* fake style - real app built by JS */</style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+    <style>
+        /* ── Reset & Base ── */
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        :root {
+            --bg-deep: #07080e;
+            --bg-surface: #0d0f1a;
+            --bg-card: #131624;
+            --bg-elevated: #1a1e30;
+            --border-subtle: #252b42;
+            --border-glow: rgba(139, 92, 246, 0.25);
+            --text-primary: #f0f3fa;
+            --text-secondary: #9aa4c8;
+            --text-muted: #5e6e94;
+            --accent-1: #8b5cf6;
+            --accent-2: #6d28d9;
+            --accent-glow: rgba(139, 92, 246, 0.35);
+            --gradient-brand: linear-gradient(135deg, #a78bfa, #7c3aed, #6d28d9);
+            --gradient-glass: linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+            --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
+            --shadow-glow: 0 0 40px rgba(139, 92, 246, 0.15);
+            --radius-lg: 28px;
+            --radius-md: 18px;
+            --radius-sm: 12px;
+            --radius-full: 9999px;
+            --font: 'Inter', system-ui, -apple-system, sans-serif;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        html,
+        body {
+            height: 100%;
+            font-family: var(--font);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-1);
+            border-radius: var(--radius-full);
+        }
+
+        /* ── Auth Container ── */
+        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.5rem;
+            background: radial-gradient(ellipse at 20% 30%, #131626, #07080e 70%);
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 2.25rem 1.75rem;
+            box-shadow: var(--shadow-card), var(--shadow-glow);
+            backdrop-filter: blur(12px);
+            transition: var(--transition);
+        }
+        .auth-card h2 {
+            font-size: 1.7rem;
+            font-weight: 800;
+            text-align: center;
+            background: var(--gradient-brand);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+        }
+        .auth-card .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 1.75rem;
+            font-weight: 400;
+        }
+        .auth-card input {
+            width: 100%;
+            background: var(--bg-deep);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.85rem 1.25rem;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            outline: none;
+            transition: var(--transition);
+            margin-bottom: 0.9rem;
+        }
+        .auth-card input:focus {
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .auth-card input::placeholder {
+            color: var(--text-muted);
+        }
+        .auth-card button {
+            width: 100%;
+            background: var(--gradient-brand);
+            border: none;
+            border-radius: var(--radius-full);
+            padding: 0.9rem;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #fff;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 0.25rem;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+        }
+        .auth-card button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.4);
+        }
+        .auth-card button:active {
+            transform: scale(0.98);
+        }
+        .auth-switch {
+            text-align: center;
+            margin-top: 1.25rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .auth-switch:hover {
+            color: var(--accent-1);
+        }
+        .auth-card .divider {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin: 1.25rem 0;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+        .auth-card .divider::before,
+        .auth-card .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle);
+        }
+        .hidden {
+            display: none !important;
+        }
+        #authMessage {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            text-align: center;
+            color: #f87171;
+            min-height: 1.5rem;
+        }
+        .g_id_signin {
+            display: flex;
+            justify-content: center;
+        }
+
+        /* ── App Layout ── */
+        .app {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+            background: var(--bg-deep);
+            overflow: hidden;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            padding: 1.25rem 1rem;
+            gap: 1.25rem;
+            overflow-y: auto;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+        .sidebar .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 1.4rem;
+            font-weight: 800;
+            background: var(--gradient-brand);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.02em;
+        }
+        .sidebar .logo span {
+            font-size: 1.6rem;
+        }
+        .sidebar .new-chat-btn {
+            background: var(--gradient-brand);
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius-full);
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 16px rgba(139, 92, 246, 0.25);
+        }
+        .sidebar .new-chat-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(139, 92, 246, 0.35);
+        }
+        .sidebar .section {
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            padding: 1rem 1rem 0.75rem;
+            border: 1px solid var(--border-subtle);
+        }
+        .sidebar .section-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+            display: block;
+        }
+        .sidebar select {
+            width: 100%;
+            background: var(--bg-deep);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.6rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .sidebar select:focus {
+            border-color: var(--accent-1);
+        }
+        .sidebar .usage-badge {
+            font-size: 0.7rem;
+            background: var(--bg-deep);
+            padding: 0.3rem 0.8rem;
+            border-radius: var(--radius-full);
+            text-align: center;
+            margin-top: 0.5rem;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
+        }
+        .sidebar .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.3rem 0;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .sidebar .toggle-row:hover {
+            color: var(--text-primary);
+        }
+        .sidebar .toggle-row input[type="checkbox"] {
+            appearance: none;
+            width: 36px;
+            height: 20px;
+            background: var(--bg-deep);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            position: relative;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+        .sidebar .toggle-row input[type="checkbox"]::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 14px;
+            height: 14px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+        .sidebar .toggle-row input[type="checkbox"]:checked {
+            background: var(--accent-1);
+            border-color: var(--accent-1);
+        }
+        .sidebar .toggle-row input[type="checkbox"]:checked::after {
+            left: 18px;
+            background: #fff;
+        }
+        .sidebar .footer-stats {
+            margin-top: auto;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-subtle);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar .footer-stats strong {
+            color: var(--text-secondary);
+        }
+
+        /* ── Main Chat ── */
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-deep);
+            min-width: 0;
+        }
+        .chat-header {
+            padding: 0.9rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-surface);
+            flex-shrink: 0;
+        }
+        .chat-header .ai-status {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .chat-header .ai-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            display: inline-block;
+            animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.4;
+                transform: scale(0.8);
+            }
+        }
+        .chat-header .user-menu-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.45rem 1.1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .chat-header .user-menu-btn:hover {
+            border-color: var(--accent-1);
+            color: var(--text-primary);
+        }
+
+        /* ── Messages ── */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 1.5rem 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+        .message {
+            display: flex;
+            gap: 0.7rem;
+            max-width: 85%;
+            animation: msg-in 0.25s ease;
+        }
+        @keyframes msg-in {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message.user-message {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .message.ai-message {
+            align-self: flex-start;
+        }
+        .message .avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--gradient-brand);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+        }
+        .message.user-message .avatar {
+            background: #374151;
+            box-shadow: none;
+        }
+        .message .bubble {
+            padding: 0.65rem 1.1rem;
+            border-radius: var(--radius-md);
+            line-height: 1.6;
+            font-size: 0.9rem;
+            word-break: break-word;
+        }
+        .message.user-message .bubble {
+            background: var(--accent-1);
+            border-bottom-right-radius: 4px;
+            color: #fff;
+        }
+        .message.ai-message .bubble {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-bottom-left-radius: 4px;
+        }
+        .message .bubble img,
+        .message .bubble video {
+            border-radius: var(--radius-sm);
+            max-width: 100%;
+        }
+        .message .bubble .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.6rem;
+        }
+        .message .bubble .btn-row button {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.2rem 0.9rem;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .message .bubble .btn-row button:hover {
+            border-color: var(--accent-1);
+            color: var(--text-primary);
+        }
+
+        /* ── Input Area ── */
+        .input-area {
+            padding: 0.9rem 1.5rem 1.2rem;
+            border-top: 1px solid var(--border-subtle);
+            background: var(--bg-surface);
+            flex-shrink: 0;
+        }
+        .input-area .file-badge {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.6rem;
+        }
+        .input-area .file-badge .file-tag {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            padding: 0.2rem 0.8rem;
+            border-radius: var(--radius-full);
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .input-area .file-badge .file-tag button {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: var(--bg-deep);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.2rem 0.2rem 0.2rem 1.2rem;
+            transition: var(--transition);
+        }
+        .input-wrapper:focus-within {
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .input-wrapper input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 0.75rem 0;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+            min-width: 0;
+        }
+        .input-wrapper input::placeholder {
+            color: var(--text-muted);
+        }
+        .input-wrapper input:disabled {
+            opacity: 0.5;
+        }
+        .input-wrapper .tool-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            cursor: pointer;
+            padding: 0.4rem 0.3rem;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+        .input-wrapper .tool-btn:hover {
+            color: var(--text-primary);
+        }
+        .input-wrapper .send-btn {
+            background: var(--gradient-brand);
+            border: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .input-wrapper .send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.35);
+        }
+        .input-wrapper .send-btn:disabled {
+            opacity: 0.4;
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 1.5rem;
+            animation: fade-in 0.2s ease;
+        }
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            max-width: 720px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 1.75rem 1.5rem;
+            box-shadow: var(--shadow-card), var(--shadow-glow);
+            animation: slide-up 0.25s ease;
+        }
+        @keyframes slide-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .modal-content .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+        .modal-content .modal-header h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+        .modal-content .modal-header .close {
+            font-size: 1.6rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: var(--transition);
+            line-height: 1;
+        }
+        .modal-content .modal-header .close:hover {
+            color: var(--text-primary);
+        }
+        .modal-content .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+        .modal-content .card-sm {
+            background: var(--bg-deep);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.1rem;
+            border: 1px solid var(--border-subtle);
+        }
+        .modal-content .card-sm h4 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        .modal-content .card-sm label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 0.5rem;
+        }
+        .modal-content .card-sm input,
+        .modal-content .card-sm textarea {
+            width: 100%;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.5rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            outline: none;
+            transition: var(--transition);
+            margin-top: 0.2rem;
+        }
+        .modal-content .card-sm input:focus,
+        .modal-content .card-sm textarea:focus {
+            border-color: var(--accent-1);
+        }
+        .modal-content .card-sm textarea {
+            border-radius: var(--radius-md);
+            resize: vertical;
+            min-height: 60px;
+        }
+        .modal-content .card-sm .btn-sm {
+            width: 100%;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.5rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 0.4rem;
+            font-size: 0.8rem;
+        }
+        .modal-content .card-sm .btn-sm:hover {
+            border-color: var(--accent-1);
+        }
+        .modal-content .card-sm .btn-sm.primary {
+            background: var(--gradient-brand);
+            border: none;
+            color: #fff;
+        }
+        .modal-content .card-sm .btn-sm.danger {
+            background: #7f1a1a;
+            border: none;
+            color: #fff;
+        }
+        .modal-content .card-sm .btn-sm.danger:hover {
+            background: #991b1b;
+        }
+        .modal-content .card-sm .btn-sm.success {
+            background: #065f46;
+            border: none;
+            color: #fff;
+        }
+        .modal-content .card-sm .btn-sm.success:hover {
+            background: #047857;
+        }
+        .modal-content .key-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin: 0.5rem 0;
+        }
+        .modal-content .key-list .key-item {
+            background: var(--bg-deep);
+            border-radius: var(--radius-sm);
+            padding: 0.4rem 0.7rem;
+            margin-bottom: 0.3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            border: 1px solid var(--border-subtle);
+        }
+        .modal-content .key-list .key-item code {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+        }
+        .modal-content .key-list .key-item .revoke {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .modal-content .free-key-box {
+            background: var(--bg-deep);
+            border-radius: var(--radius-sm);
+            padding: 0.6rem 0.8rem;
+            margin-top: 0.4rem;
+            font-size: 0.75rem;
+            border: 1px solid var(--border-subtle);
+            word-break: break-all;
+        }
+        .modal-content .free-key-box code {
+            color: var(--accent-1);
+        }
+        .profile-preview {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--accent-1);
+            margin: 0.5rem auto;
+            background-size: cover;
+            background-position: center;
+            border: 2px solid var(--border-subtle);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 820px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                z-index: 100;
+                transform: translateX(-100%);
+                width: 280px;
+                border-right: 1px solid var(--border-subtle);
+                box-shadow: 4px 0 40px rgba(0, 0, 0, 0.6);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .sidebar-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 99;
+                display: none;
+            }
+            .sidebar-overlay.active {
+                display: block;
+            }
+            .mobile-hamburger {
+                display: flex !important;
+            }
+            .modal-content .grid-2 {
+                grid-template-columns: 1fr;
+            }
+            .message {
+                max-width: 95%;
+            }
+            .auth-card {
+                padding: 1.75rem 1.25rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .chat-header {
+                padding: 0.6rem 1rem;
+            }
+            .chat-header .ai-status {
+                font-size: 0.8rem;
+            }
+            .chat-header .user-menu-btn {
+                font-size: 0.7rem;
+                padding: 0.3rem 0.8rem;
+            }
+            .messages {
+                padding: 1rem 0.8rem 0.3rem;
+            }
+            .input-area {
+                padding: 0.6rem 0.8rem 0.9rem;
+            }
+            .input-wrapper {
+                padding: 0.1rem 0.1rem 0.1rem 0.8rem;
+            }
+            .input-wrapper input {
+                font-size: 0.85rem;
+                padding: 0.5rem 0;
+            }
+            .input-wrapper .send-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 0.9rem;
+            }
+            .input-wrapper .tool-btn {
+                font-size: 1rem;
+            }
+            .message .bubble {
+                font-size: 0.82rem;
+                padding: 0.5rem 0.9rem;
+            }
+            .message .avatar {
+                width: 28px;
+                height: 28px;
+                font-size: 0.7rem;
+            }
+            .modal-content {
+                padding: 1.25rem 1rem;
+            }
+            .auth-card {
+                padding: 1.5rem 1rem;
+            }
+        }
+
+        /* ── Utilities ── */
+        .mobile-hamburger {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.2rem 0.4rem;
+        }
+        .text-muted {
+            color: var(--text-muted);
+        }
+        .text-accent {
+            color: var(--accent-1);
+        }
+        .mt-1 {
+            margin-top: 0.5rem;
+        }
+        .mb-1 {
+            margin-bottom: 0.5rem;
+        }
+        .gap-1 {
+            gap: 0.5rem;
+        }
+        .flex {
+            display: flex;
+        }
+        .flex-col {
+            flex-direction: column;
+        }
+        .items-center {
+            align-items: center;
+        }
+        .justify-between {
+            justify-content: space-between;
+        }
+        .w-full {
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
-<!-- ================= FAKE DECOY CODE ================= -->
-<!-- 20+ lines of fake comments and invisible divs (same as before) -->
-<div id="app-root">Loading Vrythos Neural Core...</div>
 
-<script>
-(async function(){
-    // ------------------------------------------------------------------
-    // BACKEND API HELPERS
-    // ------------------------------------------------------------------
-    async function apiGet(endpoint) {
-        const res = await fetch(endpoint);
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-    }
-    async function apiPost(endpoint, data) {
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || 'Request failed');
+    <!-- ─── APP ROOT ─── -->
+    <div id="app-root">Loading Vrythos Neural Core…</div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════
+        //  BACKEND API HELPERS
+        // ═══════════════════════════════════════════════════════════════
+        async function apiGet(endpoint) {
+            const res = await fetch(endpoint);
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
         }
-        return res.json();
-    }
-    async function apiPut(endpoint, data) {
-        const res = await fetch(endpoint, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-    }
-    async function apiDelete(endpoint) {
-        const res = await fetch(endpoint, { method: 'DELETE' });
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-    }
-
-    // Global data
-    let currentUser = null;
-    let modules = [];
-    let tournaments = [];
-    let selectedModuleId = null;
-    let deepThink = false;
-    let liveImageMode = false;
-    let liveVideoMode = false;
-    let messagesHistory = [];
-    let attachedFiles = [];
-    let isProcessing = false;
-
-    // Default video duration (in seconds)
-    const DEFAULT_VIDEO_DURATION = 5;
-
-    async function loadAllData() {
-        modules = await apiGet('/api/modules');
-        tournaments = await apiGet('/api/tournaments');
-    }
-
-    // User management
-    async function loadUsers() { return await apiGet('/api/users'); }
-    async function updateUser(email, updates) { return await apiPut(`/api/users/${email}`, updates); }
-    async function deleteUser(email) { return await apiDelete(`/api/users/${email}`); }
-
-    // User API keys
-    async function loadUserApiKeys(email) {
-        const allKeys = await apiGet('/api/userApiKeys');
-        const entry = allKeys.find(e => e.email === email);
-        return entry ? entry.keys : [];
-    }
-    async function saveUserApiKeys(email, keys) {
-        await apiPost('/api/userApiKeys', { email, keys });
-    }
-
-    // Abuse & pending bans
-    async function addAbuseReport(report) { return await apiPost('/api/abuse', report); }
-    async function addPendingBan(ban) { return await apiPost('/api/pendingBans', ban); }
-
-    // Image quotas
-    async function getImageQuota(email) {
-        const quotas = await apiGet('/api/imageQuotas');
-        return quotas.find(q => q.email === email) || { email, count: 0, windowStart: Date.now() };
-    }
-    async function setImageQuota(quota) { return await apiPost('/api/imageQuotas', quota); }
-
-    // Chat usage
-    async function getChatUsage(email, moduleId, date) {
-        const all = await apiGet('/api/chatUsage');
-        return all.find(u => u.email === email && u.moduleId === moduleId && u.date === date) || { email, moduleId, date, count: 0 };
-    }
-    async function setChatUsage(usage) { return await apiPost('/api/chatUsage', usage); }
-
-    // Bug reports
-    async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
-
-    // Tournaments
-    async function joinTournament(tournamentId) {
-        return await apiPost('/api/join-tournament', { email: currentUser.email, tournamentId });
-    }
-
-    // ------------------------------------------------------------------
-    // HELPER FUNCTIONS
-    // ------------------------------------------------------------------
-    async function hashPassword(pw) {
-        const enc = new TextEncoder().encode(pw);
-        const hash = await crypto.subtle.digest('SHA-256', enc);
-        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
-    }
-
-    function escapeHtml(str){
-        return String(str).replace(/[&<>"]/g, function(m){
-            if(m === '&') return '&amp;';
-            if(m === '<') return '&lt;';
-            if(m === '>') return '&gt;';
-            if(m === '"') return '&quot;';
-            return m;
-        });
-    }
-
-    // Abuse score
-    let abuseScore = 0;
-    let abuseWarningShown = false;
-    async function addAbuseScore(points, reason, context, showUserWarning = true) {
-        if (!currentUser) return;
-        abuseScore = Math.min(100, abuseScore + points);
-        console.log(`⚠️ Abuse score +${points} → ${abuseScore}% (${reason})`);
-        await addPendingBan({
-            email: currentUser.email,
-            username: currentUser.username,
-            score: abuseScore,
-            reason: reason,
-            context: context.slice(0, 200),
-            timestamp: Date.now(),
-            reviewed: false
-        });
-        await addAbuseReport({ email: currentUser.email, username: currentUser.username, reason, context: context.slice(0,100), timestamp: Date.now() });
-        if ((abuseScore >= 10 && !abuseWarningShown) || (points >= 5 && showUserWarning)) {
-            abuseWarningShown = true;
-            addAIMessage(`⚠️ Warning: Your account has been flagged for suspicious activity (current abuse score: ${abuseScore}%). Repeated violations may lead to a ban.`);
+        async function apiPost(endpoint, data) {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Request failed');
+            }
+            return res.json();
         }
-    }
-
-    // Right-click & dev tools detection
-    document.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        addAbuseScore(5, "Right-click attempt", "User right-clicked on page");
-        showWarningModal("Right-click is prohibited. Your action has been reported to admin.");
-        return false;
-    });
-    function detectDevTools() {
-        const threshold = 160;
-        const widthDiff = window.outerWidth - window.innerWidth > threshold;
-        const heightDiff = window.outerHeight - window.innerHeight > threshold;
-        if (widthDiff || heightDiff) {
-            addAbuseScore(10, "Developer tools detected", "DevTools opened");
-            showWarningModal("Developer tools detected! This has been reported to admin.");
+        async function apiPut(endpoint, data) {
+            const res = await fetch(endpoint, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
         }
-    }
-    setInterval(detectDevTools, 2000);
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
+        async function apiDelete(endpoint) {
+            const res = await fetch(endpoint, { method: 'DELETE' });
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
+        }
+
+        // ─── GLOBALS ───
+        let currentUser = null;
+        let modules = [];
+        let tournaments = [];
+        let selectedModuleId = null;
+        let deepThink = false;
+        let liveImageMode = false;
+        let liveVideoMode = false;
+        let messagesHistory = [];
+        let attachedFiles = [];
+        let isProcessing = false;
+        const DEFAULT_VIDEO_DURATION = 5;
+        const imgStore = {};
+        let imgStoreCounter = 0;
+        const videoStore = {};
+        let videoStoreCounter = 0;
+        let abuseScore = 0;
+        let abuseWarningShown = false;
+
+        // ─── HELPERS ───
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"]/g, m => {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                if (m === '"') return '&quot;';
+                return m;
+            });
+        }
+
+        async function hashPassword(pw) {
+            const enc = new TextEncoder().encode(pw);
+            const hash = await crypto.subtle.digest('SHA-256', enc);
+            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // ─── ABUSE DETECTION ───
+        async function addAbuseScore(points, reason, context) {
+            if (!currentUser) return;
+            abuseScore = Math.min(100, abuseScore + points);
+            console.warn(`⚠️ Abuse +${points} → ${abuseScore}% (${reason})`);
+            try {
+                await apiPost('/api/pendingBans', {
+                    email: currentUser.email,
+                    username: currentUser.username,
+                    score: abuseScore,
+                    reason,
+                    context: (context || '').slice(0, 200),
+                    timestamp: Date.now(),
+                    reviewed: false
+                });
+                await apiPost('/api/abuse', {
+                    email: currentUser.email,
+                    username: currentUser.username,
+                    reason,
+                    context: (context || '').slice(0, 100),
+                    timestamp: Date.now()
+                });
+            } catch (_) { /* ignore */ }
+            if ((abuseScore >= 10 && !abuseWarningShown) || points >= 5) {
+                abuseWarningShown = true;
+                addAIMessage(
+                    `⚠️ Warning: suspicious activity detected (score ${abuseScore}%). Repeated violations may lead to a ban.`
+                );
+            }
+        }
+
+        document.addEventListener('contextmenu', e => {
             e.preventDefault();
-            addAbuseScore(10, "View source attempt", "Tried to view page source");
-            showWarningModal("Viewing source is forbidden. Reported to admin.");
+            addAbuseScore(5, 'Right-click attempt', 'User right-clicked');
+            showToast('Right-click is prohibited', 'warning');
             return false;
-        }
-    });
-    function showWarningModal(msg) {
-        let modal = document.createElement("div");
-        modal.className = "modal";
-        modal.innerHTML = `<div class="modal-content"><h3>⚠️ Warning</h3><p>${escapeHtml(msg)}</p><button id="closeWarningBtn">OK</button></div>`;
-        document.body.appendChild(modal);
-        document.getElementById("closeWarningBtn").onclick = () => modal.remove();
-    }
-
-    // ------------------------------------------------------------------
-    // IMAGE GENERATION
-    // ------------------------------------------------------------------
-    async function generateImageWithCloudflare(prompt) {
-        try {
-            const res = await fetch('/api/generate/image', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt })
-            });
-            const data = await res.json();
-            if (data.success) return data.image;
-        } catch(e) { console.warn(e); }
-        return null;
-    }
-    async function generateImageWithPollinations(prompt) {
-        try {
-            const res = await fetch('/api/fallback/image', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt })
-            });
-            const data = await res.json();
-            if (data.success) return data.image;
-        } catch(e) { console.warn(e); }
-        return null;
-    }
-
-    const imgStore = {};
-    let imgStoreCounter = 0;
-    window.downloadImage = function(imgId) {
-        const dataUrl = imgStore[imgId];
-        if (!dataUrl) return;
-        const link = document.createElement('a');
-        link.download = 'vrythos_image.png';
-        link.href = dataUrl;
-        link.click();
-    };
-    window.copyImageToClipboard = async function(imgId) {
-        const dataUrl = imgStore[imgId];
-        if (!dataUrl) return;
-        try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-            alert('Image copied to clipboard!');
-        } catch(e) {
-            alert('Copy failed: ' + e.message);
-        }
-    };
-
-    async function generateImageAndShow(prompt) {
-        addAIMessage("🖌️ Generating image...", false);
-        let imgData = await generateImageWithCloudflare(prompt);
-        if (!imgData) imgData = await generateImageWithPollinations(prompt);
-        if (imgData && imgData.startsWith('data:image')) {
-            const imgId = 'img_' + (++imgStoreCounter);
-            imgStore[imgId] = imgData;
-            const imgHtml = `<img src="${imgData}" style="max-width:100%; border-radius:16px;" /><br>
-                             <button onclick="downloadImage('${imgId}')">⬇️ Download</button>
-                             <button onclick="copyImageToClipboard('${imgId}')">📋 Copy</button>`;
-            addAIMessage(imgHtml, true);
-        } else {
-            addAIMessage("❌ Image generation failed. Please try again later.");
-        }
-    }
-
-    async function getRemainingImages() {
-        const quota = await getImageQuota(currentUser.email);
-        const now = Date.now();
-        const windowMs = 5 * 60 * 60 * 1000;
-        let base = (now - quota.windowStart >= windowMs) ? 5 : Math.max(0, 5 - quota.count);
-        let extra = currentUser.extraImageCredits || 0;
-        return base + extra;
-    }
-    async function consumeImage() {
-        let quota = await getImageQuota(currentUser.email);
-        const now = Date.now();
-        const windowMs = 5 * 60 * 60 * 1000;
-        if (now - quota.windowStart >= windowMs) {
-            quota = { email: currentUser.email, count: 0, windowStart: now };
-        }
-        if (await getRemainingImages() <= 0) return false;
-        quota.count++;
-        await setImageQuota(quota);
-        updateImageDisplay();
-        return true;
-    }
-
-    // ------------------------------------------------------------------
-    // VIDEO GENERATION
-    // ------------------------------------------------------------------
-    const videoStore = {};
-    let videoStoreCounter = 0;
-    window.downloadVideo = function(videoId) {
-        const dataUrl = videoStore[videoId];
-        if (!dataUrl) return;
-        const link = document.createElement('a');
-        link.download = 'vrythos_video.mp4';
-        link.href = dataUrl;
-        link.click();
-    };
-    window.copyVideoToClipboard = async function(videoId) {
-        const dataUrl = videoStore[videoId];
-        if (!dataUrl) return;
-        try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-            alert('Video copied to clipboard!');
-        } catch(e) {
-            alert('Copy failed: ' + e.message);
-        }
-    };
-
-    async function generateVideo(prompt, duration) {
-        addAIMessage("🎬 Generating video... (may take 30-60 seconds)", false);
-        try {
-            const res = await apiPost('/api/generate/video', {
-                email: currentUser.email,
-                prompt: prompt,
-                duration: duration || DEFAULT_VIDEO_DURATION
-            });
-            if (res.success) {
-                const vidId = 'vid_' + (++videoStoreCounter);
-                videoStore[vidId] = res.video;
-                const vidHtml = `<video controls autoplay loop style="max-width:100%; border-radius:16px; max-height:400px;">
-                                    <source src="${res.video}" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video><br>
-                                <button onclick="downloadVideo('${vidId}')">⬇️ Download</button>
-                                <button onclick="copyVideoToClipboard('${vidId}')">📋 Copy</button>
-                                <span style="font-size:12px; color:#8e9dc2; margin-left:8px;">Remaining today: ${res.remaining || '?'}</span>`;
-                addAIMessage(vidHtml, true);
-            } else {
-                addAIMessage("❌ Video generation failed: " + (res.error || 'Unknown error'));
-            }
-        } catch(e) {
-            addAIMessage("❌ Video generation error: " + e.message);
-        }
-    }
-
-    function isVideoGenerationRequest(text) {
-        const videoKeywords = /(video|animate|animation|make a video|create a video|generate a video|render a video|cinematic|short film|motion|sequence|clip|movie)/i;
-        return videoKeywords.test(text);
-    }
-
-    // ------------------------------------------------------------------
-    // CHAT LIMITS
-    // ------------------------------------------------------------------
-    async function getTodayCalls() {
-        const today = new Date().toDateString();
-        const usage = await getChatUsage(currentUser.email, selectedModuleId, today);
-        return usage.count || 0;
-    }
-    async function incrementDailyCalls() {
-        const today = new Date().toDateString();
-        let usage = await getChatUsage(currentUser.email, selectedModuleId, today);
-        usage.count = (usage.count || 0) + 1;
-        await setChatUsage(usage);
-        updateSidebarStats();
-    }
-    async function canMakeChatCall() {
-        if (currentUser.banned) return false;
-        const used = await getTodayCalls();
-        const limit = 50 + (currentUser.extraChatCredits || 0);
-        return used < limit;
-    }
-
-    // ------------------------------------------------------------------
-    // AI ENGINE CALLS
-    // ------------------------------------------------------------------
-    async function callChatAPI(module_id, messages, deepThinkActive) {
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                module_id: module_id,
-                messages: messages,
-                deep_think: deepThinkActive
-            })
         });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Chat API error');
-        return data.reply;
-    }
 
-    // ------------------------------------------------------------------
-    // USER ACTIVITY TRACKING
-    // ------------------------------------------------------------------
-    let activityInterval = null;
-    function startActivityTracking() {
-        if (activityInterval) clearInterval(activityInterval);
-        activityInterval = setInterval(async () => {
-            if (currentUser) {
-                await apiPost('/api/user-activity', { email: currentUser.email });
+        function detectDevTools() {
+            const t = 160;
+            if (window.outerWidth - window.innerWidth > t || window.outerHeight - window.innerHeight > t) {
+                addAbuseScore(10, 'Developer tools detected', 'DevTools opened');
+                showToast('Developer tools detected', 'error');
             }
-        }, 5 * 60 * 1000);
-    }
-
-    // ------------------------------------------------------------------
-    // UI HELPERS
-    // ------------------------------------------------------------------
-    function setProcessing(processing) {
-        isProcessing = processing;
-        const input = document.getElementById("userInput");
-        const sendBtn = document.getElementById("sendBtn");
-        if(input) input.disabled = processing;
-        if(sendBtn) sendBtn.disabled = processing;
-        if(processing) {
-            if(input) input.placeholder = "⏳ Vrythos is thinking... please wait";
-        } else {
-            if(input) input.placeholder = "Enter next chat";
-            if(input) input.focus();
         }
-    }
-    function addUserMessage(text){
-        let container = document.getElementById("messagesContainer");
-        let div = document.createElement("div");
-        div.className = "message user-message";
-        let initial = currentUser.username.charAt(0).toUpperCase();
-        div.innerHTML = `<div class="avatar" style="background:#4b5563;">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(text).replace(/\n/g,"<br>")}</div>`;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-    }
-    function addAIMessage(html, isHtml=false){
-        let container = document.getElementById("messagesContainer");
-        let div = document.createElement("div");
-        div.className = "message ai-message";
-        div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${isHtml ? html : escapeHtml(html).replace(/\n/g,"<br>")}</div>`;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-        if(!isHtml) messagesHistory.push({role:"assistant", content:html});
-    }
-    function showTyping(){
-        let container = document.getElementById("messagesContainer");
-        let div = document.createElement("div");
-        div.id = "typingMsg";
-        div.className = "message ai-message";
-        div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">▮ Thinking...</div>`;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-        return div;
-    }
-    function isImageGenerationRequest(text) {
-        const imgKeywords = /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i;
-        return imgKeywords.test(text);
-    }
+        setInterval(detectDevTools, 2000);
 
-    // ------------------------------------------------------------------
-    // MAIN SEND MESSAGE
-    // ------------------------------------------------------------------
-    async function sendMessage(userText, forceImage = false, forceVideo = false) {
-        if (!currentUser || currentUser.banned) { addAIMessage("🚫 Account banned."); return; }
-        if (isProcessing) { addAIMessage("⏳ Please wait, previous message is still being processed."); return; }
-        setProcessing(true);
-        try {
-            let willVideo = forceVideo || (liveVideoMode && isVideoGenerationRequest(userText));
-            let willImage = (forceImage || (liveImageMode && isImageGenerationRequest(userText))) && !willVideo;
-
-            if (willVideo) {
-                let prompt = userText;
-                const videoMatch = userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
-                if (videoMatch && videoMatch[2]) prompt = videoMatch[2];
-                addUserMessage(`🎬 ${userText.substring(0,100)}`);
-                await generateVideo(prompt, DEFAULT_VIDEO_DURATION);
-                setProcessing(false);
-                return;
+        document.addEventListener('keydown', e => {
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
+                e.preventDefault();
+                addAbuseScore(10, 'View source attempt', 'Tried to view page source');
+                showToast('Viewing source is forbidden', 'error');
+                return false;
             }
-
-            if (willImage) {
-                addUserMessage(`🎨 ${userText.substring(0,100)}`);
-                let prompt = userText;
-                const match = userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
-                if (match && match[2]) prompt = match[2];
-                await generateImageAndShow(prompt);
-                setProcessing(false);
-                return;
-            }
-
-            // Normal chat
-            if (!(await canMakeChatCall())) {
-                addAIMessage(`⛔ Daily chat limit reached (${50+(currentUser.extraChatCredits||0)}/day). Request extra via bug report.`);
-                setProcessing(false);
-                return;
-            }
-            let module = modules.find(m => m.id === selectedModuleId);
-            if (!module) { addAIMessage("❌ No AI engine selected. Contact admin."); setProcessing(false); return; }
-            let fullMsg = userText;
-            if (attachedFiles.length) {
-                fullMsg += "\n\n[Attached files]\n" + attachedFiles.map(f => f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`).join("\n");
-                attachedFiles = [];
-                renderFileBadges();
-            }
-            addUserMessage(userText);
-            messagesHistory.push({ role: "user", content: fullMsg });
-            let typing = showTyping();
-            let reply = "";
-            try {
-                reply = await callChatAPI(selectedModuleId, messagesHistory.slice(-12), deepThink);
-                await incrementDailyCalls();
-                updateRemainingDisplay();
-                updateSidebarStats();
-                if (reply.includes("quota") || reply.includes("limit")) {
-                    await addAbuseScore(5, "API quota warning", userText, true);
-                }
-                const lowerInput = userText.toLowerCase();
-                const creatorKeywords = ["who made you", "who created you", "your creator", "who built you", "viraj", "bodare"];
-                if (creatorKeywords.some(keyword => lowerInput.includes(keyword))) {
-                    reply = "I am Vrythos, an advanced AI framework built by **Viraj S. Bodare**. I operate through multiple high-performance engines and am designed to be helpful, safe, and honest.";
-                }
-            } catch(e) {
-                reply = `⚠️ Service temporarily unavailable. Please check your internet connection and try again later. Error: ${e.message}`;
-            } finally {
-                if(typing) typing.remove();
-            }
-            addAIMessage(reply);
-        } finally {
-            setProcessing(false);
-        }
-    }
-
-    async function updateRemainingDisplay() {
-        let mod = modules.find(m => m.id === selectedModuleId);
-        if (mod) {
-            const used = await getTodayCalls();
-            const left = mod.dailyLimitPerUser - used;
-            document.getElementById("moduleRemaining").innerHTML = `📨 Today: ${left > 0 ? left : 0}/${mod.dailyLimitPerUser} msgs left`;
-        } else {
-            document.getElementById("moduleRemaining").innerHTML = `⚠️ No active engine`;
-        }
-    }
-    async function updateSidebarStats() {
-        let left = 50 + (currentUser.extraChatCredits||0) - (await getTodayCalls());
-        document.getElementById("dailyCallsLeft").innerText = Math.max(0, left);
-        document.getElementById("sidebarUsername").innerHTML = escapeHtml(currentUser.username);
-        await updateImageDisplay();
-    }
-    async function updateImageDisplay() {
-        let rem = await getRemainingImages();
-        document.getElementById("imageUsageDisplay").innerHTML = `🎨 Images left: ${rem} (base+extra)`;
-    }
-    function renderFileBadges() {
-        let container = document.getElementById("filePreviewArea");
-        container.innerHTML = attachedFiles.map((f,idx) => `<span class="file-tag">📄 ${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444;">✖</button></span>`).join("");
-        document.querySelectorAll(".file-tag button").forEach(btn => btn.onclick = e => {
-            let idx = parseInt(btn.dataset.idx);
-            attachedFiles.splice(idx,1);
-            renderFileBadges();
         });
-    }
-    function renderModuleDropdown() {
-        let sel = document.getElementById("moduleSelect");
-        sel.innerHTML = "";
-        if (!modules.length) {
-            let opt = document.createElement("option");
-            opt.text = "❌ No engines — Admin setup";
-            opt.disabled = true;
-            sel.appendChild(opt);
-            return;
+
+        function showToast(msg, type = 'info') {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                    position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+                    background: ${type === 'error' ? '#7f1a1a' : type === 'warning' ? '#78350f' : '#1e293b'};
+                    color: #fff; padding: 0.6rem 1.2rem; border-radius: 9999px;
+                    font-size: 0.85rem; z-index: 9999; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                    max-width: 90%; text-align: center; border: 1px solid rgba(255,255,255,0.06);
+                    animation: slide-up 0.25s ease;
+                `;
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s'; }, 3000);
+            setTimeout(() => toast.remove(), 3500);
         }
-        modules.forEach(mod => {
-            let opt = document.createElement("option");
-            opt.value = mod.id;
-            opt.textContent = `${mod.displayName} (${mod.dailyLimitPerUser}/day)`;
-            if (selectedModuleId === mod.id) opt.selected = true;
-            sel.appendChild(opt);
-        });
-        if (!selectedModuleId && modules.length) {
-            selectedModuleId = modules[0].id;
-            sel.value = selectedModuleId;
-        }
-        sel.onchange = async e => {
-            selectedModuleId = e.target.value;
-            await updateRemainingDisplay();
+
+        // ─── DOWNLOAD / COPY GLOBALS ───
+        window.downloadImage = function(id) {
+            const url = imgStore[id];
+            if (!url) return;
+            const a = document.createElement('a');
+            a.download = 'vrythos_image.png';
+            a.href = url;
+            a.click();
         };
-    }
+        window.copyImageToClipboard = async function(id) {
+            const url = imgStore[id];
+            if (!url) return;
+            try {
+                const blob = await (await fetch(url)).blob();
+                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                showToast('Image copied to clipboard!', 'info');
+            } catch (_) { showToast('Copy failed', 'error'); }
+        };
+        window.downloadVideo = function(id) {
+            const url = videoStore[id];
+            if (!url) return;
+            const a = document.createElement('a');
+            a.download = 'vrythos_video.mp4';
+            a.href = url;
+            a.click();
+        };
+        window.copyVideoToClipboard = async function(id) {
+            const url = videoStore[id];
+            if (!url) return;
+            try {
+                const blob = await (await fetch(url)).blob();
+                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                showToast('Video copied to clipboard!', 'info');
+            } catch (_) { showToast('Copy failed', 'error'); }
+        };
 
-    // ------------------------------------------------------------------
-    // TOURNAMENTS
-    // ------------------------------------------------------------------
-    async function renderTournaments() {
-        const container = document.getElementById("tournamentsContainer");
-        if (!container) return;
-        if (!tournaments.length) {
-            container.innerHTML = "<i>No active tournaments.</i>";
-            return;
+        // ─── DATA LOADERS ───
+        async function loadAllData() {
+            modules = await apiGet('/api/modules');
+            tournaments = await apiGet('/api/tournaments');
         }
-        container.innerHTML = tournaments.map(t => `
-            <div style="background:#0e111b; border-radius:12px; padding:10px; margin-bottom:10px;">
-                <strong>🏆 ${escapeHtml(t.name)}</strong><br>
-                ${escapeHtml(t.description || '')}<br>
-                Prize: ${escapeHtml(t.prize || 'None')}<br>
-                ${t.participants?.includes(currentUser.email) ?
-                    '<span style="color:#10b981;">✓ Joined</span>' :
-                    `<button class="join-tournament" data-id="${escapeHtml(t.id)}">Join Tournament</button>`}
-            </div>
-        `).join("");
-        document.querySelectorAll(".join-tournament").forEach(btn => {
-            btn.onclick = async () => {
-                await joinTournament(btn.dataset.id);
-                await loadAllData();
-                renderTournaments();
-            };
-        });
-    }
+        async function loadUsers() { return await apiGet('/api/users'); }
+        async function updateUser(email, updates) { return await apiPut(`/api/users/${email}`, updates); }
+        async function deleteUser(email) { return await apiDelete(`/api/users/${email}`); }
+        async function loadUserApiKeys(email) {
+            const all = await apiGet('/api/userApiKeys');
+            const entry = all.find(e => e.email === email);
+            return entry ? entry.keys : [];
+        }
+        async function saveUserApiKeys(email, keys) {
+            await apiPost('/api/userApiKeys', { email, keys });
+        }
+        async function getImageQuota(email) {
+            const all = await apiGet('/api/imageQuotas');
+            return all.find(q => q.email === email) || { email, count: 0, windowStart: Date.now() };
+        }
+        async function setImageQuota(q) { await apiPost('/api/imageQuotas', q); }
+        async function getChatUsage(email, moduleId, date) {
+            const all = await apiGet('/api/chatUsage');
+            return all.find(u => u.email === email && u.moduleId === moduleId && u.date === date) || { email, moduleId,
+                date, count: 0 };
+        }
+        async function setChatUsage(u) { await apiPost('/api/chatUsage', u); }
+        async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
+        async function joinTournament(id) { return await apiPost('/api/join-tournament', { email: currentUser.email,
+                tournamentId: id }); }
 
-    // ------------------------------------------------------------------
-    // USER SETTINGS MODAL (unchanged)
-    // ------------------------------------------------------------------
-    async function openUserSettings() {
-        let userKeys = await loadUserApiKeys(currentUser.email);
-        const modal = document.createElement("div"); modal.className = "modal";
-        modal.innerHTML = `
-        <div class="modal-content" style="max-width: 700px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <h3 style="margin:0;">👤 Account Center</h3>
-                <span class="close-modal" style="cursor:pointer; font-size:24px;">&times;</span>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-                <div>
-                    <div style="background:#0e111b; border-radius:16px; padding:14px; margin-bottom:16px;">
-                        <label style="font-size:12px; color:#8e9dc2;">PROFILE PICTURE URL</label>
-                        <input type="text" id="profilePicUrl" placeholder="https://..." value="${escapeHtml(currentUser.profilePic || '')}" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
-                        <div class="profile-preview" id="profilePreview" style="width:60px; height:60px; border-radius:50%; background:var(--accent); margin:8px auto; background-size:cover;"></div>
-                        <label style="font-size:12px; color:#8e9dc2;">CHANGE USERNAME</label>
-                        <input type="text" id="newUsername" placeholder="New username" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:28px; padding:8px 12px; color:white; margin:8px 0;">
-                        <button id="updateUsernameBtn" style="width:100%; background:#2d3748; margin-bottom:8px;">Update Username</button>
-                        <button id="deleteAccountBtn" style="width:100%; background:#ef4444;">🗑️ Delete Account Permanently</button>
-                    </div>
-                    <div style="background:#0e111b; border-radius:16px; padding:14px;">
-                        <h4 style="margin:0 0 8px 0;">📊 Your Stats</h4>
-                        <p style="font-size:13px; margin:4px 0;">Chat calls left today: <span id="statChatLeft">...</span></p>
-                        <p style="font-size:13px; margin:4px 0;">Image credits left: <span id="statImgLeft">...</span></p>
-                        <p style="font-size:13px; margin:4px 0;">Extra chat credits: ${currentUser.extraChatCredits||0}</p>
-                        <p style="font-size:13px; margin:4px 0;">Extra image credits: ${currentUser.extraImageCredits||0}</p>
-                        <p style="font-size:13px; margin:4px 0;">Total hours live: ${(currentUser.totalHoursLive || 0).toFixed(1)}</p>
-                    </div>
-                </div>
-                <div>
-                    <div style="background:#0e111b; border-radius:16px; padding:14px;">
-                        <h4 style="margin:0 0 8px 0;">🔑 API Keys (for external projects)</h4>
-                        <p style="font-size:12px; color:#8e9dc2;">Max 2 keys. Each key: 20 requests/day.</p>
-                        <div id="apiKeysList" style="max-height:200px; overflow-y:auto; margin-bottom:12px;"></div>
-                        <button id="generateApiKeyBtn" style="width:100%; background:#8b5cf6; margin-bottom:8px;">+ Generate New API Key</button>
-                        <small style="font-size:10px;">Use with Bearer token: <code>Authorization: Bearer YOUR_KEY</code><br>Endpoint: <code>POST /api/external/chat</code></small>
-                    </div>
-                    <!-- FREE API KEY BLOCK -->
-                    <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
-                        <h4 style="margin:0 0 8px 0;">🔓 Free API Key (100 requests/day)</h4>
-                        <p style="font-size:12px; color:#8e9dc2;">One key per user – works with both chat & image generation.</p>
-                        <div id="freeKeyInfo" style="font-size:12px; margin-bottom:8px;"></div>
-                        <button id="generateFreeKeyBtn" style="width:100%; background:#10b981; margin-bottom:8px;">✨ Generate / Regenerate Free Key</button>
-                        <button id="revokeFreeKeyBtn" style="width:100%; background:#ef4444; display:none;">🗑️ Revoke Free Key</button>
-                        <div id="freeKeyDisplay" style="background:#0a0c15; border-radius:12px; padding:8px; margin-top:8px; word-break:break-all; display:none;">
-                            <strong>Your API Key:</strong> <code id="freeKeyValue"></code><br>
-                            <strong>Endpoint:</strong> <code id="freeKeyUrl">https://vrythos-server.onrender.com/api/external/chat</code>
+        // ─── IMAGE GENERATION ───
+        async function generateImageWithCloudflare(prompt) {
+            try {
+                const res = await fetch('/api/generate/image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                const data = await res.json();
+                if (data.success) return data.image;
+            } catch (_) { /* fall through */ }
+            return null;
+        }
+        async function generateImageWithPollinations(prompt) {
+            try {
+                const res = await fetch('/api/fallback/image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                const data = await res.json();
+                if (data.success) return data.image;
+            } catch (_) { /* fall through */ }
+            return null;
+        }
+
+        async function generateImageAndShow(prompt) {
+            addAIMessage('🖌️ Generating image…', false);
+            let imgData = await generateImageWithCloudflare(prompt);
+            if (!imgData) imgData = await generateImageWithPollinations(prompt);
+            if (imgData && imgData.startsWith('data:image')) {
+                const id = 'img_' + (++imgStoreCounter);
+                imgStore[id] = imgData;
+                const html = `
+                        <img src="${imgData}" style="max-width:100%; border-radius:12px;" />
+                        <div class="btn-row">
+                            <button onclick="downloadImage('${id}')">⬇️ Download</button>
+                            <button onclick="copyImageToClipboard('${id}')">📋 Copy</button>
                         </div>
-                    </div>
-                    <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
-                        <h4 style="margin:0 0 8px 0;">🐞 Report a Bug / Request Credits</h4>
-                        <textarea id="bugReportText" placeholder="Describe issue or request" rows="2" style="width:100%; background:#0a0c15; border:1px solid #1e293b; border-radius:16px; padding:8px; color:white; margin-bottom:8px;"></textarea>
-                        <button id="submitBugBtn" style="width:100%; background:#2d3748;">Submit Report</button>
-                        <button id="logoutBtn" style="width:100%; background:#555; margin-top:8px;">🚪 Logout</button>
-                    </div>
-                </div>
-            </div>
-            <div style="background:#0e111b; border-radius:16px; padding:14px; margin-top:16px;">
-                <h4 style="margin:0 0 8px 0;">⚖️ Legal & Terms</h4>
-                <p style="font-size:12px;">By using Vrythos AI, you agree to our <a href="#" style="color:#8b5cf6;">Terms of Service</a> and <a href="#" style="color:#8b5cf6;">Privacy Policy</a>. All data is stored securely on our servers.</p>
-            </div>
-        </div>`;
-        document.body.appendChild(modal);
-        let close = () => modal.remove();
-        modal.querySelector(".close-modal").onclick = close;
-
-        (async () => {
-            const chatLeft = Math.max(0, 50 + (currentUser.extraChatCredits||0) - (await getTodayCalls()));
-            const imgLeft = await getRemainingImages();
-            const elChat = document.getElementById("statChatLeft");
-            const elImg = document.getElementById("statImgLeft");
-            if (elChat) elChat.textContent = `${chatLeft} / ${50+(currentUser.extraChatCredits||0)}`;
-            if (elImg) elImg.textContent = imgLeft;
-        })();
-
-        const picInput = document.getElementById("profilePicUrl");
-        const preview = document.getElementById("profilePreview");
-        const safePicUrl = currentUser.profilePic || '';
-        if (safePicUrl) preview.style.backgroundImage = `url(${JSON.stringify(safePicUrl)})`;
-        picInput.addEventListener("input", () => {
-            preview.style.backgroundImage = `url(${JSON.stringify(picInput.value)})`;
-        });
-
-        document.getElementById("updateUsernameBtn").onclick = async () => {
-            let newName = document.getElementById("newUsername").value.trim();
-            if (!newName) return;
-            let users = await loadUsers();
-            if (users.find(u => u.username === newName)) { alert("Username taken"); return; }
-            await updateUser(currentUser.email, { username: newName });
-            currentUser.username = newName;
-            alert("Username changed. Please log in again.");
-            close(); localStorage.removeItem("vrythos_current_session"); location.reload();
-        };
-        document.getElementById("deleteAccountBtn").onclick = async () => {
-            if (!confirm("⚠️ Permanently delete your account and all data? This cannot be undone.")) return;
-            await deleteUser(currentUser.email);
-            localStorage.removeItem("vrythos_current_session");
-            location.reload();
-        };
-        document.getElementById("submitBugBtn").onclick = async () => {
-            let desc = document.getElementById("bugReportText").value.trim();
-            if (!desc) return;
-            await addBugReport({ email: currentUser.email, username: currentUser.username, description: desc, timestamp: Date.now(), status: "pending" });
-            alert("Bug report submitted. Admin may grant extra credits if legit.");
-            document.getElementById("bugReportText").value = "";
-        };
-        document.getElementById("logoutBtn").onclick = () => { localStorage.removeItem("vrythos_current_session"); location.reload(); };
-
-        async function refreshApiKeysList() {
-            userKeys = await loadUserApiKeys(currentUser.email);
-            const container = document.getElementById("apiKeysList");
-            if (!container) return;
-            if (userKeys.length === 0) {
-                container.innerHTML = "<i>No API keys generated yet.</i>";
-                return;
+                    `;
+                addAIMessage(html, true);
+            } else {
+                addAIMessage('❌ Image generation failed. Please try again.');
             }
-            container.innerHTML = userKeys.map((key, idx) => `
-                <div style="background:#1e293b; margin:5px; padding:6px; border-radius:12px;">
-                    <b>${escapeHtml(key.name)}</b><br>
-                    <code style="font-size:10px; word-break:break-all;">${escapeHtml(key.key)}</code><br>
-                    <span style="font-size:10px;">Used today: ${key.used || 0}/20</span>
-                    <button class="revokeKey" data-idx="${idx}" style="float:right; background:#ef4444; border:none; border-radius:20px; padding:2px 8px;">Revoke</button>
-                </div>
-            `).join("");
-            document.querySelectorAll(".revokeKey").forEach(btn => btn.onclick = async () => {
-                let idx = parseInt(btn.dataset.idx);
-                userKeys.splice(idx, 1);
-                await saveUserApiKeys(currentUser.email, userKeys);
-                await refreshApiKeysList();
-            });
         }
-        await refreshApiKeysList();
-        document.getElementById("generateApiKeyBtn").onclick = async () => {
-            if (userKeys.length >= 2) {
-                alert("Maximum 2 API keys per user.");
-                return;
-            }
-            let keyName = prompt("Label for this API key (e.g., MyApp)");
-            if (!keyName) return;
-            let newKey = "vrythos_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 8);
-            userKeys.push({
-                name: keyName,
-                key: newKey,
-                used: 0,
-                date: new Date().toISOString().slice(0, 10)
-            });
-            await saveUserApiKeys(currentUser.email, userKeys);
-            await refreshApiKeysList();
-            alert(`New API Key generated: ${newKey}\nStore it safely. You won't see it again.`);
-        };
 
-        async function refreshFreeKeyInfo() {
-            try {
-                const info = await apiGet(`/api/free-api-key/info?email=${encodeURIComponent(currentUser.email)}`);
-                const infoDiv = document.getElementById('freeKeyInfo');
-                const displayDiv = document.getElementById('freeKeyDisplay');
-                const revokeBtn = document.getElementById('revokeFreeKeyBtn');
-                if (info.exists) {
-                    infoDiv.innerHTML = `✅ Active key (${info.used}/${info.limit} used today)`;
-                    document.getElementById('freeKeyValue').textContent = info.key;
-                    document.getElementById('freeKeyUrl').textContent = 'https://vrythos-server.onrender.com/api/external/chat';
-                    displayDiv.style.display = 'block';
-                    revokeBtn.style.display = 'block';
-                } else {
-                    infoDiv.innerHTML = 'No free key generated yet.';
-                    displayDiv.style.display = 'none';
-                    revokeBtn.style.display = 'none';
-                }
-            } catch(e) { console.warn(e); }
+        async function getRemainingImages() {
+            const quota = await getImageQuota(currentUser.email);
+            const now = Date.now();
+            const win = 5 * 60 * 60 * 1000;
+            const base = (now - quota.windowStart >= win) ? 5 : Math.max(0, 5 - quota.count);
+            return base + (currentUser.extraImageCredits || 0);
         }
-        await refreshFreeKeyInfo();
-        document.getElementById('generateFreeKeyBtn').onclick = async () => {
+        async function consumeImage() {
+            let quota = await getImageQuota(currentUser.email);
+            const now = Date.now();
+            const win = 5 * 60 * 60 * 1000;
+            if (now - quota.windowStart >= win) quota = { email: currentUser.email, count: 0, windowStart: now };
+            if (await getRemainingImages() <= 0) return false;
+            quota.count++;
+            await setImageQuota(quota);
+            updateImageDisplay();
+            return true;
+        }
+
+        // ─── VIDEO GENERATION ───
+        async function generateVideo(prompt, duration) {
+            addAIMessage('🎬 Generating video… (may take 30–60s)', false);
             try {
-                const res = await apiPost('/api/free-api-key/generate', { email: currentUser.email });
+                const res = await apiPost('/api/generate/video', {
+                    email: currentUser.email,
+                    prompt,
+                    duration: duration || DEFAULT_VIDEO_DURATION
+                });
                 if (res.success) {
-                    alert(`Free API Key generated!\n\nKey: ${res.key}\nEndpoint: ${res.apiUrl}\nLimit: ${res.limit}/day`);
-                    await refreshFreeKeyInfo();
+                    const id = 'vid_' + (++videoStoreCounter);
+                    videoStore[id] = res.video;
+                    const html = `
+                            <video controls autoplay loop style="max-width:100%; border-radius:12px; max-height:400px;">
+                                <source src="${res.video}" type="video/mp4">
+                                Your browser does not support video.
+                            </video>
+                            <div class="btn-row">
+                                <button onclick="downloadVideo('${id}')">⬇️ Download</button>
+                                <button onclick="copyVideoToClipboard('${id}')">📋 Copy</button>
+                                <span style="font-size:0.7rem;color:var(--text-muted);margin-left:0.5rem;">Remaining: ${res.remaining ?? '?'}</span>
+                            </div>
+                        `;
+                    addAIMessage(html, true);
                 } else {
-                    alert('Failed: ' + (res.error || 'Unknown error'));
+                    addAIMessage('❌ Video failed: ' + (res.error || 'Unknown error'));
                 }
-            } catch(e) { alert('Error: ' + e.message); }
-        };
-        document.getElementById('revokeFreeKeyBtn').onclick = async () => {
-            if (!confirm('Revoke your free API key? This cannot be undone.')) return;
+            } catch (e) {
+                addAIMessage('❌ Video error: ' + e.message);
+            }
+        }
+
+        function isVideoRequest(text) {
+            return /(video|animate|animation|make a video|create a video|generate a video|render|cinematic|short film|motion|sequence|clip|movie)/i
+                .test(text);
+        }
+        function isImageRequest(text) {
+            return /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i
+                .test(text);
+        }
+
+        // ─── CHAT LIMITS ───
+        async function getTodayCalls() {
+            const today = new Date().toDateString();
+            const u = await getChatUsage(currentUser.email, selectedModuleId, today);
+            return u.count || 0;
+        }
+        async function incrementDailyCalls() {
+            const today = new Date().toDateString();
+            let u = await getChatUsage(currentUser.email, selectedModuleId, today);
+            u.count = (u.count || 0) + 1;
+            await setChatUsage(u);
+            updateSidebarStats();
+        }
+        async function canMakeChatCall() {
+            if (currentUser.banned) return false;
+            const used = await getTodayCalls();
+            const limit = 50 + (currentUser.extraChatCredits || 0);
+            return used < limit;
+        }
+
+        // ─── AI ENGINE CALL ───
+        async function callChatAPI(module_id, messages, deep) {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ module_id, messages, deep_think: deep })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Chat API error');
+            return data.reply;
+        }
+
+        // ─── ACTIVITY TRACKING ───
+        let activityInterval = null;
+
+        function startActivityTracking() {
+            if (activityInterval) clearInterval(activityInterval);
+            activityInterval = setInterval(async () => {
+                if (currentUser) await apiPost('/api/user-activity', { email: currentUser.email });
+            }, 5 * 60 * 1000);
+        }
+
+        // ─── UI HELPERS ───
+        function setProcessing(p) {
+            isProcessing = p;
+            const inp = document.getElementById('userInput');
+            const btn = document.getElementById('sendBtn');
+            if (inp) inp.disabled = p;
+            if (btn) btn.disabled = p;
+            if (inp) inp.placeholder = p ? '⏳ Thinking… please wait' : 'Enter next chat';
+            if (!p && inp) inp.focus();
+        }
+
+        function addUserMessage(text) {
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.className = 'message user-message';
+            const initial = (currentUser?.username?.charAt(0) || 'U').toUpperCase();
+            div.innerHTML = `
+                    <div class="avatar">${escapeHtml(initial)}</div>
+                    <div class="bubble">${escapeHtml(text).replace(/\n/g,'<br>')}</div>
+                `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addAIMessage(html, isHtml = false) {
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.className = 'message ai-message';
+            div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${isHtml ? html : escapeHtml(html).replace(/\n/g,'<br>')}</div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            if (!isHtml) messagesHistory.push({ role: 'assistant', content: html });
+        }
+
+        function showTyping() {
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.id = 'typingMsg';
+            div.className = 'message ai-message';
+            div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">▮ Thinking…</div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            return div;
+        }
+
+        // ─── MAIN SEND ───
+        async function sendMessage(userText, forceImage = false, forceVideo = false) {
+            if (!currentUser || currentUser.banned) { addAIMessage('🚫 Account banned.'); return; }
+            if (isProcessing) { addAIMessage('⏳ Please wait for previous message.'); return; }
+            setProcessing(true);
             try {
-                await apiPost('/api/free-api-key/revoke', { email: currentUser.email });
-                await refreshFreeKeyInfo();
-                alert('Key revoked.');
-            } catch(e) { alert('Error: ' + e.message); }
-        };
-    }
+                const willVideo = forceVideo || (liveVideoMode && isVideoRequest(userText));
+                const willImage = (forceImage || (liveImageMode && isImageRequest(userText))) && !willVideo;
 
-    // ------------------------------------------------------------------
-    // BUILD UI (clean input area: only 📎 🎨 🎬 ➤)
-    // ------------------------------------------------------------------
-    async function buildUI() {
-        document.getElementById("app-root").innerHTML = `
-        <div class="app">
-            <div class="sidebar">
-                <div class="logo"><span>🧠</span> Vrythos Core</div>
-                <button class="new-chat-btn" id="newChatBtn">+ New Conversation</button>
-                <div class="module-selector">
-                    <label>🧠 AI ENGINE</label>
-                    <select id="moduleSelect"></select>
-                    <div id="moduleRemaining" class="usage-badge">Today: -- msgs left</div>
-                </div>
-                <div class="deep-think-container">
-                    <label class="depth-heading">🔬 REASONING DEPTH</label>
-                    <label class="deep-think-toggle"><input type="checkbox" id="deepThinkToggle"> Enable step‑by‑step analysis</label>
-                </div>
-                <div class="live-image-container">
-                    <label class="live-heading">🎨 LIVE IMAGE MODE</label>
-                    <label class="live-image-toggle"><input type="checkbox" id="liveImageToggle"> Auto‑generate images from descriptions</label>
-                </div>
-                <!-- LIVE VIDEO MODE -->
-                <div class="live-image-container" style="margin-top:8px;">
-                    <label class="live-heading">🎬 LIVE VIDEO MODE</label>
-                    <label class="live-image-toggle"><input type="checkbox" id="liveVideoToggle"> Auto‑generate videos from descriptions</label>
-                </div>
-                <div id="imageUsageDisplay" class="usage-badge">🖼️ Images left: --</div>
-                <div style="margin-top:16px;">
-                    <div class="module-selector" style="margin-bottom:8px;">
-                        <label>🏆 TOURNAMENTS</label>
-                        <div id="tournamentsContainer" style="max-height:200px; overflow-y:auto;"></div>
-                    </div>
-                </div>
-                <div style="font-size:11px; margin-top: auto; text-align:center; color:#5b6e8c;">
-                    <span id="sidebarUsername">user</span> • <span id="dailyCallsLeft">50</span> calls left today
-                </div>
-            </div>
-            <div class="main-chat">
-                <div class="chat-header">
-                    <div class="ai-status"><div class="status-dot"></div> Vrythos · Neural Core</div>
-                    <div class="user-menu-btn" id="userSettingsBtn">👤 My Account ⚙️</div>
-                </div>
-                <div class="messages" id="messagesContainer">
-                    <div class="message ai-message"><div class="avatar">🧠</div><div class="bubble">Welcome to Vrythos AI. Secure chat, image gen, video gen, and personal API keys for your projects!</div></div>
-                </div>
-                <div class="input-area">
-                    <div id="filePreviewArea" class="file-badge"></div>
-                    <div class="input-wrapper">
-                        <button class="attach-btn" id="attachBtn" title="Attach file">📎</button>
-                        <button class="img-gen-btn" id="imageGenBtn" title="Generate image">🎨</button>
-                        <button class="video-gen-btn" id="videoGenBtn" title="Generate video (default 5s)">🎬</button>
-                        <input type="text" id="userInput" placeholder="Enter next chat" autocomplete="off">
-                        <button class="send-btn" id="sendBtn">➤</button>
-                    </div>
-                    <input type="file" id="fileInput" multiple style="display:none;" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg">
-                </div>
-            </div>
-        </div>`;
+                if (willVideo) {
+                    let prompt = userText;
+                    const m = userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
+                    if (m && m[2]) prompt = m[2];
+                    addUserMessage(`🎬 ${userText.substring(0,100)}`);
+                    await generateVideo(prompt, DEFAULT_VIDEO_DURATION);
+                    setProcessing(false);
+                    return;
+                }
 
-        // Event listeners
-        document.getElementById("newChatBtn").onclick = () => { messagesHistory = []; document.getElementById("messagesContainer").innerHTML = ""; addAIMessage("New session ready."); };
-        document.getElementById("sendBtn").onclick = () => { let inp = document.getElementById("userInput"); if(inp.value.trim() && !isProcessing) sendMessage(inp.value.trim()); inp.value = ""; };
-        document.getElementById("userInput").addEventListener("keypress", e => { if(e.key === "Enter") { let inp = document.getElementById("userInput"); if(inp.value.trim() && !isProcessing) sendMessage(inp.value.trim()); inp.value = ""; } });
-        document.getElementById("deepThinkToggle").onchange = e => deepThink = e.target.checked;
-        document.getElementById("liveImageToggle").onchange = e => liveImageMode = e.target.checked;
-        document.getElementById("liveVideoToggle").onchange = e => liveVideoMode = e.target.checked;
+                if (willImage) {
+                    addUserMessage(`🎨 ${userText.substring(0,100)}`);
+                    let prompt = userText;
+                    const m = userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
+                    if (m && m[2]) prompt = m[2];
+                    await generateImageAndShow(prompt);
+                    setProcessing(false);
+                    return;
+                }
 
-        document.getElementById("attachBtn").onclick = () => document.getElementById("fileInput").click();
-        document.getElementById("fileInput").onchange = e => {
-            if(e.target.files) Array.from(e.target.files).forEach(f => {
-                let reader = new FileReader();
-                reader.onload = ev => {
-                    attachedFiles.push({ name: f.name, content: ev.target.result, isText: f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i) });
+                // Normal chat
+                if (!(await canMakeChatCall())) {
+                    addAIMessage(
+                        `⛔ Daily chat limit reached (${50+(currentUser.extraChatCredits||0)}/day). Request extra via bug report.`
+                        );
+                    setProcessing(false);
+                    return;
+                }
+                const module = modules.find(m => m.id === selectedModuleId);
+                if (!module) { addAIMessage('❌ No AI engine selected. Contact admin.'); setProcessing(false); return; }
+
+                let fullMsg = userText;
+                if (attachedFiles.length) {
+                    fullMsg += '\n\n[Attached files]\n' + attachedFiles.map(f =>
+                        f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`
+                    ).join('\n');
+                    attachedFiles = [];
+                    renderFileBadges();
+                }
+
+                addUserMessage(userText);
+                messagesHistory.push({ role: 'user', content: fullMsg });
+                const typing = showTyping();
+                let reply = '';
+                try {
+                    reply = await callChatAPI(selectedModuleId, messagesHistory.slice(-12), deepThink);
+                    await incrementDailyCalls();
+                    updateRemainingDisplay();
+                    updateSidebarStats();
+                    if (reply.includes('quota') || reply.includes('limit')) {
+                        await addAbuseScore(5, 'API quota warning', userText);
+                    }
+                    const lower = userText.toLowerCase();
+                    const creatorWords = ['who made you', 'who created you', 'your creator', 'who built you', 'viraj',
+                        'bodare'
+                    ];
+                    if (creatorWords.some(w => lower.includes(w))) {
+                        reply =
+                            'I am Vrythos, an advanced AI framework built by **Viraj S. Bodare**. I operate through multiple high-performance engines and am designed to be helpful, safe, and honest.';
+                    }
+                } catch (e) {
+                    reply = `⚠️ Service temporarily unavailable. Please try again later. Error: ${e.message}`;
+                } finally {
+                    if (typing) typing.remove();
+                }
+                addAIMessage(reply);
+            } finally {
+                setProcessing(false);
+            }
+        }
+
+        // ─── UI UPDATES ───
+        async function updateRemainingDisplay() {
+            const mod = modules.find(m => m.id === selectedModuleId);
+            if (mod) {
+                const used = await getTodayCalls();
+                const left = mod.dailyLimitPerUser - used;
+                document.getElementById('moduleRemaining').textContent =
+                    `📨 Today: ${left > 0 ? left : 0}/${mod.dailyLimitPerUser} msgs left`;
+            } else {
+                document.getElementById('moduleRemaining').textContent = '⚠️ No active engine';
+            }
+        }
+
+        async function updateSidebarStats() {
+            const left = 50 + (currentUser.extraChatCredits || 0) - (await getTodayCalls());
+            document.getElementById('dailyCallsLeft').textContent = Math.max(0, left);
+            document.getElementById('sidebarUsername').textContent = currentUser.username;
+            await updateImageDisplay();
+            // update tournaments
+            renderTournaments();
+        }
+
+        async function updateImageDisplay() {
+            const rem = await getRemainingImages();
+            document.getElementById('imageUsageDisplay').textContent = `🎨 Images left: ${rem} (base+extra)`;
+        }
+
+        function renderFileBadges() {
+            const container = document.getElementById('filePreviewArea');
+            container.innerHTML = attachedFiles.map((f, idx) =>
+                `<span class="file-tag">📄 ${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444;cursor:pointer;">✖</button></span>`
+            ).join('');
+            container.querySelectorAll('.file-tag button').forEach(btn => {
+                btn.onclick = () => {
+                    const idx = parseInt(btn.dataset.idx);
+                    attachedFiles.splice(idx, 1);
                     renderFileBadges();
                 };
-                if(f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
-                else reader.readAsDataURL(f);
             });
-        };
-        document.getElementById("imageGenBtn").onclick = () => { let inp = document.getElementById("userInput"); let prompt = inp.value.trim() || "cyberpunk city"; if(!isProcessing) sendMessage(prompt, true); inp.value = ""; };
-        document.getElementById("videoGenBtn").onclick = () => {
-            let inp = document.getElementById("userInput");
-            let prompt = inp.value.trim();
-            if (!prompt) { prompt = "A cinematic scene with vibrant colors"; }
-            if (!isProcessing) {
-                sendMessage(prompt, false, true);
-                inp.value = "";
-            }
-        };
-        document.getElementById("userSettingsBtn").onclick = openUserSettings;
-        renderModuleDropdown();
-        await updateRemainingDisplay();
-        await updateSidebarStats();
-        await renderTournaments();
-        startActivityTracking();
-    }
-
-    // ------------------------------------------------------------------
-    // GOOGLE OAUTH CALLBACK
-    // ------------------------------------------------------------------
-    window.handleGoogleLogin = async (response) => {
-        try {
-            const res = await apiPost('/api/auth/google', { token: response.credential });
-            if (res.success) {
-                currentUser = {
-                    email: res.email,
-                    username: res.username,
-                    name: res.name,
-                    profilePic: res.profilePic,
-                    extraChatCredits: res.extraChatCredits || 0,
-                    extraImageCredits: res.extraImageCredits || 0,
-                    banned: res.banned || false,
-                    totalHoursLive: res.totalHoursLive || 0
-                };
-                localStorage.setItem("vrythos_current_session", res.email);
-                await buildUI();
-            } else {
-                document.getElementById("authMessage").innerText = res.error || "Google login failed";
-            }
-        } catch(e) {
-            const authMsg = document.getElementById("authMessage");
-            if (authMsg) authMsg.innerText = "Google login error: " + e.message;
-        }
-    };
-
-    // ------------------------------------------------------------------
-    // AUTHENTICATION
-    // ------------------------------------------------------------------
-    async function initAuth() {
-        let savedSession = localStorage.getItem("vrythos_current_session");
-        if (savedSession) {
-            try {
-                let users = await loadUsers();
-                let dbUser = users.find(u => u.email === savedSession && !u.banned);
-                if (dbUser) {
-                    currentUser = {
-                        email: dbUser.email,
-                        username: dbUser.username,
-                        name: dbUser.name || '',
-                        profilePic: dbUser.profilePic || '',
-                        passwordHash: dbUser.passwordHash || null,
-                        extraChatCredits: dbUser.extraChatCredits || 0,
-                        extraImageCredits: dbUser.extraImageCredits || 0,
-                        banned: dbUser.banned || false,
-                        totalHoursLive: dbUser.totalHoursLive || 0,
-                        authProvider: dbUser.authProvider || 'email'
-                    };
-                    await buildUI();
-                    return;
-                }
-            } catch(e) {
-                console.warn('Session restore failed:', e.message);
-                localStorage.removeItem("vrythos_current_session");
-            }
-        }
-        document.getElementById("app-root").innerHTML = `
-        <div class="auth-container">
-            <div class="auth-card" style="background: linear-gradient(145deg, #11141f, #0a0c15);">
-                <h2>⚡ VRYTHOS NEURAL</h2>
-                <div id="loginForm">
-                    <div id="g_id_onload"
-                        data-client_id="527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com"
-                        data-callback="handleGoogleLogin"
-                        data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin"
-                        data-type="standard"
-                        data-size="large"
-                        data-theme="filled_blue"
-                        data-text="sign_in_with"
-                        data-shape="rectangular"
-                        data-logo_alignment="left">
-                    </div>
-                    <div style="margin: 15px 0; text-align: center; color: #8e9dc2;">──────── or ────────</div>
-                    <input type="email" id="loginEmail" placeholder="Email" autocomplete="off">
-                    <input type="password" id="loginPassword" placeholder="Password">
-                    <button id="doLoginBtn">Sign In</button>
-                    <div class="auth-switch" id="showRegisterBtn">✨ Create new account</div>
-                    <div class="auth-switch" id="forgotPasswordBtn" style="color:#8e9dc2;">🔐 Forgot password?</div>
-                </div>
-                <div id="registerForm" class="hidden">
-                    <input type="text" id="regUsername" placeholder="Username">
-                    <input type="text" id="regName" placeholder="Full Name">
-                    <input type="email" id="regEmail" placeholder="Email">
-                    <input type="password" id="regPassword" placeholder="Password (min 4 chars)">
-                    <input type="password" id="regPasswordConfirm" placeholder="Confirm password">
-                    <button id="doRegisterBtn">Register</button>
-                    <div class="auth-switch" id="showLoginBtn">← Back to login</div>
-                </div>
-                <div id="authMessage" style="margin-top:12px; font-size:12px; color:#f97316; text-align:center;"></div>
-            </div>
-        </div>`;
-
-        if (window.google && window.google.accounts) {
-            window.google.accounts.id.initialize({
-                client_id: "527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com",
-                callback: window.handleGoogleLogin
-            });
-            window.google.accounts.id.renderButton(
-                document.querySelector(".g_id_signin"),
-                { theme: "filled_blue", size: "large", shape: "rectangular", text: "sign_in_with", logo_alignment: "left" }
-            );
         }
 
-        document.getElementById("loginPassword").addEventListener("keypress", e => {
-            if (e.key === "Enter") document.getElementById("doLoginBtn").click();
-        });
-
-        document.getElementById("doLoginBtn").onclick = async () => {
-            let email = document.getElementById("loginEmail").value.trim();
-            let pwd = document.getElementById("loginPassword").value;
-            try {
-                let users = await loadUsers();
-                let user = users.find(u => u.email === email);
-                if (!user) {
-                    document.getElementById("authMessage").innerHTML = "❌ User not found. <a href='#' id='suggestRegister'>Create new account?</a>";
-                    document.getElementById("suggestRegister")?.addEventListener("click", () => document.getElementById("showRegisterBtn").click());
-                    return;
-                }
-                if (!user.passwordHash) {
-                    document.getElementById("authMessage").innerText = "This account uses Google login. Please use Google Sign-In.";
-                    return;
-                }
-                let hashed = await hashPassword(pwd);
-                if (user.passwordHash !== hashed) { document.getElementById("authMessage").innerText = "Wrong password"; return; }
-                if (user.banned) { document.getElementById("authMessage").innerText = "Account banned."; return; }
-                currentUser = {
-                    email: user.email,
-                    username: user.username,
-                    name: user.name || '',
-                    profilePic: user.profilePic || '',
-                    passwordHash: user.passwordHash || null,
-                    extraChatCredits: user.extraChatCredits || 0,
-                    extraImageCredits: user.extraImageCredits || 0,
-                    banned: user.banned || false,
-                    totalHoursLive: user.totalHoursLive || 0,
-                    authProvider: user.authProvider || 'email'
-                };
-                localStorage.setItem("vrythos_current_session", user.email);
-                await buildUI();
-            } catch(e) {
-                document.getElementById("authMessage").innerText = "Login error: " + e.message;
-            }
-        };
-        document.getElementById("showRegisterBtn").onclick = () => {
-            document.getElementById("loginForm").classList.add("hidden");
-            document.getElementById("registerForm").classList.remove("hidden");
-            document.getElementById("authMessage").innerHTML = "";
-        };
-        document.getElementById("showLoginBtn").onclick = () => {
-            document.getElementById("registerForm").classList.add("hidden");
-            document.getElementById("loginForm").classList.remove("hidden");
-        };
-        document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => alert("Password reset is not available. Use Google login or contact admin."));
-        document.getElementById("doRegisterBtn").onclick = async () => {
-            let username = document.getElementById("regUsername").value.trim();
-            let name = document.getElementById("regName").value.trim();
-            let email = document.getElementById("regEmail").value.trim();
-            let password = document.getElementById("regPassword").value;
-            let confirm = document.getElementById("regPasswordConfirm").value;
-            if (!username || !name || !email || password.length < 4 || password !== confirm) {
-                document.getElementById("authMessage").innerText = "Please fill all fields correctly (password min 4 chars, match)";
+        function renderModuleDropdown() {
+            const sel = document.getElementById('moduleSelect');
+            sel.innerHTML = '';
+            if (!modules.length) {
+                const opt = document.createElement('option');
+                opt.text = '❌ No engines — Admin setup';
+                opt.disabled = true;
+                sel.appendChild(opt);
                 return;
             }
-            try {
-                let users = await loadUsers();
-                if (users.find(u => u.email === email)) {
-                    document.getElementById("authMessage").innerText = "Email already registered";
-                    return;
-                }
-                if (users.find(u => u.username === username)) {
-                    document.getElementById("authMessage").innerText = "Username already taken";
-                    return;
-                }
-                let passwordHash = await hashPassword(password);
-                let newUser = {
-                    email,
-                    username,
-                    name,
-                    passwordHash,
-                    profilePic: "",
-                    dailyCallsRecord: { date: "", count: 0 },
-                    extraChatCredits: 0,
-                    extraImageCredits: 0,
-                    banned: false,
-                    createdAt: Date.now(),
-                    totalHoursLive: 0,
-                    lastActive: Date.now(),
-                    authProvider: 'email'
+            modules.forEach(mod => {
+                const opt = document.createElement('option');
+                opt.value = mod.id;
+                opt.textContent = `${mod.displayName} (${mod.dailyLimitPerUser}/day)`;
+                if (selectedModuleId === mod.id) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            if (!selectedModuleId && modules.length) {
+                selectedModuleId = modules[0].id;
+                sel.value = selectedModuleId;
+            }
+            sel.onchange = async e => {
+                selectedModuleId = e.target.value;
+                await updateRemainingDisplay();
+            };
+        }
+
+        async function renderTournaments() {
+            const container = document.getElementById('tournamentsContainer');
+            if (!container) return;
+            if (!tournaments.length) {
+                container.innerHTML = '<i style="color:var(--text-muted);font-size:0.8rem;">No active tournaments.</i>';
+                return;
+            }
+            container.innerHTML = tournaments.map(t => `
+                    <div style="background:var(--bg-deep);border-radius:var(--radius-sm);padding:0.6rem 0.8rem;margin-bottom:0.5rem;border:1px solid var(--border-subtle);">
+                        <strong style="font-size:0.85rem;">🏆 ${escapeHtml(t.name)}</strong>
+                        <div style="font-size:0.75rem;color:var(--text-secondary);">${escapeHtml(t.description || '')}</div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);">Prize: ${escapeHtml(t.prize || 'None')}</div>
+                        ${t.participants?.includes(currentUser.email) ?
+                            '<span style="color:#10b981;font-size:0.7rem;">✓ Joined</span>' :
+                            `<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent-1);border:none;border-radius:var(--radius-full);padding:0.15rem 0.8rem;color:#fff;font-size:0.7rem;cursor:pointer;margin-top:0.2rem;">Join</button>`
+                        }
+                    </div>
+                `).join('');
+            container.querySelectorAll('.join-tournament-btn').forEach(btn => {
+                btn.onclick = async () => {
+                    await joinTournament(btn.dataset.id);
+                    await loadAllData();
+                    renderTournaments();
                 };
-                await apiPost('/api/users', newUser);
-                document.getElementById("authMessage").innerHTML = "✅ Account created! Please login.";
-                document.getElementById("registerForm").classList.add("hidden");
-                document.getElementById("loginForm").classList.remove("hidden");
-            } catch(e) {
-                document.getElementById("authMessage").innerText = "Registration error: " + e.message;
+            });
+        }
+
+        // ─── USER SETTINGS MODAL ───
+        async function openUserSettings() {
+            let userKeys = await loadUserApiKeys(currentUser.email);
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>👤 Account Center</h3>
+                            <span class="close" id="settingsClose">&times;</span>
+                        </div>
+                        <div class="grid-2">
+                            <div class="card-sm">
+                                <h4>Profile</h4>
+                                <label>Profile Picture URL</label>
+                                <input type="text" id="profilePicUrl" placeholder="https://…" value="${escapeHtml(currentUser.profilePic || '')}" />
+                                <div class="profile-preview" id="profilePreview" style="background-image:url('${escapeHtml(currentUser.profilePic || '')}');"></div>
+                                <label>Change Username</label>
+                                <input type="text" id="newUsername" placeholder="New username" />
+                                <button class="btn-sm primary" id="updateUsernameBtn">Update Username</button>
+                                <button class="btn-sm danger" id="deleteAccountBtn">🗑️ Delete Account</button>
+                            </div>
+                            <div class="card-sm">
+                                <h4>📊 Your Stats</h4>
+                                <div style="font-size:0.8rem;line-height:1.8;">
+                                    <div>Chat left today: <strong id="statChatLeft">…</strong></div>
+                                    <div>Image credits: <strong id="statImgLeft">…</strong></div>
+                                    <div>Extra chat: ${currentUser.extraChatCredits||0}</div>
+                                    <div>Extra image: ${currentUser.extraImageCredits||0}</div>
+                                    <div>Hours live: ${(currentUser.totalHoursLive||0).toFixed(1)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid-2" style="margin-top:1rem;">
+                            <div class="card-sm">
+                                <h4>🔑 API Keys (max 2)</h4>
+                                <div class="key-list" id="apiKeysList"></div>
+                                <button class="btn-sm primary" id="generateApiKeyBtn">+ Generate Key</button>
+                                <div style="font-size:0.6rem;color:var(--text-muted);margin-top:0.3rem;">Bearer token · 20 req/day</div>
+                            </div>
+                            <div class="card-sm">
+                                <h4>🔓 Free API Key (100/day)</h4>
+                                <div id="freeKeyInfo" style="font-size:0.75rem;color:var(--text-secondary);"></div>
+                                <button class="btn-sm success" id="generateFreeKeyBtn">✨ Generate / Regenerate</button>
+                                <button class="btn-sm danger" id="revokeFreeKeyBtn" style="display:none;">🗑️ Revoke</button>
+                                <div class="free-key-box" id="freeKeyDisplay" style="display:none;">
+                                    <strong>Key:</strong> <code id="freeKeyValue"></code><br>
+                                    <strong>Endpoint:</strong> <code>https://vrythos-server.onrender.com/api/external/chat</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid-2" style="margin-top:1rem;">
+                            <div class="card-sm">
+                                <h4>🐞 Report Bug / Request Credits</h4>
+                                <textarea id="bugReportText" placeholder="Describe issue or request…" rows="2"></textarea>
+                                <button class="btn-sm" id="submitBugBtn">Submit Report</button>
+                            </div>
+                            <div class="card-sm">
+                                <h4>⚖️ Legal</h4>
+                                <div style="font-size:0.7rem;color:var(--text-secondary);line-height:1.6;">
+                                    By using Vrythos AI, you agree to our
+                                    <a href="#" style="color:var(--accent-1);">Terms</a> and
+                                    <a href="#" style="color:var(--accent-1);">Privacy Policy</a>.
+                                    All data is securely stored.
+                                </div>
+                                <button class="btn-sm" id="logoutBtn" style="margin-top:0.6rem;background:#374151;border:none;color:#fff;">🚪 Logout</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            document.body.appendChild(modal);
+
+            const close = () => modal.remove();
+            modal.querySelector('#settingsClose').onclick = close;
+            modal.addEventListener('click', e => { if (e.target === modal) close(); });
+
+            // Stats
+            (async () => {
+                const chatLeft = Math.max(0, 50 + (currentUser.extraChatCredits || 0) - (await getTodayCalls()));
+                const imgLeft = await getRemainingImages();
+                document.getElementById('statChatLeft').textContent = `${chatLeft} / ${50+(currentUser.extraChatCredits||0)}`;
+                document.getElementById('statImgLeft').textContent = imgLeft;
+            })();
+
+            const picInput = document.getElementById('profilePicUrl');
+            const preview = document.getElementById('profilePreview');
+            picInput.addEventListener('input', () => {
+                preview.style.backgroundImage = `url('${picInput.value}')`;
+            });
+
+            document.getElementById('updateUsernameBtn').onclick = async () => {
+                const name = document.getElementById('newUsername').value.trim();
+                if (!name) return;
+                const users = await loadUsers();
+                if (users.find(u => u.username === name)) { showToast('Username taken', 'error'); return; }
+                await updateUser(currentUser.email, { username: name });
+                currentUser.username = name;
+                showToast('Username updated. Please log in again.', 'info');
+                close();
+                localStorage.removeItem('vrythos_current_session');
+                location.reload();
+            };
+
+            document.getElementById('deleteAccountBtn').onclick = async () => {
+                if (!confirm('⚠️ Permanently delete your account and all data? This cannot be undone.')) return;
+                await deleteUser(currentUser.email);
+                localStorage.removeItem('vrythos_current_session');
+                location.reload();
+            };
+
+            document.getElementById('submitBugBtn').onclick = async () => {
+                const desc = document.getElementById('bugReportText').value.trim();
+                if (!desc) return;
+                await addBugReport({ email: currentUser.email, username: currentUser.username, description: desc,
+                    timestamp: Date.now(), status: 'pending' });
+                showToast('Bug report submitted!', 'info');
+                document.getElementById('bugReportText').value = '';
+            };
+
+            document.getElementById('logoutBtn').onclick = () => {
+                localStorage.removeItem('vrythos_current_session');
+                location.reload();
+            };
+
+            // API Keys
+            async function refreshApiKeys() {
+                userKeys = await loadUserApiKeys(currentUser.email);
+                const container = document.getElementById('apiKeysList');
+                if (!container) return;
+                if (!userKeys.length) {
+                    container.innerHTML = '<i style="color:var(--text-muted);font-size:0.75rem;">No keys yet.</i>';
+                    return;
+                }
+                container.innerHTML = userKeys.map((k, idx) =>
+                    `<div class="key-item">
+                            <span><strong>${escapeHtml(k.name)}</strong> <code>${escapeHtml(k.key)}</code> <span style="color:var(--text-muted);">${k.used||0}/20</span></span>
+                            <button class="revoke" data-idx="${idx}">✖</button>
+                        </div>`
+                ).join('');
+                container.querySelectorAll('.revoke').forEach(btn => {
+                    btn.onclick = async () => {
+                        const idx = parseInt(btn.dataset.idx);
+                        userKeys.splice(idx, 1);
+                        await saveUserApiKeys(currentUser.email, userKeys);
+                        await refreshApiKeys();
+                    };
+                });
+            }
+            await refreshApiKeys();
+
+            document.getElementById('generateApiKeyBtn').onclick = async () => {
+                if (userKeys.length >= 2) { showToast('Max 2 keys per user.', 'error'); return; }
+                const name = prompt('Label for this key (e.g., MyApp)');
+                if (!name) return;
+                const newKey = 'vrythos_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36)
+                .substring(2, 8);
+                userKeys.push({ name, key: newKey, used: 0, date: new Date().toISOString().slice(0, 10) });
+                await saveUserApiKeys(currentUser.email, userKeys);
+                await refreshApiKeys();
+                showToast(`Key generated: ${newKey}`, 'info');
+            };
+
+            // Free key
+            async function refreshFreeKey() {
+                try {
+                    const info = await apiGet(
+                        `/api/free-api-key/info?email=${encodeURIComponent(currentUser.email)}`);
+                    const infoDiv = document.getElementById('freeKeyInfo');
+                    const displayDiv = document.getElementById('freeKeyDisplay');
+                    const revokeBtn = document.getElementById('revokeFreeKeyBtn');
+                    if (info.exists) {
+                        infoDiv.innerHTML = `✅ Active (${info.used}/${info.limit} used today)`;
+                        document.getElementById('freeKeyValue').textContent = info.key;
+                        displayDiv.style.display = 'block';
+                        revokeBtn.style.display = 'block';
+                    } else {
+                        infoDiv.innerHTML = 'No free key yet.';
+                        displayDiv.style.display = 'none';
+                        revokeBtn.style.display = 'none';
+                    }
+                } catch (_) { /* ignore */ }
+            }
+            await refreshFreeKey();
+
+            document.getElementById('generateFreeKeyBtn').onclick = async () => {
+                try {
+                    const res = await apiPost('/api/free-api-key/generate', { email: currentUser.email });
+                    if (res.success) {
+                        showToast(`Free key generated: ${res.key}`, 'info');
+                        await refreshFreeKey();
+                    } else {
+                        showToast('Failed: ' + (res.error || 'Unknown'), 'error');
+                    }
+                } catch (e) { showToast('Error: ' + e.message, 'error'); }
+            };
+
+            document.getElementById('revokeFreeKeyBtn').onclick = async () => {
+                if (!confirm('Revoke your free API key?')) return;
+                try {
+                    await apiPost('/api/free-api-key/revoke', { email: currentUser.email });
+                    await refreshFreeKey();
+                    showToast('Key revoked.', 'info');
+                } catch (e) { showToast('Error: ' + e.message, 'error'); }
+            };
+        }
+
+        // ─── BUILD UI ───
+        async function buildUI() {
+            document.getElementById('app-root').innerHTML = `
+                    <div class="app">
+                        <!-- Sidebar -->
+                        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+                        <div class="sidebar" id="sidebar">
+                            <div class="logo"><span>🧠</span> Vrythos Core</div>
+                            <button class="new-chat-btn" id="newChatBtn">+ New Conversation</button>
+
+                            <div class="section">
+                                <span class="section-label">🧠 AI ENGINE</span>
+                                <select id="moduleSelect"></select>
+                                <div class="usage-badge" id="moduleRemaining">📨 Today: -- msgs left</div>
+                            </div>
+
+                            <div class="section">
+                                <span class="section-label">🔬 REASONING DEPTH</span>
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="deepThinkToggle" />
+                                    Enable step‑by‑step analysis
+                                </label>
+                            </div>
+
+                            <div class="section">
+                                <span class="section-label">🎨 LIVE IMAGE MODE</span>
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="liveImageToggle" />
+                                    Auto‑generate images from descriptions
+                                </label>
+                            </div>
+
+                            <div class="section">
+                                <span class="section-label">🎬 LIVE VIDEO MODE</span>
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="liveVideoToggle" />
+                                    Auto‑generate videos from descriptions
+                                </label>
+                            </div>
+
+                            <div class="usage-badge" id="imageUsageDisplay">🎨 Images left: --</div>
+
+                            <div class="section" style="margin-top:0.25rem;">
+                                <span class="section-label">🏆 TOURNAMENTS</span>
+                                <div id="tournamentsContainer"></div>
+                            </div>
+
+                            <div class="footer-stats">
+                                <span id="sidebarUsername">user</span>
+                                <span><strong id="dailyCallsLeft">50</strong> calls left</span>
+                            </div>
+                        </div>
+
+                        <!-- Main Chat -->
+                        <div class="main-chat">
+                            <div class="chat-header">
+                                <div style="display:flex;align-items:center;gap:0.6rem;">
+                                    <button class="mobile-hamburger" id="hamburgerBtn">☰</button>
+                                    <div class="ai-status"><span class="dot"></span> Vrythos · Neural Core</div>
+                                </div>
+                                <div class="user-menu-btn" id="userSettingsBtn">👤 My Account ⚙️</div>
+                            </div>
+                            <div class="messages" id="messagesContainer">
+                                <div class="message ai-message">
+                                    <div class="avatar">🧠</div>
+                                    <div class="bubble">Welcome to Vrythos AI. Secure chat, image gen, video gen, and personal API keys for your projects!</div>
+                                </div>
+                            </div>
+                            <div class="input-area">
+                                <div class="file-badge" id="filePreviewArea"></div>
+                                <div class="input-wrapper">
+                                    <button class="tool-btn" id="attachBtn" title="Attach file">📎</button>
+                                    <button class="tool-btn" id="imageGenBtn" title="Generate image">🎨</button>
+                                    <button class="tool-btn" id="videoGenBtn" title="Generate video">🎬</button>
+                                    <input type="text" id="userInput" placeholder="Enter next chat" autocomplete="off" />
+                                    <button class="send-btn" id="sendBtn">➤</button>
+                                </div>
+                                <input type="file" id="fileInput" multiple style="display:none;" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg" />
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+            // ─── Event binding ───
+            document.getElementById('newChatBtn').onclick = () => {
+                messagesHistory = [];
+                document.getElementById('messagesContainer').innerHTML = '';
+                addAIMessage('New session ready.');
+            };
+
+            document.getElementById('sendBtn').onclick = () => {
+                const inp = document.getElementById('userInput');
+                if (inp.value.trim() && !isProcessing) sendMessage(inp.value.trim());
+                inp.value = '';
+            };
+
+            document.getElementById('userInput').addEventListener('keypress', e => {
+                if (e.key === 'Enter') {
+                    const inp = document.getElementById('userInput');
+                    if (inp.value.trim() && !isProcessing) sendMessage(inp.value.trim());
+                    inp.value = '';
+                }
+            });
+
+            document.getElementById('deepThinkToggle').onchange = e => deepThink = e.target.checked;
+            document.getElementById('liveImageToggle').onchange = e => liveImageMode = e.target.checked;
+            document.getElementById('liveVideoToggle').onchange = e => liveVideoMode = e.target.checked;
+
+            document.getElementById('attachBtn').onclick = () => document.getElementById('fileInput').click();
+            document.getElementById('fileInput').onchange = e => {
+                if (e.target.files) {
+                    Array.from(e.target.files).forEach(f => {
+                        const reader = new FileReader();
+                        reader.onload = ev => {
+                            attachedFiles.push({
+                                name: f.name,
+                                content: ev.target.result,
+                                isText: f.type.startsWith('text/') || f.name.match(/\.(txt|json|md)$/i)
+                            });
+                            renderFileBadges();
+                        };
+                        if (f.type.startsWith('text/') || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
+                        else reader.readAsDataURL(f);
+                    });
+                }
+            };
+
+            document.getElementById('imageGenBtn').onclick = () => {
+                const inp = document.getElementById('userInput');
+                const prompt = inp.value.trim() || 'cyberpunk city';
+                if (!isProcessing) sendMessage(prompt, true);
+                inp.value = '';
+            };
+
+            document.getElementById('videoGenBtn').onclick = () => {
+                const inp = document.getElementById('userInput');
+                const prompt = inp.value.trim() || 'A cinematic scene with vibrant colors';
+                if (!isProcessing) sendMessage(prompt, false, true);
+                inp.value = '';
+            };
+
+            document.getElementById('userSettingsBtn').onclick = openUserSettings;
+
+            // Hamburger
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            document.getElementById('hamburgerBtn').onclick = () => {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            };
+            overlay.onclick = () => {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            };
+
+            renderModuleDropdown();
+            await updateRemainingDisplay();
+            await updateSidebarStats();
+            await renderTournaments();
+            startActivityTracking();
+
+            // Close sidebar on resize to desktop
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 820) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                }
+            });
+        }
+
+        // ─── GOOGLE OAUTH ───
+        window.handleGoogleLogin = async (response) => {
+            try {
+                const res = await apiPost('/api/auth/google', { token: response.credential });
+                if (res.success) {
+                    currentUser = {
+                        email: res.email,
+                        username: res.username,
+                        name: res.name,
+                        profilePic: res.profilePic,
+                        extraChatCredits: res.extraChatCredits || 0,
+                        extraImageCredits: res.extraImageCredits || 0,
+                        banned: res.banned || false,
+                        totalHoursLive: res.totalHoursLive || 0
+                    };
+                    localStorage.setItem('vrythos_current_session', res.email);
+                    await buildUI();
+                } else {
+                    document.getElementById('authMessage').textContent = res.error || 'Google login failed';
+                }
+            } catch (e) {
+                const el = document.getElementById('authMessage');
+                if (el) el.textContent = 'Google login error: ' + e.message;
             }
         };
-    }
 
-    await loadAllData();
-    await initAuth();
-})();
-</script>
-<style>
-    /* same CSS as before – with video controls */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    :root { --bg-primary: #0a0c15; --bg-secondary: #11141f; --bg-sidebar: #0e111b; --text-primary: #f0f3fa; --text-secondary: #8e9dc2; --accent: #8b5cf6; --border: #1e293b; --user-bubble: #7c3aed; --ai-bubble: #1e293b; --success: #10b981; --danger: #ef4444; }
-    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
-    .app, .auth-container { display: flex; height: 100vh; width: 100%; }
-    .auth-container { align-items: center; justify-content: center; background: radial-gradient(circle at 20% 30%, #0f1222, #03050b); }
-    .auth-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 2rem; padding: 2rem; width: 380px; backdrop-filter: blur(8px); }
-    .auth-card h2 { margin-bottom: 1.5rem; text-align: center; background: linear-gradient(135deg, #c084fc, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .auth-card input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); padding: 12px; border-radius: 28px; color: white; margin-bottom: 12px; outline: none; }
-    .auth-card button { background: var(--accent); border: none; padding: 12px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
-    .auth-switch { text-align: center; margin-top: 16px; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
-    .hidden { display: none !important; }
-    .sidebar { width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 16px; gap: 24px; overflow-y: auto; }
-    .logo { display: flex; align-items: center; gap: 12px; font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, #c084fc, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .new-chat-btn { background: var(--accent); border: none; padding: 12px; border-radius: 40px; color: white; font-weight: 600; cursor: pointer; }
-    .module-selector, .deep-think-container, .live-image-container { background: rgba(0,0,0,0.3); border-radius: 16px; padding: 12px; }
-    select, .deep-think-toggle, .live-image-toggle { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); padding: 8px 12px; border-radius: 28px; color: white; }
-    .deep-think-container .depth-heading, .live-image-container .live-heading { display: block !important; font-size: 0.7rem !important; text-transform: uppercase !important; color: var(--text-secondary) !important; margin-bottom: 8px !important; }
-    .deep-think-toggle, .live-image-toggle { margin-top: 0 !important; display: flex !important; align-items: center !important; gap: 10px !important; width: 100% !important; }
-    .usage-badge { font-size: 11px; background: #1e293b; padding: 4px 8px; border-radius: 20px; text-align: center; margin-top: 6px; }
-    .main-chat { flex: 1; display: flex; flex-direction: column; background: var(--bg-primary); }
-    .chat-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); }
-    .user-menu-btn { background: #2d3748; border-radius: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
-    .messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
-    .message { display: flex; gap: 12px; max-width: 80%; }
-    .user-message { align-self: flex-end; flex-direction: row-reverse; }
-    .ai-message { align-self: flex-start; }
-    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: bold; background-size: cover; flex-shrink: 0; }
-    .bubble { padding: 12px 18px; border-radius: 22px; line-height: 1.5; font-size: 0.9rem; }
-    .user-message .bubble { background: var(--user-bubble); border-bottom-right-radius: 6px; }
-    .ai-message .bubble { background: var(--ai-bubble); border-bottom-left-radius: 6px; border: 1px solid var(--border); }
-    .input-area { padding: 20px 24px; border-top: 1px solid var(--border); background: var(--bg-secondary); }
-    .input-wrapper { display: flex; gap: 8px; background: var(--bg-primary); border-radius: 60px; padding: 4px 4px 4px 20px; border: 1px solid var(--border); align-items: center; }
-    .input-wrapper input { flex: 1; background: transparent; border: none; padding: 12px 0; color: white; outline: none; }
-    .input-wrapper input:disabled { opacity: 0.5; cursor: not-allowed; }
-    .send-btn { background: var(--accent); border: none; width: 44px; height: 44px; border-radius: 40px; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
-    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .attach-btn, .img-gen-btn, .video-gen-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 4px 6px; opacity: 0.7; transition: opacity 0.2s; }
-    .attach-btn:hover, .img-gen-btn:hover, .video-gen-btn:hover { opacity: 1; }
-    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-content { background: var(--bg-secondary); border-radius: 28px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 24px; border: 1px solid var(--accent); }
-    .close-modal { cursor: pointer; }
-    .profile-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); margin: 10px auto; background-size: cover; }
-    .file-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-    .file-tag { background: #2d3748; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
-    .ai-status { display: flex; align-items: center; font-weight: 600; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    @media (max-width: 700px) { .sidebar { display: none; } .message { max-width: 95%; } }
-    /* Video button style */
-    .video-gen-btn { font-size: 1.2rem; padding: 4px 6px; }
-</style>
+        // ─── AUTH ───
+        async function initAuth() {
+            const saved = localStorage.getItem('vrythos_current_session');
+            if (saved) {
+                try {
+                    const users = await loadUsers();
+                    const dbUser = users.find(u => u.email === saved && !u.banned);
+                    if (dbUser) {
+                        currentUser = {
+                            email: dbUser.email,
+                            username: dbUser.username,
+                            name: dbUser.name || '',
+                            profilePic: dbUser.profilePic || '',
+                            passwordHash: dbUser.passwordHash || null,
+                            extraChatCredits: dbUser.extraChatCredits || 0,
+                            extraImageCredits: dbUser.extraImageCredits || 0,
+                            banned: dbUser.banned || false,
+                            totalHoursLive: dbUser.totalHoursLive || 0,
+                            authProvider: dbUser.authProvider || 'email'
+                        };
+                        await buildUI();
+                        return;
+                    }
+                } catch (_) {
+                    localStorage.removeItem('vrythos_current_session');
+                }
+            }
+
+            // Show auth
+            document.getElementById('app-root').innerHTML = `
+                    <div class="auth-container">
+                        <div class="auth-card">
+                            <h2>⚡ VRYTHOS</h2>
+                            <div class="subtitle">Neural · Secure · Creative</div>
+                            <div id="loginForm">
+                                <div id="g_id_onload"
+                                    data-client_id="527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com"
+                                    data-callback="handleGoogleLogin"
+                                    data-auto_prompt="false">
+                                </div>
+                                <div class="g_id_signin" data-type="standard" data-size="large" data-theme="filled_blue" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+                                <div class="divider">or</div>
+                                <input type="email" id="loginEmail" placeholder="Email" autocomplete="off" />
+                                <input type="password" id="loginPassword" placeholder="Password" />
+                                <button id="doLoginBtn">Sign In</button>
+                                <div class="auth-switch" id="showRegisterBtn">✨ Create new account</div>
+                                <div class="auth-switch" style="color:var(--text-muted);font-size:0.75rem;" id="forgotPasswordBtn">🔐 Forgot password?</div>
+                            </div>
+                            <div id="registerForm" class="hidden">
+                                <input type="text" id="regUsername" placeholder="Username" />
+                                <input type="text" id="regName" placeholder="Full Name" />
+                                <input type="email" id="regEmail" placeholder="Email" />
+                                <input type="password" id="regPassword" placeholder="Password (min 4 chars)" />
+                                <input type="password" id="regPasswordConfirm" placeholder="Confirm password" />
+                                <button id="doRegisterBtn">Register</button>
+                                <div class="auth-switch" id="showLoginBtn">← Back to login</div>
+                            </div>
+                            <div id="authMessage"></div>
+                        </div>
+                    </div>
+                `;
+
+            // Google init
+            if (window.google && window.google.accounts) {
+                window.google.accounts.id.initialize({
+                    client_id: '527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com',
+                    callback: window.handleGoogleLogin
+                });
+                window.google.accounts.id.renderButton(
+                    document.querySelector('.g_id_signin'), { theme: 'filled_blue', size: 'large', shape: 'rectangular',
+                        text: 'sign_in_with', logo_alignment: 'left' }
+                );
+            }
+
+            document.getElementById('loginPassword').addEventListener('keypress', e => {
+                if (e.key === 'Enter') document.getElementById('doLoginBtn').click();
+            });
+
+            document.getElementById('doLoginBtn').onclick = async () => {
+                const email = document.getElementById('loginEmail').value.trim();
+                const pwd = document.getElementById('loginPassword').value;
+                try {
+                    const users = await loadUsers();
+                    const user = users.find(u => u.email === email);
+                    if (!user) {
+                        document.getElementById('authMessage').innerHTML =
+                            '❌ User not found. <a href="#" id="suggestRegister" style="color:var(--accent-1);">Create new account?</a>';
+                        document.getElementById('suggestRegister')?.addEventListener('click', () => document
+                            .getElementById('showRegisterBtn').click());
+                        return;
+                    }
+                    if (!user.passwordHash) {
+                        document.getElementById('authMessage').textContent =
+                            'This account uses Google login. Please use Google Sign-In.';
+                        return;
+                    }
+                    if (await hashPassword(pwd) !== user.passwordHash) {
+                        document.getElementById('authMessage').textContent = 'Wrong password';
+                        return;
+                    }
+                    if (user.banned) { document.getElementById('authMessage').textContent = 'Account banned.'; return; }
+                    currentUser = {
+                        email: user.email,
+                        username: user.username,
+                        name: user.name || '',
+                        profilePic: user.profilePic || '',
+                        passwordHash: user.passwordHash || null,
+                        extraChatCredits: user.extraChatCredits || 0,
+                        extraImageCredits: user.extraImageCredits || 0,
+                        banned: user.banned || false,
+                        totalHoursLive: user.totalHoursLive || 0,
+                        authProvider: user.authProvider || 'email'
+                    };
+                    localStorage.setItem('vrythos_current_session', user.email);
+                    await buildUI();
+                } catch (e) {
+                    document.getElementById('authMessage').textContent = 'Login error: ' + e.message;
+                }
+            };
+
+            document.getElementById('showRegisterBtn').onclick = () => {
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('registerForm').classList.remove('hidden');
+                document.getElementById('authMessage').textContent = '';
+            };
+            document.getElementById('showLoginBtn').onclick = () => {
+                document.getElementById('registerForm').classList.add('hidden');
+                document.getElementById('loginForm').classList.remove('hidden');
+            };
+            document.getElementById('forgotPasswordBtn').onclick = () => {
+                showToast('Password reset not available. Use Google login or contact admin.', 'warning');
+            };
+
+            document.getElementById('doRegisterBtn').onclick = async () => {
+                const username = document.getElementById('regUsername').value.trim();
+                const name = document.getElementById('regName').value.trim();
+                const email = document.getElementById('regEmail').value.trim();
+                const password = document.getElementById('regPassword').value;
+                const confirm = document.getElementById('regPasswordConfirm').value;
+                if (!username || !name || !email || password.length < 4 || password !== confirm) {
+                    document.getElementById('authMessage').textContent =
+                        'Please fill all fields correctly (password min 4 chars, match)';
+                    return;
+                }
+                try {
+                    const users = await loadUsers();
+                    if (users.find(u => u.email === email)) {
+                        document.getElementById('authMessage').textContent = 'Email already registered';
+                        return;
+                    }
+                    if (users.find(u => u.username === username)) {
+                        document.getElementById('authMessage').textContent = 'Username already taken';
+                        return;
+                    }
+                    const passwordHash = await hashPassword(password);
+                    await apiPost('/api/users', {
+                        email,
+                        username,
+                        name,
+                        passwordHash,
+                        profilePic: '',
+                        dailyCallsRecord: { date: '', count: 0 },
+                        extraChatCredits: 0,
+                        extraImageCredits: 0,
+                        banned: false,
+                        createdAt: Date.now(),
+                        totalHoursLive: 0,
+                        lastActive: Date.now(),
+                        authProvider: 'email'
+                    });
+                    document.getElementById('authMessage').innerHTML = '✅ Account created! Please login.';
+                    document.getElementById('registerForm').classList.add('hidden');
+                    document.getElementById('loginForm').classList.remove('hidden');
+                } catch (e) {
+                    document.getElementById('authMessage').textContent = 'Registration error: ' + e.message;
+                }
+            };
+        }
+
+        // ─── BOOT ───
+        await loadAllData();
+        await initAuth();
+    </script>
 </body>
 </html>
