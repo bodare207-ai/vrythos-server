@@ -420,6 +420,8 @@
             font-size: 0.9rem;
             word-break: break-word;
             position: relative;
+            max-width: 100%;
+            overflow: visible;
         }
         .message.user-message .bubble {
             background: var(--accent);
@@ -510,6 +512,27 @@
             opacity: 0.4;
             cursor: not-allowed;
         }
+        /* Full output button */
+        .message .bubble .message-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.6rem;
+            justify-content: flex-end;
+        }
+        .message .bubble .message-actions button {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.15rem 0.6rem;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .message .bubble .message-actions button:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
 
         /* ────────────── Input Area ────────────── */
         .input-area {
@@ -543,32 +566,37 @@
         }
         .input-wrapper {
             display: flex;
-            align-items: center;
+            align-items: stretch;
             gap: 0.4rem;
             background: var(--bg-primary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-full);
             padding: 0.2rem 0.2rem 0.2rem 1.2rem;
             transition: var(--transition);
+            min-height: 44px;
         }
         .input-wrapper:focus-within {
             border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
-        .input-wrapper input {
+        .input-wrapper textarea {
             flex: 1;
             background: transparent;
             border: none;
-            padding: 0.75rem 0;
+            padding: 0.6rem 0;
             color: var(--text-primary);
             font-size: 0.95rem;
             outline: none;
-            min-width: 0;
+            resize: none;
+            min-height: 44px;
+            max-height: 200px;
+            line-height: 1.5;
+            font-family: var(--font);
         }
-        .input-wrapper input::placeholder {
+        .input-wrapper textarea::placeholder {
             color: var(--text-muted);
         }
-        .input-wrapper input:disabled {
+        .input-wrapper textarea:disabled {
             opacity: 0.5;
         }
         .input-wrapper .tool-btn {
@@ -580,6 +608,7 @@
             padding: 0.4rem 0.3rem;
             transition: var(--transition);
             flex-shrink: 0;
+            align-self: center;
         }
         .input-wrapper .tool-btn:hover {
             color: var(--text-primary);
@@ -598,6 +627,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            align-self: center;
         }
         .input-wrapper .send-btn:hover {
             transform: scale(1.05);
@@ -608,6 +638,13 @@
             transform: none;
             box-shadow: none;
             cursor: not-allowed;
+        }
+        .input-area .char-counter {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-align: right;
+            margin-top: 0.3rem;
+            padding-right: 0.5rem;
         }
 
         /* ────────────── Modal ────────────── */
@@ -672,6 +709,42 @@
         }
         .modal-content .modal-header .close:hover {
             color: var(--text-primary);
+        }
+        .modal-content .modal-body {
+            max-height: 60vh;
+            overflow-y: auto;
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            border: 1px solid var(--border-subtle);
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        .modal-content .modal-actions {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1rem;
+            justify-content: flex-end;
+        }
+        .modal-content .modal-actions button {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.4rem 1.2rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.8rem;
+        }
+        .modal-content .modal-actions button:hover {
+            border-color: var(--accent);
+        }
+        .modal-content .modal-actions button.primary {
+            background: var(--accent);
+            border: none;
         }
         .modal-content .grid-2 {
             display: grid;
@@ -872,10 +945,12 @@
             }
             .input-wrapper {
                 padding: 0.1rem 0.1rem 0.1rem 0.8rem;
+                min-height: 36px;
             }
-            .input-wrapper input {
+            .input-wrapper textarea {
                 font-size: 0.85rem;
-                padding: 0.5rem 0;
+                padding: 0.4rem 0;
+                min-height: 36px;
             }
             .input-wrapper .send-btn {
                 width: 36px;
@@ -1002,6 +1077,8 @@
         let abuseScore = 0;
         let abuseWarningShown = false;
         let usedModuleIds = [];
+        let messageIdCounter = 0;
+        const messageContentStore = {};
 
         // ─── HELPERS ───
         function escapeHtml(str) {
@@ -1279,17 +1356,13 @@
         }
 
         // ─── CODE PROCESSING & DEBUGGING ───
-        // This function parses text for code blocks (fenced with triple backticks)
-        // and returns an array of { type: 'code', language, code } or null.
         function processCodeInText(text) {
-            // Regex to find ```language\ncode\n``` (non-greedy)
             const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
             let match;
             let lastIndex = 0;
             let parts = [];
             let hasCode = false;
             while ((match = codeBlockRegex.exec(text)) !== null) {
-                // Add text before code
                 if (match.index > lastIndex) {
                     parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
                 }
@@ -1299,7 +1372,6 @@
                 hasCode = true;
                 lastIndex = match.index + match[0].length;
             }
-            // Add remaining text
             if (lastIndex < text.length) {
                 parts.push({ type: 'text', content: text.substring(lastIndex) });
             }
@@ -1307,7 +1379,8 @@
             return parts;
         }
 
-        // Build HTML from parts, store code in codeStore
+        let codeStore = {};
+
         function buildCodeHtml(parts) {
             let html = '';
             for (const part of parts) {
@@ -1317,7 +1390,6 @@
                     const codeId = 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
                     const lang = part.language || 'txt';
                     const code = part.code;
-                    // Store in codeStore
                     codeStore[codeId] = { language: lang, code: code };
                     html += `
                         <div class="code-block-wrapper" data-codeid="${codeId}">
@@ -1335,10 +1407,6 @@
             return html;
         }
 
-        // Store code blocks globally for actions
-        let codeStore = {};
-
-        // Download code
         window.downloadCode = function(id) {
             const data = codeStore[id];
             if (!data) return;
@@ -1346,7 +1414,6 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            // Determine file extension from language
             const extMap = {
                 'html': 'html',
                 'css': 'css',
@@ -1378,7 +1445,6 @@
             URL.revokeObjectURL(url);
         };
 
-        // Copy code
         window.copyCode = async function(id) {
             const data = codeStore[id];
             if (!data) return;
@@ -1388,7 +1454,6 @@
             } catch (_) { showToast('Copy failed', 'error'); }
         };
 
-        // Debug code: send to AI with debug prompt
         window.debugCode = async function(id) {
             const data = codeStore[id];
             if (!data) return;
@@ -1403,7 +1468,6 @@
                     `Please review the following ${lang} code for errors, bugs, or improvements. Provide the fixed version with explanations. Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
                 messagesHistory.push({ role: 'user', content: debugPrompt });
                 const debugReply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
-                // Remove the user message we added? We'll keep it for context.
                 addAIMessage(debugReply);
                 if (btn) {
                     btn.disabled = false;
@@ -1418,34 +1482,78 @@
             }
         };
 
-        // ─── ADD AI MESSAGE with code processing ───
+        // ─── FULL OUTPUT MODAL ───
+        function showFullOutput(content) {
+            // Escape content for display as plain text
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h3>📄 Full Output</h3>
+                        <span class="close" id="fullOutputClose">&times;</span>
+                    </div>
+                    <div class="modal-body" id="fullOutputBody">${escapeHtml(content)}</div>
+                    <div class="modal-actions">
+                        <button class="primary" id="fullOutputCopyBtn">📋 Copy Full Text</button>
+                        <button id="fullOutputCloseBtn">Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            const close = () => modal.remove();
+            modal.querySelector('#fullOutputClose').onclick = close;
+            modal.querySelector('#fullOutputCloseBtn').onclick = close;
+            modal.querySelector('#fullOutputCopyBtn').onclick = async () => {
+                try {
+                    await navigator.clipboard.writeText(content);
+                    showToast('Full output copied!', 'info');
+                } catch (_) { showToast('Copy failed', 'error'); }
+            };
+            modal.addEventListener('click', e => { if (e.target === modal) close(); });
+        }
+
+        // ─── ADD AI MESSAGE ───
         function addAIMessage(content, isHtml = false) {
             const container = document.getElementById('messagesContainer');
             const div = document.createElement('div');
             div.className = 'message ai-message';
 
-            if (isHtml) {
-                div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${content}</div>`;
-                container.appendChild(div);
-                container.scrollTop = container.scrollHeight;
-                return;
-            }
-
-            // Process code blocks
-            const parts = processCodeInText(content);
             let bubbleContent = '';
-            if (parts) {
-                bubbleContent = buildCodeHtml(parts);
+            let rawContent = content; // keep raw for modal
+
+            if (isHtml) {
+                bubbleContent = content;
             } else {
-                bubbleContent = escapeHtml(content).replace(/\n/g, '<br>');
+                // Process code blocks
+                const parts = processCodeInText(content);
+                if (parts) {
+                    bubbleContent = buildCodeHtml(parts);
+                } else {
+                    bubbleContent = escapeHtml(content).replace(/\n/g, '<br>');
+                }
             }
 
-            div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${bubbleContent}</div>`;
+            // Generate a unique ID for this message
+            const msgId = 'msg_' + (++messageIdCounter);
+            messageContentStore[msgId] = rawContent;
+
+            div.innerHTML = `
+                <div class="avatar">⚡</div>
+                <div class="bubble">
+                    ${bubbleContent}
+                    <div class="message-actions">
+                        <button onclick="showFullOutput('${escapeHtml(rawContent)}')">📄 View Full</button>
+                    </div>
+                </div>
+            `;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
 
-            // Add to history only if it's not an image/video generation message
-            if (!content.startsWith('🖌️') && !content.startsWith('🎬')) {
+            // Store message ID for potential later use
+            div.dataset.msgId = msgId;
+
+            if (!isHtml && !content.startsWith('🖌️') && !content.startsWith('🎬')) {
                 messagesHistory.push({ role: 'assistant', content: content });
             }
         }
@@ -1463,12 +1571,12 @@
         // ─── UI HELPERS ───
         function setProcessing(p) {
             isProcessing = p;
-            const inp = document.getElementById('userInput');
+            const textarea = document.getElementById('userInput');
             const btn = document.getElementById('sendBtn');
-            if (inp) inp.disabled = p;
+            if (textarea) textarea.disabled = p;
             if (btn) btn.disabled = p;
-            if (inp) inp.placeholder = p ? '⏳ Thinking…' : 'Message Vrythos…';
-            if (!p && inp) inp.focus();
+            if (textarea) textarea.placeholder = p ? '⏳ Thinking…' : 'Message Vrythos…';
+            if (!p && textarea) textarea.focus();
         }
 
         function addUserMessage(text) {
@@ -1875,14 +1983,26 @@
                                     <button class="tool-btn" id="attachBtn" title="Attach file">📎</button>
                                     <button class="tool-btn" id="imageGenBtn" title="Generate image">🎨</button>
                                     <button class="tool-btn" id="videoGenBtn" title="Generate video">🎬</button>
-                                    <input type="text" id="userInput" placeholder="Message Vrythos…" autocomplete="off" />
+                                    <textarea id="userInput" placeholder="Message Vrythos…" rows="1"></textarea>
                                     <button class="send-btn" id="sendBtn">➤</button>
                                 </div>
+                                <div class="char-counter" id="charCounter">0 characters</div>
                                 <input type="file" id="fileInput" multiple style="display:none;" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg" />
                             </div>
                         </div>
                     </div>
                 `;
+
+            // ─── Auto‑grow textarea ───
+            const textarea = document.getElementById('userInput');
+            const charCounter = document.getElementById('charCounter');
+            textarea.addEventListener('input', () => {
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+                charCounter.textContent = textarea.value.length + ' characters';
+            });
+            // Trigger on load
+            textarea.dispatchEvent(new Event('input'));
 
             // ─── Event binding ───
             document.getElementById('newChatBtn').onclick = () => {
@@ -1892,16 +2012,21 @@
             };
 
             document.getElementById('sendBtn').onclick = () => {
-                const inp = document.getElementById('userInput');
-                if (inp.value.trim() && !isProcessing) sendMessage(inp.value.trim());
-                inp.value = '';
+                const val = textarea.value.trim();
+                if (val && !isProcessing) sendMessage(val);
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                charCounter.textContent = '0 characters';
             };
 
-            document.getElementById('userInput').addEventListener('keypress', e => {
-                if (e.key === 'Enter') {
-                    const inp = document.getElementById('userInput');
-                    if (inp.value.trim() && !isProcessing) sendMessage(inp.value.trim());
-                    inp.value = '';
+            textarea.addEventListener('keydown', e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const val = textarea.value.trim();
+                    if (val && !isProcessing) sendMessage(val);
+                    textarea.value = '';
+                    textarea.style.height = 'auto';
+                    charCounter.textContent = '0 characters';
                 }
             });
 
@@ -1929,17 +2054,19 @@
             };
 
             document.getElementById('imageGenBtn').onclick = () => {
-                const inp = document.getElementById('userInput');
-                const prompt = inp.value.trim() || 'cyberpunk city';
+                const prompt = textarea.value.trim() || 'cyberpunk city';
                 if (!isProcessing) sendMessage(prompt, true);
-                inp.value = '';
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                charCounter.textContent = '0 characters';
             };
 
             document.getElementById('videoGenBtn').onclick = () => {
-                const inp = document.getElementById('userInput');
-                const prompt = inp.value.trim() || 'A cinematic scene with vibrant colors';
+                const prompt = textarea.value.trim() || 'A cinematic scene with vibrant colors';
                 if (!isProcessing) sendMessage(prompt, false, true);
-                inp.value = '';
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                charCounter.textContent = '0 characters';
             };
 
             document.getElementById('userSettingsBtn').onclick = openUserSettings;
