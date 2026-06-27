@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
     <style>
-        /* ── Reset & Base ── */
+        /* ────────────── Reset & Variables ────────────── */
         *,
         *::before,
         *::after {
@@ -19,34 +19,30 @@
             box-sizing: border-box;
         }
         :root {
-            --bg-deep: #07080e;
-            --bg-surface: #0d0f1a;
-            --bg-card: #131624;
-            --bg-elevated: #1a1e30;
-            --border-subtle: #252b42;
-            --border-glow: rgba(139, 92, 246, 0.25);
+            --bg-primary: #0a0b10;
+            --bg-secondary: #14161f;
+            --bg-card: #1a1d2b;
+            --bg-elevated: #252a3f;
+            --border-subtle: #2a2f45;
             --text-primary: #f0f3fa;
-            --text-secondary: #9aa4c8;
+            --text-secondary: #a8b2d4;
             --text-muted: #5e6e94;
-            --accent-1: #8b5cf6;
-            --accent-2: #6d28d9;
-            --accent-glow: rgba(139, 92, 246, 0.35);
-            --gradient-brand: linear-gradient(135deg, #a78bfa, #7c3aed, #6d28d9);
-            --gradient-glass: linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
-            --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
-            --shadow-glow: 0 0 40px rgba(139, 92, 246, 0.15);
-            --radius-lg: 28px;
-            --radius-md: 18px;
-            --radius-sm: 12px;
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.25);
+            --accent-hover: #7c3aed;
+            --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.6);
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 10px;
             --radius-full: 9999px;
             --font: 'Inter', system-ui, -apple-system, sans-serif;
-            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition: 0.2s ease;
         }
         html,
         body {
             height: 100%;
             font-family: var(--font);
-            background: var(--bg-deep);
+            background: var(--bg-primary);
             color: var(--text-primary);
             overflow: hidden;
         }
@@ -54,39 +50,34 @@
             width: 4px;
             height: 4px;
         }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
         ::-webkit-scrollbar-thumb {
-            background: var(--accent-1);
+            background: var(--accent);
             border-radius: var(--radius-full);
         }
 
-        /* ── Auth Container ── */
+        /* ────────────── Auth ────────────── */
         .auth-container {
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             padding: 1.5rem;
-            background: radial-gradient(ellipse at 20% 30%, #131626, #07080e 70%);
+            background: radial-gradient(ellipse at 20% 30%, #181c2a, #07080e 70%);
         }
         .auth-card {
             width: 100%;
             max-width: 400px;
-            background: var(--bg-card);
+            background: var(--bg-secondary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg);
             padding: 2.25rem 1.75rem;
-            box-shadow: var(--shadow-card), var(--shadow-glow);
-            backdrop-filter: blur(12px);
-            transition: var(--transition);
+            box-shadow: var(--shadow-card);
         }
         .auth-card h2 {
             font-size: 1.7rem;
             font-weight: 800;
             text-align: center;
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #a78bfa, #7c3aed);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
@@ -98,11 +89,10 @@
             color: var(--text-secondary);
             font-size: 0.85rem;
             margin-bottom: 1.75rem;
-            font-weight: 400;
         }
         .auth-card input {
             width: 100%;
-            background: var(--bg-deep);
+            background: var(--bg-primary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-full);
             padding: 0.85rem 1.25rem;
@@ -113,15 +103,12 @@
             margin-bottom: 0.9rem;
         }
         .auth-card input:focus {
-            border-color: var(--accent-1);
+            border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-        .auth-card input::placeholder {
-            color: var(--text-muted);
         }
         .auth-card button {
             width: 100%;
-            background: var(--gradient-brand);
+            background: var(--accent);
             border: none;
             border-radius: var(--radius-full);
             padding: 0.9rem;
@@ -130,15 +117,11 @@
             color: #fff;
             cursor: pointer;
             transition: var(--transition);
-            margin-top: 0.25rem;
             box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
         }
         .auth-card button:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 32px rgba(139, 92, 246, 0.4);
-        }
-        .auth-card button:active {
-            transform: scale(0.98);
         }
         .auth-switch {
             text-align: center;
@@ -149,7 +132,7 @@
             transition: var(--transition);
         }
         .auth-switch:hover {
-            color: var(--accent-1);
+            color: var(--accent);
         }
         .auth-card .divider {
             display: flex;
@@ -181,20 +164,20 @@
             justify-content: center;
         }
 
-        /* ── App Layout ── */
+        /* ────────────── App Layout ────────────── */
         .app {
             display: flex;
             height: 100vh;
             width: 100%;
-            background: var(--bg-deep);
+            background: var(--bg-primary);
             overflow: hidden;
         }
 
-        /* ── Sidebar ── */
+        /* ────────────── Sidebar ────────────── */
         .sidebar {
             width: 280px;
             min-width: 280px;
-            background: var(--bg-surface);
+            background: var(--bg-secondary);
             border-right: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
@@ -210,7 +193,7 @@
             gap: 0.6rem;
             font-size: 1.4rem;
             font-weight: 800;
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #a78bfa, #7c3aed);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
@@ -220,7 +203,7 @@
             font-size: 1.6rem;
         }
         .sidebar .new-chat-btn {
-            background: var(--gradient-brand);
+            background: var(--accent);
             border: none;
             padding: 0.75rem 1rem;
             border-radius: var(--radius-full);
@@ -250,31 +233,6 @@
             margin-bottom: 0.6rem;
             display: block;
         }
-        .sidebar select {
-            width: 100%;
-            background: var(--bg-deep);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-full);
-            padding: 0.6rem 1rem;
-            color: var(--text-primary);
-            font-size: 0.85rem;
-            outline: none;
-            cursor: pointer;
-            transition: var(--transition);
-        }
-        .sidebar select:focus {
-            border-color: var(--accent-1);
-        }
-        .sidebar .usage-badge {
-            font-size: 0.7rem;
-            background: var(--bg-deep);
-            padding: 0.3rem 0.8rem;
-            border-radius: var(--radius-full);
-            text-align: center;
-            margin-top: 0.5rem;
-            color: var(--text-secondary);
-            border: 1px solid var(--border-subtle);
-        }
         .sidebar .toggle-row {
             display: flex;
             align-items: center;
@@ -292,7 +250,7 @@
             appearance: none;
             width: 36px;
             height: 20px;
-            background: var(--bg-deep);
+            background: var(--bg-primary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-full);
             cursor: pointer;
@@ -312,8 +270,8 @@
             transition: var(--transition);
         }
         .sidebar .toggle-row input[type="checkbox"]:checked {
-            background: var(--accent-1);
-            border-color: var(--accent-1);
+            background: var(--accent);
+            border-color: var(--accent);
         }
         .sidebar .toggle-row input[type="checkbox"]:checked::after {
             left: 18px;
@@ -332,13 +290,23 @@
         .sidebar .footer-stats strong {
             color: var(--text-secondary);
         }
+        .sidebar .module-status {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            padding: 0.3rem 0.8rem;
+            border-radius: var(--radius-full);
+            text-align: center;
+            border: 1px solid var(--border-subtle);
+            margin-top: 0.5rem;
+        }
 
-        /* ── Main Chat ── */
+        /* ────────────── Main Chat ────────────── */
         .main-chat {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--bg-deep);
+            background: var(--bg-primary);
             min-width: 0;
         }
         .chat-header {
@@ -347,7 +315,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--bg-surface);
+            background: var(--bg-secondary);
             flex-shrink: 0;
         }
         .chat-header .ai-status {
@@ -391,11 +359,11 @@
             gap: 0.5rem;
         }
         .chat-header .user-menu-btn:hover {
-            border-color: var(--accent-1);
+            border-color: var(--accent);
             color: var(--text-primary);
         }
 
-        /* ── Messages ── */
+        /* ────────────── Messages ────────────── */
         .messages {
             flex: 1;
             overflow-y: auto;
@@ -431,7 +399,7 @@
             width: 34px;
             height: 34px;
             border-radius: 50%;
-            background: var(--gradient-brand);
+            background: var(--accent);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -451,9 +419,10 @@
             line-height: 1.6;
             font-size: 0.9rem;
             word-break: break-word;
+            position: relative;
         }
         .message.user-message .bubble {
-            background: var(--accent-1);
+            background: var(--accent);
             border-bottom-right-radius: 4px;
             color: #fff;
         }
@@ -484,15 +453,49 @@
             transition: var(--transition);
         }
         .message .bubble .btn-row button:hover {
-            border-color: var(--accent-1);
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+        /* Code block styling */
+        .message .bubble pre {
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            padding: 0.8rem;
+            margin: 0.5rem 0;
+            overflow-x: auto;
+            position: relative;
+            border: 1px solid var(--border-subtle);
+        }
+        .message .bubble pre code {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .message .bubble .code-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.3rem;
+        }
+        .message .bubble .code-actions button {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 0.2rem 0.7rem;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .message .bubble .code-actions button:hover {
+            border-color: var(--accent);
             color: var(--text-primary);
         }
 
-        /* ── Input Area ── */
+        /* ────────────── Input Area ────────────── */
         .input-area {
             padding: 0.9rem 1.5rem 1.2rem;
             border-top: 1px solid var(--border-subtle);
-            background: var(--bg-surface);
+            background: var(--bg-secondary);
             flex-shrink: 0;
         }
         .input-area .file-badge {
@@ -522,14 +525,14 @@
             display: flex;
             align-items: center;
             gap: 0.4rem;
-            background: var(--bg-deep);
+            background: var(--bg-primary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-full);
             padding: 0.2rem 0.2rem 0.2rem 1.2rem;
             transition: var(--transition);
         }
         .input-wrapper:focus-within {
-            border-color: var(--accent-1);
+            border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
         .input-wrapper input {
@@ -562,7 +565,7 @@
             color: var(--text-primary);
         }
         .input-wrapper .send-btn {
-            background: var(--gradient-brand);
+            background: var(--accent);
             border: none;
             width: 42px;
             height: 42px;
@@ -587,7 +590,7 @@
             cursor: not-allowed;
         }
 
-        /* ── Modal ── */
+        /* ────────────── Modal ────────────── */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -609,7 +612,7 @@
             }
         }
         .modal-content {
-            background: var(--bg-card);
+            background: var(--bg-secondary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg);
             max-width: 720px;
@@ -617,7 +620,7 @@
             max-height: 90vh;
             overflow-y: auto;
             padding: 1.75rem 1.5rem;
-            box-shadow: var(--shadow-card), var(--shadow-glow);
+            box-shadow: var(--shadow-card);
             animation: slide-up 0.25s ease;
         }
         @keyframes slide-up {
@@ -656,7 +659,7 @@
             gap: 1.25rem;
         }
         .modal-content .card-sm {
-            background: var(--bg-deep);
+            background: var(--bg-primary);
             border-radius: var(--radius-md);
             padding: 1rem 1.1rem;
             border: 1px solid var(--border-subtle);
@@ -676,7 +679,7 @@
         .modal-content .card-sm input,
         .modal-content .card-sm textarea {
             width: 100%;
-            background: var(--bg-surface);
+            background: var(--bg-secondary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-full);
             padding: 0.5rem 1rem;
@@ -688,7 +691,7 @@
         }
         .modal-content .card-sm input:focus,
         .modal-content .card-sm textarea:focus {
-            border-color: var(--accent-1);
+            border-color: var(--accent);
         }
         .modal-content .card-sm textarea {
             border-radius: var(--radius-md);
@@ -709,10 +712,10 @@
             font-size: 0.8rem;
         }
         .modal-content .card-sm .btn-sm:hover {
-            border-color: var(--accent-1);
+            border-color: var(--accent);
         }
         .modal-content .card-sm .btn-sm.primary {
-            background: var(--gradient-brand);
+            background: var(--accent);
             border: none;
             color: #fff;
         }
@@ -738,7 +741,7 @@
             margin: 0.5rem 0;
         }
         .modal-content .key-list .key-item {
-            background: var(--bg-deep);
+            background: var(--bg-secondary);
             border-radius: var(--radius-sm);
             padding: 0.4rem 0.7rem;
             margin-bottom: 0.3rem;
@@ -760,7 +763,7 @@
             font-size: 0.8rem;
         }
         .modal-content .free-key-box {
-            background: var(--bg-deep);
+            background: var(--bg-secondary);
             border-radius: var(--radius-sm);
             padding: 0.6rem 0.8rem;
             margin-top: 0.4rem;
@@ -769,20 +772,29 @@
             word-break: break-all;
         }
         .modal-content .free-key-box code {
-            color: var(--accent-1);
+            color: var(--accent);
         }
         .profile-preview {
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            background: var(--accent-1);
+            background: var(--accent);
             margin: 0.5rem auto;
             background-size: cover;
             background-position: center;
             border: 2px solid var(--border-subtle);
         }
 
-        /* ── Responsive ── */
+        /* ────────────── Responsive ────────────── */
+        .mobile-hamburger {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.2rem 0.4rem;
+        }
         @media (max-width: 820px) {
             .sidebar {
                 position: fixed;
@@ -870,48 +882,7 @@
             }
         }
 
-        /* ── Utilities ── */
-        .mobile-hamburger {
-            display: none;
-            background: none;
-            border: none;
-            color: var(--text-primary);
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0.2rem 0.4rem;
-        }
-        .text-muted {
-            color: var(--text-muted);
-        }
-        .text-accent {
-            color: var(--accent-1);
-        }
-        .mt-1 {
-            margin-top: 0.5rem;
-        }
-        .mb-1 {
-            margin-bottom: 0.5rem;
-        }
-        .gap-1 {
-            gap: 0.5rem;
-        }
-        .flex {
-            display: flex;
-        }
-        .flex-col {
-            flex-direction: column;
-        }
-        .items-center {
-            align-items: center;
-        }
-        .justify-between {
-            justify-content: space-between;
-        }
-        .w-full {
-            width: 100%;
-        }
-
-        /* ── Loading / Error states ── */
+        /* ────────────── Loading / Error ────────────── */
         #app-root.loading {
             display: flex;
             align-items: center;
@@ -919,7 +890,7 @@
             height: 100vh;
             font-size: 1.2rem;
             color: var(--text-secondary);
-            background: var(--bg-deep);
+            background: var(--bg-primary);
         }
         #app-root.error {
             display: flex;
@@ -930,7 +901,7 @@
             color: #f87171;
             padding: 2rem;
             text-align: center;
-            background: var(--bg-deep);
+            background: var(--bg-primary);
         }
         #app-root.error h2 {
             font-size: 1.5rem;
@@ -942,7 +913,7 @@
         }
         #app-root.error button {
             margin-top: 1.5rem;
-            background: var(--accent-1);
+            background: var(--accent);
             border: none;
             padding: 0.6rem 1.5rem;
             border-radius: var(--radius-full);
@@ -997,7 +968,6 @@
         let currentUser = null;
         let modules = [];
         let tournaments = [];
-        let selectedModuleId = null;
         let deepThink = false;
         let liveImageMode = false;
         let liveVideoMode = false;
@@ -1011,6 +981,8 @@
         let videoStoreCounter = 0;
         let abuseScore = 0;
         let abuseWarningShown = false;
+        // Track used module IDs for fallback
+        let usedModuleIds = [];
 
         // ─── HELPERS ───
         function escapeHtml(str) {
@@ -1142,6 +1114,8 @@
         async function loadAllData() {
             modules = await apiGet('/api/modules');
             tournaments = await apiGet('/api/tournaments');
+            // Reset used module IDs
+            usedModuleIds = [];
         }
         async function loadUsers() { return await apiGet('/api/users'); }
         async function updateUser(email, updates) { return await apiPut(`/api/users/${email}`, updates); }
@@ -1159,17 +1133,11 @@
             return all.find(q => q.email === email) || { email, count: 0, windowStart: Date.now() };
         }
         async function setImageQuota(q) { await apiPost('/api/imageQuotas', q); }
-        async function getChatUsage(email, moduleId, date) {
-            const all = await apiGet('/api/chatUsage');
-            return all.find(u => u.email === email && u.moduleId === moduleId && u.date === date) || { email, moduleId,
-                date, count: 0 };
-        }
-        async function setChatUsage(u) { await apiPost('/api/chatUsage', u); }
         async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
         async function joinTournament(id) { return await apiPost('/api/join-tournament', { email: currentUser.email,
                 tournamentId: id }); }
 
-        // ─── IMAGE GENERATION ───
+        // ─── IMAGE GENERATION (no limit checks) ───
         async function generateImageWithCloudflare(prompt) {
             try {
                 const res = await fetch('/api/generate/image', {
@@ -1215,26 +1183,7 @@
             }
         }
 
-        async function getRemainingImages() {
-            const quota = await getImageQuota(currentUser.email);
-            const now = Date.now();
-            const win = 5 * 60 * 60 * 1000;
-            const base = (now - quota.windowStart >= win) ? 5 : Math.max(0, 5 - quota.count);
-            return base + (currentUser.extraImageCredits || 0);
-        }
-        async function consumeImage() {
-            let quota = await getImageQuota(currentUser.email);
-            const now = Date.now();
-            const win = 5 * 60 * 60 * 1000;
-            if (now - quota.windowStart >= win) quota = { email: currentUser.email, count: 0, windowStart: now };
-            if (await getRemainingImages() <= 0) return false;
-            quota.count++;
-            await setImageQuota(quota);
-            updateImageDisplay();
-            return true;
-        }
-
-        // ─── VIDEO GENERATION ───
+        // ─── VIDEO GENERATION (backend still enforces 5/day, we ignore frontend limit) ───
         async function generateVideo(prompt, duration) {
             addAIMessage('🎬 Generating video… (may take 30–60s)', false);
             try {
@@ -1254,7 +1203,6 @@
                             <div class="btn-row">
                                 <button onclick="downloadVideo('${id}')">⬇️ Download</button>
                                 <button onclick="copyVideoToClipboard('${id}')">📋 Copy</button>
-                                <span style="font-size:0.7rem;color:var(--text-muted);margin-left:0.5rem;">Remaining: ${res.remaining ?? '?'}</span>
                             </div>
                         `;
                     addAIMessage(html, true);
@@ -1275,27 +1223,31 @@
                 .test(text);
         }
 
-        // ─── CHAT LIMITS ───
-        async function getTodayCalls() {
-            const today = new Date().toDateString();
-            const u = await getChatUsage(currentUser.email, selectedModuleId, today);
-            return u.count || 0;
-        }
-        async function incrementDailyCalls() {
-            const today = new Date().toDateString();
-            let u = await getChatUsage(currentUser.email, selectedModuleId, today);
-            u.count = (u.count || 0) + 1;
-            await setChatUsage(u);
-            updateSidebarStats();
-        }
-        async function canMakeChatCall() {
-            if (currentUser.banned) return false;
-            const used = await getTodayCalls();
-            const limit = 50 + (currentUser.extraChatCredits || 0);
-            return used < limit;
+        // ─── AI ENGINE CALL WITH RANDOM MODULE & FALLBACK ───
+        async function callChatWithFallback(messages, deep) {
+            // Try up to 3 different modules
+            let attempts = 0;
+            let lastError = null;
+            const maxAttempts = Math.min(modules.length, 3);
+            // Shuffle modules to get random order
+            const shuffled = [...modules].sort(() => Math.random() - 0.5);
+            for (const mod of shuffled) {
+                if (attempts >= maxAttempts) break;
+                attempts++;
+                try {
+                    const reply = await callChatAPI(mod.id, messages, deep);
+                    // Success – update module status
+                    updateModuleStatus(mod.displayName);
+                    return reply;
+                } catch (err) {
+                    lastError = err;
+                    console.warn(`Module ${mod.displayName} failed: ${err.message}`);
+                    // Continue to next module
+                }
+            }
+            throw new Error(lastError || 'All AI engines unavailable');
         }
 
-        // ─── AI ENGINE CALL ───
         async function callChatAPI(module_id, messages, deep) {
             const res = await fetch('/api/chat', {
                 method: 'POST',
@@ -1305,6 +1257,11 @@
             const data = await res.json();
             if (!data.success) throw new Error(data.error || 'Chat API error');
             return data.reply;
+        }
+
+        function updateModuleStatus(name) {
+            const el = document.getElementById('moduleStatus');
+            if (el) el.textContent = `⚡ ${name}`;
         }
 
         // ─── ACTIVITY TRACKING ───
@@ -1324,7 +1281,7 @@
             const btn = document.getElementById('sendBtn');
             if (inp) inp.disabled = p;
             if (btn) btn.disabled = p;
-            if (inp) inp.placeholder = p ? '⏳ Thinking… please wait' : 'Enter next chat';
+            if (inp) inp.placeholder = p ? '⏳ Thinking…' : 'Message Vrythos…';
             if (!p && inp) inp.focus();
         }
 
@@ -1345,10 +1302,60 @@
             const container = document.getElementById('messagesContainer');
             const div = document.createElement('div');
             div.className = 'message ai-message';
-            div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${isHtml ? html : escapeHtml(html).replace(/\n/g,'<br>')}</div>`;
+            // If it's HTML, we render it directly; otherwise escape
+            const content = isHtml ? html : escapeHtml(html).replace(/\n/g, '<br>');
+            div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${content}</div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
             if (!isHtml) messagesHistory.push({ role: 'assistant', content: html });
+            // Process code blocks for download
+            if (!isHtml) {
+                processCodeBlocks(div.querySelector('.bubble'));
+            }
+        }
+
+        function processCodeBlocks(bubble) {
+            // Find all <pre><code> blocks inside bubble
+            const pres = bubble.querySelectorAll('pre code');
+            pres.forEach((codeElement) => {
+                const pre = codeElement.closest('pre');
+                if (!pre) return;
+                const codeText = codeElement.textContent;
+                // Detect language from class (e.g., "language-html")
+                let lang = 'txt';
+                const classes = codeElement.className.split(' ');
+                for (const cls of classes) {
+                    if (cls.startsWith('language-')) {
+                        lang = cls.replace('language-', '');
+                        break;
+                    }
+                }
+                // Create download button
+                const actions = document.createElement('div');
+                actions.className = 'code-actions';
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = '📥 Download';
+                downloadBtn.onclick = () => {
+                    const blob = new Blob([codeText], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `code.${lang}`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+                const copyBtn = document.createElement('button');
+                copyBtn.textContent = '📋 Copy';
+                copyBtn.onclick = async () => {
+                    try {
+                        await navigator.clipboard.writeText(codeText);
+                        showToast('Code copied!', 'info');
+                    } catch (_) { showToast('Copy failed', 'error'); }
+                };
+                actions.appendChild(downloadBtn);
+                actions.appendChild(copyBtn);
+                pre.parentNode.insertBefore(actions, pre.nextSibling);
+            });
         }
 
         function showTyping() {
@@ -1391,17 +1398,8 @@
                     return;
                 }
 
-                // Normal chat
-                if (!(await canMakeChatCall())) {
-                    addAIMessage(
-                        `⛔ Daily chat limit reached (${50+(currentUser.extraChatCredits||0)}/day). Request extra via bug report.`
-                        );
-                    setProcessing(false);
-                    return;
-                }
-                const module = modules.find(m => m.id === selectedModuleId);
-                if (!module) { addAIMessage('❌ No AI engine selected. Contact admin.'); setProcessing(false); return; }
-
+                // Normal chat – no limit checks
+                addUserMessage(userText);
                 let fullMsg = userText;
                 if (attachedFiles.length) {
                     fullMsg += '\n\n[Attached files]\n' + attachedFiles.map(f =>
@@ -1410,29 +1408,15 @@
                     attachedFiles = [];
                     renderFileBadges();
                 }
-
-                addUserMessage(userText);
                 messagesHistory.push({ role: 'user', content: fullMsg });
+
                 const typing = showTyping();
                 let reply = '';
                 try {
-                    reply = await callChatAPI(selectedModuleId, messagesHistory.slice(-12), deepThink);
-                    await incrementDailyCalls();
-                    updateRemainingDisplay();
-                    updateSidebarStats();
-                    if (reply.includes('quota') || reply.includes('limit')) {
-                        await addAbuseScore(5, 'API quota warning', userText);
-                    }
-                    const lower = userText.toLowerCase();
-                    const creatorWords = ['who made you', 'who created you', 'your creator', 'who built you', 'viraj',
-                        'bodare'
-                    ];
-                    if (creatorWords.some(w => lower.includes(w))) {
-                        reply =
-                            'I am Vrythos, an advanced AI framework built by **Viraj S. Bodare**. I operate through multiple high-performance engines and am designed to be helpful, safe, and honest.';
-                    }
+                    // Random module selection with fallback
+                    reply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
                 } catch (e) {
-                    reply = `⚠️ Service temporarily unavailable. Please try again later. Error: ${e.message}`;
+                    reply = `⚠️ All AI engines are currently unavailable. Please try again later. Error: ${e.message}`;
                 } finally {
                     if (typing) typing.remove();
                 }
@@ -1443,31 +1427,6 @@
         }
 
         // ─── UI UPDATES ───
-        async function updateRemainingDisplay() {
-            const mod = modules.find(m => m.id === selectedModuleId);
-            if (mod) {
-                const used = await getTodayCalls();
-                const left = mod.dailyLimitPerUser - used;
-                document.getElementById('moduleRemaining').textContent =
-                    `📨 Today: ${left > 0 ? left : 0}/${mod.dailyLimitPerUser} msgs left`;
-            } else {
-                document.getElementById('moduleRemaining').textContent = '⚠️ No active engine';
-            }
-        }
-
-        async function updateSidebarStats() {
-            const left = 50 + (currentUser.extraChatCredits || 0) - (await getTodayCalls());
-            document.getElementById('dailyCallsLeft').textContent = Math.max(0, left);
-            document.getElementById('sidebarUsername').textContent = currentUser.username;
-            await updateImageDisplay();
-            renderTournaments();
-        }
-
-        async function updateImageDisplay() {
-            const rem = await getRemainingImages();
-            document.getElementById('imageUsageDisplay').textContent = `🎨 Images left: ${rem} (base+extra)`;
-        }
-
         function renderFileBadges() {
             const container = document.getElementById('filePreviewArea');
             container.innerHTML = attachedFiles.map((f, idx) =>
@@ -1482,33 +1441,6 @@
             });
         }
 
-        function renderModuleDropdown() {
-            const sel = document.getElementById('moduleSelect');
-            sel.innerHTML = '';
-            if (!modules.length) {
-                const opt = document.createElement('option');
-                opt.text = '❌ No engines — Admin setup';
-                opt.disabled = true;
-                sel.appendChild(opt);
-                return;
-            }
-            modules.forEach(mod => {
-                const opt = document.createElement('option');
-                opt.value = mod.id;
-                opt.textContent = `${mod.displayName} (${mod.dailyLimitPerUser}/day)`;
-                if (selectedModuleId === mod.id) opt.selected = true;
-                sel.appendChild(opt);
-            });
-            if (!selectedModuleId && modules.length) {
-                selectedModuleId = modules[0].id;
-                sel.value = selectedModuleId;
-            }
-            sel.onchange = async e => {
-                selectedModuleId = e.target.value;
-                await updateRemainingDisplay();
-            };
-        }
-
         async function renderTournaments() {
             const container = document.getElementById('tournamentsContainer');
             if (!container) return;
@@ -1517,13 +1449,13 @@
                 return;
             }
             container.innerHTML = tournaments.map(t => `
-                    <div style="background:var(--bg-deep);border-radius:var(--radius-sm);padding:0.6rem 0.8rem;margin-bottom:0.5rem;border:1px solid var(--border-subtle);">
+                    <div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:0.6rem 0.8rem;margin-bottom:0.5rem;border:1px solid var(--border-subtle);">
                         <strong style="font-size:0.85rem;">🏆 ${escapeHtml(t.name)}</strong>
                         <div style="font-size:0.75rem;color:var(--text-secondary);">${escapeHtml(t.description || '')}</div>
                         <div style="font-size:0.7rem;color:var(--text-muted);">Prize: ${escapeHtml(t.prize || 'None')}</div>
                         ${t.participants?.includes(currentUser.email) ?
                             '<span style="color:#10b981;font-size:0.7rem;">✓ Joined</span>' :
-                            `<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent-1);border:none;border-radius:var(--radius-full);padding:0.15rem 0.8rem;color:#fff;font-size:0.7rem;cursor:pointer;margin-top:0.2rem;">Join</button>`
+                            `<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent);border:none;border-radius:var(--radius-full);padding:0.15rem 0.8rem;color:#fff;font-size:0.7rem;cursor:pointer;margin-top:0.2rem;">Join</button>`
                         }
                     </div>
                 `).join('');
@@ -1534,6 +1466,10 @@
                     renderTournaments();
                 };
             });
+        }
+
+        function updateSidebarUser() {
+            document.getElementById('sidebarUsername').textContent = currentUser.username;
         }
 
         // ─── USER SETTINGS MODAL ───
@@ -1561,10 +1497,8 @@
                             <div class="card-sm">
                                 <h4>📊 Your Stats</h4>
                                 <div style="font-size:0.8rem;line-height:1.8;">
-                                    <div>Chat left today: <strong id="statChatLeft">…</strong></div>
-                                    <div>Image credits: <strong id="statImgLeft">…</strong></div>
-                                    <div>Extra chat: ${currentUser.extraChatCredits||0}</div>
-                                    <div>Extra image: ${currentUser.extraImageCredits||0}</div>
+                                    <div>Extra chat credits: ${currentUser.extraChatCredits||0}</div>
+                                    <div>Extra image credits: ${currentUser.extraImageCredits||0}</div>
                                     <div>Hours live: ${(currentUser.totalHoursLive||0).toFixed(1)}</div>
                                 </div>
                             </div>
@@ -1599,8 +1533,8 @@
                                 <h4>⚖️ Legal</h4>
                                 <div style="font-size:0.7rem;color:var(--text-secondary);line-height:1.6;">
                                     By using Vrythos AI, you agree to our
-                                    <a href="#" style="color:var(--accent-1);">Terms</a> and
-                                    <a href="#" style="color:var(--accent-1);">Privacy Policy</a>.
+                                    <a href="#" style="color:var(--accent);">Terms</a> and
+                                    <a href="#" style="color:var(--accent);">Privacy Policy</a>.
                                     All data is securely stored.
                                 </div>
                                 <button class="btn-sm" id="logoutBtn" style="margin-top:0.6rem;background:#374151;border:none;color:#fff;">🚪 Logout</button>
@@ -1613,14 +1547,6 @@
             const close = () => modal.remove();
             modal.querySelector('#settingsClose').onclick = close;
             modal.addEventListener('click', e => { if (e.target === modal) close(); });
-
-            // Stats
-            (async () => {
-                const chatLeft = Math.max(0, 50 + (currentUser.extraChatCredits || 0) - (await getTodayCalls()));
-                const imgLeft = await getRemainingImages();
-                document.getElementById('statChatLeft').textContent = `${chatLeft} / ${50+(currentUser.extraChatCredits||0)}`;
-                document.getElementById('statImgLeft').textContent = imgLeft;
-            })();
 
             const picInput = document.getElementById('profilePicUrl');
             const preview = document.getElementById('profilePreview');
@@ -1755,9 +1681,8 @@
                             <button class="new-chat-btn" id="newChatBtn">+ New Conversation</button>
 
                             <div class="section">
-                                <span class="section-label">🧠 AI ENGINE</span>
-                                <select id="moduleSelect"></select>
-                                <div class="usage-badge" id="moduleRemaining">📨 Today: -- msgs left</div>
+                                <span class="section-label">🧠 ACTIVE ENGINE</span>
+                                <div class="module-status" id="moduleStatus">⚡ Auto‑select</div>
                             </div>
 
                             <div class="section">
@@ -1784,8 +1709,6 @@
                                 </label>
                             </div>
 
-                            <div class="usage-badge" id="imageUsageDisplay">🎨 Images left: --</div>
-
                             <div class="section" style="margin-top:0.25rem;">
                                 <span class="section-label">🏆 TOURNAMENTS</span>
                                 <div id="tournamentsContainer"></div>
@@ -1793,7 +1716,7 @@
 
                             <div class="footer-stats">
                                 <span id="sidebarUsername">user</span>
-                                <span><strong id="dailyCallsLeft">50</strong> calls left</span>
+                                <span style="color:var(--text-muted);">⚡ Unlimited</span>
                             </div>
                         </div>
 
@@ -1809,7 +1732,7 @@
                             <div class="messages" id="messagesContainer">
                                 <div class="message ai-message">
                                     <div class="avatar">🧠</div>
-                                    <div class="bubble">Welcome to Vrythos AI. Secure chat, image gen, video gen, and personal API keys for your projects!</div>
+                                    <div class="bubble">Welcome to Vrythos AI. I can chat, generate images, videos, and even give you code files to download. Ask me anything!</div>
                                 </div>
                             </div>
                             <div class="input-area">
@@ -1818,7 +1741,7 @@
                                     <button class="tool-btn" id="attachBtn" title="Attach file">📎</button>
                                     <button class="tool-btn" id="imageGenBtn" title="Generate image">🎨</button>
                                     <button class="tool-btn" id="videoGenBtn" title="Generate video">🎬</button>
-                                    <input type="text" id="userInput" placeholder="Enter next chat" autocomplete="off" />
+                                    <input type="text" id="userInput" placeholder="Message Vrythos…" autocomplete="off" />
                                     <button class="send-btn" id="sendBtn">➤</button>
                                 </div>
                                 <input type="file" id="fileInput" multiple style="display:none;" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg" />
@@ -1899,9 +1822,7 @@
                 overlay.classList.remove('active');
             };
 
-            renderModuleDropdown();
-            await updateRemainingDisplay();
-            await updateSidebarStats();
+            updateSidebarUser();
             await renderTournaments();
             startActivityTracking();
 
@@ -1960,6 +1881,7 @@
                             totalHoursLive: dbUser.totalHoursLive || 0,
                             authProvider: dbUser.authProvider || 'email'
                         };
+                        await loadAllData();
                         await buildUI();
                         return;
                     }
@@ -2026,7 +1948,7 @@
                     const user = users.find(u => u.email === email);
                     if (!user) {
                         document.getElementById('authMessage').innerHTML =
-                            '❌ User not found. <a href="#" id="suggestRegister" style="color:var(--accent-1);">Create new account?</a>';
+                            '❌ User not found. <a href="#" id="suggestRegister" style="color:var(--accent);">Create new account?</a>';
                         document.getElementById('suggestRegister')?.addEventListener('click', () => document
                             .getElementById('showRegisterBtn').click());
                         return;
@@ -2054,6 +1976,7 @@
                         authProvider: user.authProvider || 'email'
                     };
                     localStorage.setItem('vrythos_current_session', user.email);
+                    await loadAllData();
                     await buildUI();
                 } catch (e) {
                     document.getElementById('authMessage').textContent = 'Login error: ' + e.message;
@@ -2119,7 +2042,7 @@
             };
         }
 
-        // ─── BOOT WITH ERROR HANDLING ───
+        // ─── BOOT ───
         (async function boot() {
             try {
                 await loadAllData();
