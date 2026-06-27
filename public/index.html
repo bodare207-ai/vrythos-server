@@ -910,12 +910,52 @@
         .w-full {
             width: 100%;
         }
+
+        /* ── Loading / Error states ── */
+        #app-root.loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            background: var(--bg-deep);
+        }
+        #app-root.error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #f87171;
+            padding: 2rem;
+            text-align: center;
+            background: var(--bg-deep);
+        }
+        #app-root.error h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        #app-root.error p {
+            max-width: 500px;
+            color: var(--text-secondary);
+        }
+        #app-root.error button {
+            margin-top: 1.5rem;
+            background: var(--accent-1);
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: var(--radius-full);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
     <!-- ─── APP ROOT ─── -->
-    <div id="app-root">Loading Vrythos Neural Core…</div>
+    <div id="app-root" class="loading">⏳ Loading Vrythos Neural Core…</div>
 
     <script>
         // ═══════════════════════════════════════════════════════════════
@@ -1016,7 +1056,7 @@
                 abuseWarningShown = true;
                 addAIMessage(
                     `⚠️ Warning: suspicious activity detected (score ${abuseScore}%). Repeated violations may lead to a ban.`
-                );
+                    );
             }
         }
 
@@ -1420,7 +1460,6 @@
             document.getElementById('dailyCallsLeft').textContent = Math.max(0, left);
             document.getElementById('sidebarUsername').textContent = currentUser.username;
             await updateImageDisplay();
-            // update tournaments
             renderTournaments();
         }
 
@@ -2080,9 +2119,23 @@
             };
         }
 
-        // ─── BOOT ───
-        await loadAllData();
-        await initAuth();
+        // ─── BOOT WITH ERROR HANDLING ───
+        (async function boot() {
+            try {
+                await loadAllData();
+                await initAuth();
+            } catch (err) {
+                console.error('Boot error:', err);
+                const root = document.getElementById('app-root');
+                root.className = 'error';
+                root.innerHTML = `
+                        <h2>⚠️ Connection Error</h2>
+                        <p>Could not connect to the Vrythos server. Make sure the backend is running and reachable.</p>
+                        <p style="font-size:0.85rem;color:var(--text-muted);">${escapeHtml(err.message)}</p>
+                        <button onclick="location.reload()">🔄 Retry</button>
+                    `;
+            }
+        })();
     </script>
 </body>
 </html>
