@@ -469,6 +469,13 @@
             border: 1px solid var(--border-subtle);
             position: relative;
         }
+        .message .bubble .code-block-wrapper .code-lang {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+            display: block;
+        }
         .message .bubble .code-block-wrapper pre {
             margin: 0;
             overflow-x: auto;
@@ -1272,9 +1279,10 @@
         }
 
         // ─── CODE PROCESSING & DEBUGGING ───
-        // This function parses text for markdown code fences and returns HTML with code blocks and actions.
+        // This function parses text for code blocks (fenced with triple backticks)
+        // and returns an array of { type: 'code', language, code } or null.
         function processCodeInText(text) {
-            // Regex to find ```language\ncode\n```
+            // Regex to find ```language\ncode\n``` (non-greedy)
             const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
             let match;
             let lastIndex = 0;
@@ -1295,24 +1303,25 @@
             if (lastIndex < text.length) {
                 parts.push({ type: 'text', content: text.substring(lastIndex) });
             }
-            // If no code found, return null
             if (!hasCode) return null;
             return parts;
         }
 
-        // Build HTML from parts
+        // Build HTML from parts, store code in codeStore
         function buildCodeHtml(parts) {
             let html = '';
             for (const part of parts) {
                 if (part.type === 'text') {
                     html += escapeHtml(part.content).replace(/\n/g, '<br>');
                 } else {
-                    // Generate unique ID for this code block
                     const codeId = 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
                     const lang = part.language || 'txt';
                     const code = part.code;
+                    // Store in codeStore
+                    codeStore[codeId] = { language: lang, code: code };
                     html += `
-                        <div class="code-block-wrapper" data-codeid="${codeId}" data-lang="${lang}" data-code="${escapeHtml(code)}">
+                        <div class="code-block-wrapper" data-codeid="${codeId}">
+                            <span class="code-lang">${escapeHtml(lang)}</span>
                             <pre><code class="language-${lang}">${escapeHtml(code)}</code></pre>
                             <div class="code-actions">
                                 <button onclick="downloadCode('${codeId}')">📥 Download</button>
@@ -1329,11 +1338,6 @@
         // Store code blocks globally for actions
         let codeStore = {};
 
-        // When a code block is rendered, we store its data
-        function registerCodeBlock(id, language, code) {
-            codeStore[id] = { language, code };
-        }
-
         // Download code
         window.downloadCode = function(id) {
             const data = codeStore[id];
@@ -1342,7 +1346,34 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `code.${data.language}`;
+            // Determine file extension from language
+            const extMap = {
+                'html': 'html',
+                'css': 'css',
+                'js': 'js',
+                'javascript': 'js',
+                'python': 'py',
+                'py': 'py',
+                'java': 'java',
+                'c': 'c',
+                'cpp': 'cpp',
+                'c++': 'cpp',
+                'go': 'go',
+                'rust': 'rs',
+                'php': 'php',
+                'ruby': 'rb',
+                'rb': 'rb',
+                'swift': 'swift',
+                'ts': 'ts',
+                'typescript': 'ts',
+                'json': 'json',
+                'xml': 'xml',
+                'sh': 'sh',
+                'bash': 'sh',
+                'txt': 'txt'
+            };
+            const ext = extMap[data.language] || 'txt';
+            a.download = `code.${ext}`;
             a.click();
             URL.revokeObjectURL(url);
         };
@@ -1363,73 +1394,49 @@
             if (!data) return;
             const code = data.code;
             const lang = data.language;
-            // Disable button during debug
             const btn = document.querySelector(`.code-block-wrapper[data-codeid="${id}"] .code-actions button:last-child`);
             if (btn) btn.disabled = true;
-            btn.textContent = '⏳ Debugging…';
+            const originalText = btn ? btn.textContent : '🔍 Debug';
+            if (btn) btn.textContent = '⏳ Debugging…';
             try {
-                // Build a debug prompt
                 const debugPrompt =
                     `Please review the following ${lang} code for errors, bugs, or improvements. Provide the fixed version with explanations. Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
-                // Add a user message to history (so the AI sees it)
                 messagesHistory.push({ role: 'user', content: debugPrompt });
-                // Call AI with fallback
                 const debugReply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
                 // Remove the user message we added? We'll keep it for context.
-                // Add the debug reply as a new assistant message
                 addAIMessage(debugReply);
-                // Enable button
                 if (btn) {
                     btn.disabled = false;
-                    btn.textContent = '🔍 Debug';
+                    btn.textContent = originalText;
                 }
             } catch (err) {
                 showToast('Debug failed: ' + err.message, 'error');
                 if (btn) {
                     btn.disabled = false;
-                    btn.textContent = '🔍 Debug';
+                    btn.textContent = originalText;
                 }
             }
         };
 
-        // ─── OVERRIDE addAIMessage to process code ───
-        // We'll keep the original logic but intercept text to add code processing.
-        // We'll store the original function and replace.
-        const originalAddAIMessage = window.addAIMessage; // but we define it below.
-
-        // We'll define a new addAIMessage that processes code.
+        // ─── ADD AI MESSAGE with code processing ───
         function addAIMessage(content, isHtml = false) {
             const container = document.getElementById('messagesContainer');
             const div = document.createElement('div');
             div.className = 'message ai-message';
 
             if (isHtml) {
-                // If already HTML, just insert
                 div.innerHTML = `<div class="avatar">⚡</div><div class="bubble">${content}</div>`;
                 container.appendChild(div);
                 container.scrollTop = container.scrollHeight;
-                // We won't add to history because it might be image/video or system messages
                 return;
             }
 
-            // Process code blocks in content
+            // Process code blocks
             const parts = processCodeInText(content);
             let bubbleContent = '';
             if (parts) {
-                // There are code blocks, build HTML
                 bubbleContent = buildCodeHtml(parts);
-                // Register code blocks after rendering
-                // We need to store code data globally
-                // We'll store after DOM update, but we can also store inline
-                // We'll use a mutation observer or just store in a map
-                // Since we have the data, we can store now
-                // But we need the codeId from the build
-                // We'll store in codeStore during build.
-                // However, buildCodeHtml doesn't store; we'll store after we have the HTML.
-                // Let's generate IDs and store.
-                // We'll modify buildCodeHtml to also register.
             } else {
-                // No code, just escape
                 bubbleContent = escapeHtml(content).replace(/\n/g, '<br>');
             }
 
@@ -1437,30 +1444,7 @@
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
 
-            // If there were code blocks, we need to register them
-            if (parts) {
-                // Find all code-block-wrapper elements inside this div
-                const wrappers = div.querySelectorAll('.code-block-wrapper');
-                wrappers.forEach(wrapper => {
-                    const id = wrapper.dataset.codeid;
-                    const lang = wrapper.dataset.lang;
-                    const code = wrapper.dataset.code;
-                    if (id && lang && code) {
-                        codeStore[id] = { language: lang, code: decodeURIComponent(escapeHtml(code)) };
-                        // Actually dataset.code is already escaped? We set it with escapeHtml, but we need original code.
-                        // We stored the code in dataset.code as escaped, but we need to decode.
-                        // Better to store the raw code in a separate map.
-                        // We'll store raw code during build.
-                        // We'll store in the build function.
-                    }
-                });
-            }
-
-            // Add to history only if it's a regular message (not HTML with images/videos)
-            // We'll assume that if parts exist (code), it's a text message, so add.
-            // But we might have added system messages like "Generating image...", we should not add those.
-            // So we'll add only if not isHtml and not an image/video generation message.
-            // Check if content starts with "🖌️" or "🎬" – we'll skip those.
+            // Add to history only if it's not an image/video generation message
             if (!content.startsWith('🖌️') && !content.startsWith('🎬')) {
                 messagesHistory.push({ role: 'assistant', content: content });
             }
@@ -1541,9 +1525,18 @@
                     return;
                 }
 
-                // Normal chat – no limit checks
+                // Normal chat – add instruction to format code with triple backticks if user asks for code
+                let modifiedText = userText;
+                const codeKeywords = ['code', 'html', 'css', 'javascript', 'python', 'java', 'c++', 'c#', 'php', 'ruby', 'go',
+                    'rust', 'swift', 'typescript', 'js', 'py', 'cpp'
+                ];
+                if (codeKeywords.some(kw => userText.toLowerCase().includes(kw))) {
+                    modifiedText +=
+                        "\n\n(Please format any code you provide with triple backticks and language specifier, e.g., ```html ... ```)";
+                }
+
                 addUserMessage(userText);
-                let fullMsg = userText;
+                let fullMsg = modifiedText;
                 if (attachedFiles.length) {
                     fullMsg += '\n\n[Attached files]\n' + attachedFiles.map(f =>
                         f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`
@@ -1561,7 +1554,6 @@
                 } finally {
                     if (typing) typing.remove();
                 }
-                // Use addAIMessage which will process code
                 addAIMessage(reply);
             } finally {
                 setProcessing(false);
