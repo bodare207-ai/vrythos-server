@@ -1605,11 +1605,10 @@
             return div;
         }
 
-        // ─── BEST CODING MODE (CHAIN 4 ENGINES) ───
+        // ─── BEST CODING MODE (CHAIN WITH FALLBACK) ───
         async function handleBestCoding(userText, attachedFilesText) {
-            // Get up to 4 modules (use the order they appear in the list)
-            let selected = modules.slice(0, 4);
-            if (selected.length === 0) {
+            const availableModules = [...modules];
+            if (availableModules.length === 0) {
                 addAIMessage('❌ No AI engines available. Please add at least one engine in the admin panel.');
                 return;
             }
@@ -1620,69 +1619,70 @@
                 initialContent += '\n\n' + attachedFilesText;
             }
 
-            // We'll store the latest reply
+            // We'll try to get up to 4 refinement steps, using distinct modules if possible.
+            // For each step, we try modules in order, skipping those that failed previously.
             let currentReply = null;
-            let currentMessages = [{ role: 'user', content: initialContent }];
+            let usedModuleIds = [];
+            let step = 0; // 0 = initial, 1,2,3 = refinements
+            const maxSteps = Math.min(4, availableModules.length);
+            // We'll loop until we reach maxSteps or run out of modules.
+            let moduleIndex = 0;
+            let attempts = 0;
+            const maxAttempts = availableModules.length * 2; // safety
 
-            // Show a progress indicator (we'll update the same typing element)
+            // Progress indicator – we'll update the typing bubble
             const typing = showTyping();
             const typingBubble = typing.querySelector('.bubble');
 
-            // Loop through each module
-            for (let i = 0; i < selected.length; i++) {
-                const mod = selected[i];
-                const stepNum = i + 1;
-                const total = selected.length;
-                typingBubble.textContent = `🔄 Refining with ${mod.displayName} (${stepNum}/${total})…`;
+            while (step < maxSteps && attempts < maxAttempts) {
+                attempts++;
+                let moduleFoundForStep = false;
+                // try each module in order, skipping already used ones
+                for (let i = 0; i < availableModules.length; i++) {
+                    const mod = availableModules[i];
+                    if (usedModuleIds.includes(mod.id)) continue; // already used or failed
 
-                try {
-                    // For the first step, use the original messages.
-                    // For subsequent steps, we pass the previous output with a refinement instruction.
-                    let messagesToSend;
-                    if (i === 0) {
-                        // First step: use the full conversation history (last 12 messages)
-                        // to maintain context, but we also include the user's current query.
-                        // We'll just use the currentMessages (which contains the user query)
-                        messagesToSend = currentMessages;
-                    } else {
-                        // Construct a refinement prompt: include original user query and previous output.
-                        const refinementPrompt =
-                            `Original user request: "${userText}"\n\nPrevious output:\n${currentReply}\n\nPlease review, fix any bugs, improve the code, add more features, and make it more professional. Also fix any errors. Provide the final improved version.`;
-                        messagesToSend = [{ role: 'user', content: refinementPrompt }];
+                    // Update progress
+                    typingBubble.textContent = `🔄 Step ${step+1}/${maxSteps} with ${mod.displayName}…`;
+
+                    try {
+                        let reply;
+                        if (step === 0) {
+                            // Initial answer
+                            reply = await callChatAPI(mod.id, [{ role: 'user', content: initialContent }], deepThink);
+                        } else {
+                            // Refinement: pass previous output with improvement instructions
+                            const refinementPrompt =
+                                `Original user request: "${userText}"\n\nPrevious output:\n${currentReply}\n\nPlease review, fix any bugs, improve the code, add more features, and make it more professional. Also fix any errors. Provide the final improved version.`;
+                            reply = await callChatAPI(mod.id, [{ role: 'user', content: refinementPrompt }], deepThink);
+                        }
+                        // Success
+                        currentReply = reply;
+                        usedModuleIds.push(mod.id); // mark as used successfully
+                        step++;
+                        moduleFoundForStep = true;
+                        updateModuleStatus(mod.displayName);
+                        break; // move to next step
+                    } catch (err) {
+                        // This module failed for this step; skip it permanently (add to used)
+                        console.warn(`Module ${mod.displayName} failed for step ${step}: ${err.message}`);
+                        usedModuleIds.push(mod.id); // won't be tried again
+                        // continue to next module for same step
                     }
+                }
 
-                    // Call the API for this module
-                    const reply = await callChatAPI(mod.id, messagesToSend, deepThink);
-                    currentReply = reply;
-
-                    // Update module status
-                    updateModuleStatus(mod.displayName);
-
-                } catch (err) {
-                    // If a module fails, we can still continue with the previous reply
-                    console.warn(`Module ${mod.displayName} failed: ${err.message}`);
-                    // If we have no reply yet, we can't continue
-                    if (currentReply === null) {
-                        typing.remove();
-                        addAIMessage(`❌ First engine (${mod.displayName}) failed: ${err.message}. No fallback available.`);
-                        setProcessing(false);
-                        return;
-                    }
-                    // Otherwise, we keep the previous reply and move to next module
-                    // But we should inform the user
-                    addAIMessage(`⚠️ Engine ${mod.displayName} failed, continuing with previous refinement.`);
+                if (!moduleFoundForStep) {
+                    // No module succeeded for this step, break the loop (we can't proceed)
+                    break;
                 }
             }
 
-            // Remove typing indicator
             typing.remove();
 
-            // Display final output
             if (currentReply) {
                 addAIMessage(currentReply);
-                // Also update the chat history with the final answer (already done inside addAIMessage)
             } else {
-                addAIMessage('❌ Best coding chain failed to produce any output.');
+                addAIMessage('❌ Best coding chain failed to produce any output. No engine could generate a response.');
             }
         }
 
