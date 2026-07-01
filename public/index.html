@@ -1066,6 +1066,7 @@
         let deepThink = false;
         let liveImageMode = false;
         let liveVideoMode = false;
+        let bestCodingMode = false;          // NEW
         let messagesHistory = [];
         let attachedFiles = [];
         let isProcessing = false;
@@ -1604,6 +1605,87 @@
             return div;
         }
 
+        // ─── BEST CODING MODE (CHAIN 4 ENGINES) ───
+        async function handleBestCoding(userText, attachedFilesText) {
+            // Get up to 4 modules (use the order they appear in the list)
+            let selected = modules.slice(0, 4);
+            if (selected.length === 0) {
+                addAIMessage('❌ No AI engines available. Please add at least one engine in the admin panel.');
+                return;
+            }
+
+            // Build initial user message with attachments
+            let initialContent = userText;
+            if (attachedFilesText) {
+                initialContent += '\n\n' + attachedFilesText;
+            }
+
+            // We'll store the latest reply
+            let currentReply = null;
+            let currentMessages = [{ role: 'user', content: initialContent }];
+
+            // Show a progress indicator (we'll update the same typing element)
+            const typing = showTyping();
+            const typingBubble = typing.querySelector('.bubble');
+
+            // Loop through each module
+            for (let i = 0; i < selected.length; i++) {
+                const mod = selected[i];
+                const stepNum = i + 1;
+                const total = selected.length;
+                typingBubble.textContent = `🔄 Refining with ${mod.displayName} (${stepNum}/${total})…`;
+
+                try {
+                    // For the first step, use the original messages.
+                    // For subsequent steps, we pass the previous output with a refinement instruction.
+                    let messagesToSend;
+                    if (i === 0) {
+                        // First step: use the full conversation history (last 12 messages)
+                        // to maintain context, but we also include the user's current query.
+                        // We'll just use the currentMessages (which contains the user query)
+                        messagesToSend = currentMessages;
+                    } else {
+                        // Construct a refinement prompt: include original user query and previous output.
+                        const refinementPrompt =
+                            `Original user request: "${userText}"\n\nPrevious output:\n${currentReply}\n\nPlease review, fix any bugs, improve the code, add more features, and make it more professional. Also fix any errors. Provide the final improved version.`;
+                        messagesToSend = [{ role: 'user', content: refinementPrompt }];
+                    }
+
+                    // Call the API for this module
+                    const reply = await callChatAPI(mod.id, messagesToSend, deepThink);
+                    currentReply = reply;
+
+                    // Update module status
+                    updateModuleStatus(mod.displayName);
+
+                } catch (err) {
+                    // If a module fails, we can still continue with the previous reply
+                    console.warn(`Module ${mod.displayName} failed: ${err.message}`);
+                    // If we have no reply yet, we can't continue
+                    if (currentReply === null) {
+                        typing.remove();
+                        addAIMessage(`❌ First engine (${mod.displayName}) failed: ${err.message}. No fallback available.`);
+                        setProcessing(false);
+                        return;
+                    }
+                    // Otherwise, we keep the previous reply and move to next module
+                    // But we should inform the user
+                    addAIMessage(`⚠️ Engine ${mod.displayName} failed, continuing with previous refinement.`);
+                }
+            }
+
+            // Remove typing indicator
+            typing.remove();
+
+            // Display final output
+            if (currentReply) {
+                addAIMessage(currentReply);
+                // Also update the chat history with the final answer (already done inside addAIMessage)
+            } else {
+                addAIMessage('❌ Best coding chain failed to produce any output.');
+            }
+        }
+
         // ─── MAIN SEND ───
         async function sendMessage(userText, forceImage = false, forceVideo = false) {
             if (!currentUser || currentUser.banned) { addAIMessage('🚫 Account banned.'); return; }
@@ -1633,7 +1715,25 @@
                     return;
                 }
 
-                // Normal chat – add instruction to format code with triple backticks if user asks for code
+                // ─── BEST CODING MODE CHECK ───
+                if (bestCodingMode && modules.length > 0) {
+                    // Prepare attached files text
+                    let filesText = '';
+                    if (attachedFiles.length) {
+                        filesText = attachedFiles.map(f =>
+                            f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`
+                        ).join('\n');
+                        attachedFiles = [];
+                        renderFileBadges();
+                    }
+
+                    addUserMessage(userText);
+                    await handleBestCoding(userText, filesText);
+                    setProcessing(false);
+                    return;
+                }
+
+                // ─── NORMAL CHAT ───
                 let modifiedText = userText;
                 const codeKeywords = ['code', 'html', 'css', 'javascript', 'python', 'java', 'c++', 'c#', 'php', 'ruby', 'go',
                     'rust', 'swift', 'typescript', 'js', 'py', 'cpp'
@@ -1951,6 +2051,15 @@
                                 </label>
                             </div>
 
+                            <!-- NEW: Best Coding Mode -->
+                            <div class="section">
+                                <span class="section-label">⚙️ BEST CODING MODE</span>
+                                <label class="toggle-row">
+                                    <input type="checkbox" id="bestCodingToggle" />
+                                    Multi‑pass refinement (4 engines)
+                                </label>
+                            </div>
+
                             <div class="section" style="margin-top:0.25rem;">
                                 <span class="section-label">🏆 TOURNAMENTS</span>
                                 <div id="tournamentsContainer"></div>
@@ -2033,6 +2142,7 @@
             document.getElementById('deepThinkToggle').onchange = e => deepThink = e.target.checked;
             document.getElementById('liveImageToggle').onchange = e => liveImageMode = e.target.checked;
             document.getElementById('liveVideoToggle').onchange = e => liveVideoMode = e.target.checked;
+            document.getElementById('bestCodingToggle').onchange = e => bestCodingMode = e.target.checked;
 
             document.getElementById('attachBtn').onclick = () => document.getElementById('fileInput').click();
             document.getElementById('fileInput').onchange = e => {
