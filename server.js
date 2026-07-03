@@ -254,6 +254,9 @@ function asyncHandler(fn) {
 // ========== AI PROVIDER HANDLERS ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest.`;
 
+// Increase token limits to 8192 for longer outputs
+const MAX_TOKENS = 8192;
+
 async function callGroq(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
     if (deepThink) sys += " Use step-by-step reasoning.";
@@ -261,7 +264,7 @@ async function callGroq(module, messages, deepThink) {
     const response = await fetch(module.apiUrl, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${module.primaryKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: module.model, messages: apiMessages, temperature: 0.7, max_tokens: 1200 })
+        body: JSON.stringify({ model: module.model, messages: apiMessages, temperature: 0.7, max_tokens: MAX_TOKENS })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message || 'Groq API error');
@@ -274,7 +277,11 @@ async function callGemini(module, messages, deepThink) {
     const contents = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
     const modelName = module.model.replace("models/", "");
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${module.primaryKey}`;
-    const payload = { contents, systemInstruction: { parts: [{ text: sys }] }, generationConfig: { temperature: 0.7 } };
+    const payload = {
+        contents,
+        systemInstruction: { parts: [{ text: sys }] },
+        generationConfig: { temperature: 0.7, maxOutputTokens: MAX_TOKENS }
+    };
     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message || 'Gemini API error');
@@ -288,7 +295,7 @@ async function callOpenRouter(module, messages, deepThink) {
     const response = await fetch(module.apiUrl, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${module.primaryKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: module.model, messages: apiMessages, temperature: 0.7, max_tokens: 1200 })
+        body: JSON.stringify({ model: module.model, messages: apiMessages, temperature: 0.7, max_tokens: MAX_TOKENS })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message || 'OpenRouter API error');
@@ -300,10 +307,15 @@ async function callCloudflareText(module, messages, deepThink) {
     if (deepThink) sys += " Use step-by-step reasoning.";
     const url = `https://api.cloudflare.com/client/v4/accounts/${module.accountId}/ai/run/${module.model}`;
     const formattedMessages = [{ role: "system", content: sys }, ...messages];
+    const bodyPayload = { messages: formattedMessages };
+    // Some Cloudflare models support max_tokens, we add it if possible
+    if (module.model.includes('llama') || module.model.includes('mistral') || module.model.includes('mixtral')) {
+        bodyPayload.max_tokens = MAX_TOKENS;
+    }
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${module.apiToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: formattedMessages })
+        body: JSON.stringify(bodyPayload)
     });
     const data = await response.json();
     if (!response.ok || !data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare text error');
