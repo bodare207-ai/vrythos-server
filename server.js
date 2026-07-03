@@ -252,10 +252,10 @@ function asyncHandler(fn) {
 }
 
 // ========== AI PROVIDER HANDLERS ==========
-const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest.`;
+const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest. When providing code, always use triple backticks with the language specifier (e.g., \`\`\`html ... \`\`\`). Keep responses complete and do not truncate.`;
 
-// Increase token limits to 8192 for longer outputs
-const MAX_TOKENS = 8192;
+// Increase token limit to 20000 for long outputs
+const MAX_TOKENS = 20000;
 
 async function callGroq(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
@@ -303,7 +303,7 @@ async function callOpenRouter(module, messages, deepThink) {
 }
 
 // ────────────────────────────────────────────────────────────────
-//  FIXED: Cloudflare Text handler for Kimi K2.7 Code & all models
+//  FIXED: Cloudflare Text handler – supports Kimi, higher tokens
 // ────────────────────────────────────────────────────────────────
 async function callCloudflareText(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
@@ -312,7 +312,7 @@ async function callCloudflareText(module, messages, deepThink) {
     const formattedMessages = [{ role: "system", content: sys }, ...messages];
     const bodyPayload = {
         messages: formattedMessages,
-        max_tokens: MAX_TOKENS,          // always set for all models
+        max_tokens: MAX_TOKENS,          // now always sent
         temperature: 0.7
     };
     const response = await fetch(url, {
