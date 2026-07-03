@@ -302,24 +302,38 @@ async function callOpenRouter(module, messages, deepThink) {
     return data.choices?.[0]?.message?.content || "No response";
 }
 
+// ────────────────────────────────────────────────────────────────
+//  FIXED: Cloudflare Text handler for Kimi K2.7 Code & all models
+// ────────────────────────────────────────────────────────────────
 async function callCloudflareText(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
     if (deepThink) sys += " Use step-by-step reasoning.";
     const url = `https://api.cloudflare.com/client/v4/accounts/${module.accountId}/ai/run/${module.model}`;
     const formattedMessages = [{ role: "system", content: sys }, ...messages];
-    const bodyPayload = { messages: formattedMessages };
-    // Some Cloudflare models support max_tokens, we add it if possible
-    if (module.model.includes('llama') || module.model.includes('mistral') || module.model.includes('mixtral')) {
-        bodyPayload.max_tokens = MAX_TOKENS;
-    }
+    const bodyPayload = {
+        messages: formattedMessages,
+        max_tokens: MAX_TOKENS,          // always set for all models
+        temperature: 0.7
+    };
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${module.apiToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyPayload)
     });
     const data = await response.json();
-    if (!response.ok || !data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare text error');
-    return data.result.response;
+    if (!response.ok || !data.success) {
+        throw new Error(data.errors?.[0]?.message || 'Cloudflare text error');
+    }
+    // Try multiple response shapes
+    let reply = data.result?.response;
+    if (!reply && data.result?.choices) {
+        reply = data.result.choices[0]?.message?.content || data.result.choices[0]?.text;
+    }
+    if (!reply) {
+        console.error('Unexpected Cloudflare response:', JSON.stringify(data));
+        throw new Error('Cloudflare returned an unexpected response structure');
+    }
+    return reply;
 }
 
 // ========== NEW: Video Generation via Agnes API ==========
