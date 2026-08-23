@@ -37,8 +37,10 @@
         .modal-box button { width: 100%; }
         .forgot-link { color: #8e9dc2; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 8px; display: inline-block; }
         .forgot-link:hover { color: #c084fc; }
-        /* new video settings inline style */
         .video-settings-card input { width: 100%; margin-bottom: 8px; }
+        /* New earnings styles */
+        .earning-balance { font-size: 1.5rem; font-weight: bold; color: #10b981; }
+        .withdraw-item { background: #0e111b; border-radius: 12px; padding: 8px; margin: 6px 0; }
     </style>
 </head>
 <body>
@@ -61,6 +63,43 @@
             <div class="stat-card">Monthly: <span id="monthlyUsers">0</span></div>
             <div class="stat-card">Total Accounts: <span id="totalAccounts">0</span></div>
         </div>
+
+        <!-- ===== NEW: Earnings & Withdrawals Panel ===== -->
+        <div class="card" id="earningsCard">
+            <h3>💰 Earnings & Withdrawals (Admin)</h3>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
+                <div class="stat-card" style="flex: 0 0 auto;">
+                    <span style="color:#8e9dc2;">Total Earnings:</span><br>
+                    <span id="earningsBalance" class="earning-balance">$0.00</span>
+                </div>
+                <button id="editEarningsBtn" style="background:#2d3748;">✏️ Edit Earnings</button>
+            </div>
+            <div id="earningsEditArea" style="display:none; margin-bottom: 12px;">
+                <input type="number" id="earningsInput" placeholder="Enter new earnings amount" step="0.01" min="0" style="width: 200px;">
+                <button id="saveEarningsBtn" class="success">Save</button>
+                <button id="cancelEarningsBtn" style="background:#555;">Cancel</button>
+            </div>
+
+            <h4>Withdraw Funds</h4>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+                <select id="withdrawMethod" style="min-width: 160px;">
+                    <option value="amazon">Amazon Gift Card Code</option>
+                    <option value="playstore">Google Play Store Code</option>
+                    <option value="upi">UPI Transfer</option>
+                    <option value="paypal">PayPal</option>
+                    <option value="bank">Bank Transfer</option>
+                </select>
+                <input type="number" id="withdrawAmount" placeholder="Amount" step="0.01" min="0" style="width: 120px;">
+                <input type="text" id="withdrawDetail" placeholder="UPI ID / Email / etc." style="flex: 1; min-width: 150px;">
+                <button id="withdrawBtn" class="success">Withdraw</button>
+            </div>
+
+            <h4>Withdrawal History</h4>
+            <div id="withdrawHistory" style="max-height: 250px; overflow-y: auto; background: #0a0c15; border-radius: 12px; padding: 8px;">
+                <i>No withdrawals yet.</i>
+            </div>
+        </div>
+
         <div class="grid">
             <div class="card">
                 <h3>🤖 AI Engines (dual‑key + failover)</h3>
@@ -93,7 +132,6 @@
             <div id="imageSettingsStatus" style="font-size:12px; margin-top:8px;"></div>
         </div>
 
-        <!-- ===== NEW: Video Generation Settings ===== -->
         <div class="card video-settings-card">
             <h3>🎬 Video Generation Settings (Agnes AI)</h3>
             <input type="password" id="agnesApiKey" placeholder="Agnes API Key (sk-...)" style="width:100%;">
@@ -211,6 +249,10 @@
     let adminLiveImageFlag = false;
     let adminMessagesHistory = [];
     let adminAttachedFiles = [];
+
+    // ===== NEW: Earnings state (fake, persisted in localStorage) =====
+    let earningsBalance = parseFloat(localStorage.getItem('adminEarningsBalance') || '0');
+    let withdrawals = JSON.parse(localStorage.getItem('adminWithdrawals') || '[]');
 
     // FIX: imgStore avoids embedding full base64 data URIs in onclick attributes
     const imgStore = {};
@@ -936,8 +978,125 @@
         await refreshAll();
     };
 
+    // ===== NEW: Earnings Functions =====
+    function saveEarningsToStorage() {
+        localStorage.setItem('adminEarningsBalance', earningsBalance.toFixed(2));
+    }
+
+    function updateEarningsDisplay() {
+        document.getElementById('earningsBalance').innerText = `$${earningsBalance.toFixed(2)}`;
+    }
+
+    function loadEarnings() {
+        earningsBalance = parseFloat(localStorage.getItem('adminEarningsBalance') || '0');
+        withdrawals = JSON.parse(localStorage.getItem('adminWithdrawals') || '[]');
+        updateEarningsDisplay();
+        renderWithdrawHistory();
+    }
+
+    function renderWithdrawHistory() {
+        const container = document.getElementById('withdrawHistory');
+        if (!withdrawals.length) {
+            container.innerHTML = '<i>No withdrawals yet.</i>';
+            return;
+        }
+        container.innerHTML = withdrawals.map(w => `
+            <div class="withdraw-item">
+                <strong>${escapeHtml(w.method)}</strong> - $${w.amount.toFixed(2)}<br>
+                <small>${escapeHtml(w.detail)}</small><br>
+                <small style="color:#10b981;">Status: ${escapeHtml(w.status)}</small><br>
+                <small>${new Date(w.timestamp).toLocaleString()}</small>
+            </div>
+        `).join('');
+    }
+
+    function generateWithdrawalDetail(method) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const rand = length => Array.from({length}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+        switch(method) {
+            case 'amazon':
+                return `Amazon Code: AMZ-${rand(4)}-${rand(6)}-${rand(4)}`;
+            case 'playstore':
+                return `Google Play Code: GP-${rand(4)}-${rand(6)}-${rand(4)}`;
+            case 'upi':
+                return `UPI Ref: UPI${Date.now()}`;
+            case 'paypal':
+                return `PayPal Transaction ID: PP${Date.now()}`;
+            case 'bank':
+                return `Bank Ref: BK${Date.now()}`;
+            default:
+                return 'N/A';
+        }
+    }
+
+    // Earnings event handlers
+    document.getElementById('editEarningsBtn').onclick = () => {
+        document.getElementById('earningsEditArea').style.display = 'block';
+        document.getElementById('earningsInput').value = earningsBalance;
+    };
+
+    document.getElementById('cancelEarningsBtn').onclick = () => {
+        document.getElementById('earningsEditArea').style.display = 'none';
+    };
+
+    document.getElementById('saveEarningsBtn').onclick = () => {
+        const newVal = parseFloat(document.getElementById('earningsInput').value);
+        if (isNaN(newVal) || newVal < 0) {
+            alert('Please enter a valid non-negative number.');
+            return;
+        }
+        earningsBalance = newVal;
+        saveEarningsToStorage();
+        updateEarningsDisplay();
+        document.getElementById('earningsEditArea').style.display = 'none';
+    };
+
+    document.getElementById('withdrawBtn').onclick = () => {
+        const method = document.getElementById('withdrawMethod').value;
+        const amount = parseFloat(document.getElementById('withdrawAmount').value);
+        let detail = document.getElementById('withdrawDetail').value.trim();
+
+        if (isNaN(amount) || amount <= 0) {
+            alert('Enter a valid withdrawal amount.');
+            return;
+        }
+        if (amount > earningsBalance) {
+            alert('Insufficient earnings balance.');
+            return;
+        }
+        if (!detail) {
+            detail = generateWithdrawalDetail(method);
+        } else {
+            detail = `${method.toUpperCase()} - ${detail}`;
+        }
+
+        // Deduct from balance
+        earningsBalance -= amount;
+        saveEarningsToStorage();
+        updateEarningsDisplay();
+
+        // Add to history
+        withdrawals.unshift({
+            method: method,
+            amount: amount,
+            detail: detail,
+            status: 'Success',
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('adminWithdrawals', JSON.stringify(withdrawals));
+        renderWithdrawHistory();
+
+        // Clear inputs
+        document.getElementById('withdrawAmount').value = '';
+        document.getElementById('withdrawDetail').value = '';
+        alert(`✅ Withdrawal of $${amount.toFixed(2)} processed successfully.\n${detail}`);
+    };
+
     // REFRESH ALL
     async function refreshAll() {
+        // Load fake earnings from localStorage
+        loadEarnings();
+
         await loadAllData();
         await renderModules();
         await renderUserSelect();
