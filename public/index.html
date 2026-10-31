@@ -221,7 +221,7 @@ let abuseWarningShown=false;
 let messageIdCounter=0;
 const messageContentStore={};
 
-function escapeHtml(str){return String(str).replace(/[&<>"']/g,m=>{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])}
+function escapeHtml(str){const map={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};return String(str).replace(/[&<>"']/g,m=>map[m])}
 function smartScroll(el){if(!el)return;const threshold=120;if(el.scrollHeight-el.scrollTop-el.clientHeight<threshold)el.scrollTop=el.scrollHeight}
 async function hashPassword(pw){const enc=new TextEncoder().encode(pw);const h=await crypto.subtle.digest('SHA-256',enc);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
 function showToast(msg,type='info'){const t=document.createElement('div');const bg=type==='error'?'#7f1a1a':type==='warning'?'#78350f':'#2a2926';t.style.cssText=`position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:${bg};color:#f5f4ef;padding:.65rem 1.25rem;border-radius:9999px;font-size:.82rem;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:90%;text-align:center;border:1px solid #3a3833;min-height:44px;display:flex;align-items:center;justify-content:center;font-family:'Inter',system-ui,sans-serif`;t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s'},2800);setTimeout(()=>t.remove(),3200)}
