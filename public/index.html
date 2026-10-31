@@ -663,6 +663,22 @@
             color: var(--text-primary);
         }
 
+        /* ===== Typing animation cursor ===== */
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.05em;
+            background: var(--accent);
+            margin-left: 3px;
+            vertical-align: text-bottom;
+            border-radius: 1px;
+            animation: cursor-blink 0.9s steps(1) infinite;
+        }
+        @keyframes cursor-blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
         /* ================================================================
            WELCOME SCREEN
            ================================================================ */
@@ -1013,7 +1029,7 @@
         }
 
         /* ================================================================
-           MODALS (user settings — unchanged)
+           MODALS (user settings)
            ================================================================ */
         .modal-overlay {
             position: fixed;
@@ -1493,7 +1509,7 @@
         }
 
         /* ================================================================
-           ABUSE DETECTION (unchanged)
+           ABUSE DETECTION
            ================================================================ */
         async function addAbuseScore(points, reason, context) {
             if (!currentUser) return;
@@ -1623,16 +1639,16 @@
             return null;
         }
         async function generateImageAndShow(prompt) {
-            addAIMessage('Generating image…', false);
+            addAIMessage('Generating image…', false, false);
             let imgData = await generateImageWithCloudflare(prompt);
             if (!imgData) imgData = await generateImageWithPollinations(prompt);
             if (imgData && imgData.startsWith('data:image')) {
                 const id = 'img_' + (++imgStoreCounter);
                 imgStore[id] = imgData;
                 const html = `<img src="${imgData}" style="max-width:100%; border-radius:12px;" /><div class="btn-row"><button onclick="downloadImage('${id}')">Download</button><button onclick="copyImageToClipboard('${id}')">Copy</button></div>`;
-                addAIMessage(html, true);
+                addAIMessage(html, true, false);
             } else {
-                addAIMessage('Image generation failed. Please try again.');
+                addAIMessage('Image generation failed. Please try again.', false, false);
             }
         }
 
@@ -1640,7 +1656,7 @@
            VIDEO GENERATION
            ================================================================ */
         async function generateVideo(prompt, duration) {
-            addAIMessage('Generating video… (may take 30–60s)', false);
+            addAIMessage('Generating video… (may take 30–60s)', false, false);
             try {
                 const res = await apiPost('/api/generate/video', {
                     email: currentUser.email, prompt, duration: duration || DEFAULT_VIDEO_DURATION
@@ -1649,12 +1665,12 @@
                     const id = 'vid_' + (++videoStoreCounter);
                     videoStore[id] = res.video;
                     const html = `<video controls autoplay loop style="max-width:100%; border-radius:12px; max-height:400px;"><source src="${res.video}" type="video/mp4">Your browser does not support video.</video><div class="btn-row"><button onclick="downloadVideo('${id}')">Download</button><button onclick="copyVideoToClipboard('${id}')">Copy</button></div>`;
-                    addAIMessage(html, true);
+                    addAIMessage(html, true, false);
                 } else {
-                    addAIMessage('Video failed: ' + (res.error || 'Unknown error'));
+                    addAIMessage('Video failed: ' + (res.error || 'Unknown error'), false, false);
                 }
             } catch (e) {
-                addAIMessage('Video error: ' + e.message);
+                addAIMessage('Video error: ' + e.message, false, false);
             }
         }
 
@@ -1779,7 +1795,7 @@
                 const debugPrompt = `Please review the following ${lang} code for errors, bugs, or improvements. Provide the fixed version with explanations. Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
                 messagesHistory.push({ role: 'user', content: debugPrompt });
                 const debugReply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
-                addAIMessage(debugReply);
+                addAIMessage(debugReply, false, true);
                 if (btn) { btn.disabled = false; btn.textContent = originalText; }
             } catch (err) {
                 showToast('Debug failed: ' + err.message, 'error');
@@ -1808,16 +1824,14 @@
         }
 
         /* ================================================================
-           MESSAGE RENDERING
+           AI MESSAGE — INSTANT version (warnings, images, status)
            ================================================================ */
-        function addAIMessage(content, isHtml = false) {
+        function _addAIMessageInstant(content, isHtml = false) {
             const container = document.getElementById('messagesContainer');
             const div = document.createElement('div');
             div.className = 'message ai-message';
 
             let bubbleContent = '';
-            let rawContent = content;
-
             if (isHtml) {
                 bubbleContent = content;
             } else {
@@ -1826,7 +1840,7 @@
             }
 
             const msgId = 'msg_' + (++messageIdCounter);
-            messageContentStore[msgId] = rawContent;
+            messageContentStore[msgId] = content;
 
             div.innerHTML = `<div class="avatar">◆</div><div class="bubble">${bubbleContent}<div class="msg-actions-bar"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
             container.appendChild(div);
@@ -1845,20 +1859,151 @@
                 setProcessing(true);
                 try {
                     const reply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
-                    addAIMessage(reply);
+                    addAIMessage(reply, false, true);
                 } catch (e) {
-                    addAIMessage('Regenerate failed: ' + e.message);
+                    addAIMessage('Regenerate failed: ' + e.message, false, false);
                 } finally {
                     setProcessing(false);
                 }
             };
             div.querySelector(`[data-full="${msgId}"]`).onclick = () => showFullOutput(messageContentStore[msgId] || '');
 
-            if (!isHtml && !content.startsWith('Generating') && !content.startsWith('Video')) {
+            if (!isHtml) {
                 messagesHistory.push({ role: 'assistant', content: content });
             }
         }
 
+        /* ================================================================
+           TYPING HELPER — reveals text word-by-word at 7 words/second
+           ================================================================ */
+        const MS_PER_WORD = 1000 / 7;   // ~142.86 ms → 7 words/second
+
+        async function typeInto(text, targetEl, isAborted) {
+            const tokens = text.split(/(\s+)/);
+            let buffer = '';
+
+            for (let i = 0; i < tokens.length; i++) {
+                const token = tokens[i];
+
+                if (isAborted && isAborted()) {
+                    for (let j = i; j < tokens.length; j++) buffer += tokens[j];
+                    targetEl.innerHTML = escapeHtml(buffer).replace(/\n/g, '<br>');
+                    const c = document.getElementById('messagesContainer');
+                    if (c) c.scrollTop = c.scrollHeight;
+                    return;
+                }
+
+                buffer += token;
+                targetEl.innerHTML = escapeHtml(buffer).replace(/\n/g, '<br>');
+                const c = document.getElementById('messagesContainer');
+                if (c) c.scrollTop = c.scrollHeight;
+
+                if (token.trim()) {
+                    await new Promise(r => setTimeout(r, MS_PER_WORD));
+                } else if (token.includes('\n')) {
+                    await new Promise(r => setTimeout(r, 25));
+                }
+            }
+        }
+
+        /* ================================================================
+           AI MESSAGE — STREAMING version (typing animation)
+           ================================================================ */
+        let currentTypingAbort = null;
+
+        async function streamAIMessage(content) {
+            if (currentTypingAbort) {
+                currentTypingAbort();
+                currentTypingAbort = null;
+            }
+
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.className = 'message ai-message';
+            const msgId = 'msg_' + (++messageIdCounter);
+            messageContentStore[msgId] = content;
+
+            const parts = processCodeInText(content);
+
+            div.innerHTML = `<div class="avatar">◆</div><div class="bubble"><span class="typing-content"></span><span class="typing-cursor"></span><div class="msg-actions-bar" style="display:none;"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+
+            messagesHistory.push({ role: 'assistant', content: content });
+
+            div.querySelector(`[data-copy="${msgId}"]`).onclick = async () => {
+                try { await navigator.clipboard.writeText(messageContentStore[msgId] || ''); showToast('Copied', 'info'); }
+                catch (_) { showToast('Copy failed', 'error'); }
+            };
+            div.querySelector(`[data-regen="${msgId}"]`).onclick = async () => {
+                if (isProcessing || !currentUser) return;
+                const lastUser = [...messagesHistory].reverse().find(m => m.role === 'user');
+                if (!lastUser) return;
+                showToast('Regenerating…', 'info');
+                setProcessing(true);
+                try {
+                    const reply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
+                    addAIMessage(reply, false, true);
+                } catch (e) {
+                    addAIMessage('Regenerate failed: ' + e.message, false, false);
+                } finally {
+                    setProcessing(false);
+                }
+            };
+            div.querySelector(`[data-full="${msgId}"]`).onclick = () => showFullOutput(messageContentStore[msgId] || '');
+
+            const typingContent = div.querySelector('.typing-content');
+            const cursorEl = div.querySelector('.typing-cursor');
+            let aborted = false;
+            currentTypingAbort = () => { aborted = true; };
+            const isAborted = () => aborted;
+
+            try {
+                if (parts) {
+                    for (let i = 0; i < parts.length; i++) {
+                        const part = parts[i];
+                        if (part.type === 'text') {
+                            await typeInto(part.content, typingContent, isAborted);
+                        } else {
+                            typingContent.innerHTML += buildCodeHtml([part]);
+                            container.scrollTop = container.scrollHeight;
+                            await new Promise(r => setTimeout(r, 60));
+                        }
+                        if (aborted) {
+                            for (let j = i + 1; j < parts.length; j++) {
+                                const p = parts[j];
+                                if (p.type === 'text') typingContent.innerHTML += escapeHtml(p.content).replace(/\n/g, '<br>');
+                                else typingContent.innerHTML += buildCodeHtml([p]);
+                            }
+                            container.scrollTop = container.scrollHeight;
+                            break;
+                        }
+                    }
+                } else {
+                    await typeInto(content, typingContent, isAborted);
+                }
+            } finally {
+                if (cursorEl.parentNode) cursorEl.remove();
+                div.querySelector('.msg-actions-bar').style.display = 'flex';
+                container.scrollTop = container.scrollHeight;
+                if (!aborted) currentTypingAbort = null;
+            }
+        }
+
+        /* ================================================================
+           Public wrapper — 3rd arg "stream" opts into typing animation
+           ================================================================ */
+        function addAIMessage(content, isHtml = false, stream = false) {
+            if (stream && !isHtml) {
+                streamAIMessage(content);
+            } else {
+                _addAIMessageInstant(content, isHtml);
+            }
+        }
+
+        /* ================================================================
+           USER MESSAGE
+           ================================================================ */
         function addUserMessage(text) {
             const container = document.getElementById('messagesContainer');
             const div = document.createElement('div');
@@ -1935,7 +2080,7 @@
         async function handleBestCoding(userText, attachedFilesText) {
             const availableModules = [...modules];
             if (availableModules.length === 0) {
-                addAIMessage('No AI engines available. Please add at least one engine in the admin panel.');
+                addAIMessage('No AI engines available. Please add at least one engine in the admin panel.', false, false);
                 return;
             }
 
@@ -1981,16 +2126,16 @@
             }
 
             typing.remove();
-            if (currentReply) addAIMessage(currentReply);
-            else addAIMessage('Best coding chain failed to produce any output.');
+            if (currentReply) addAIMessage(currentReply, false, true);
+            else addAIMessage('Best coding chain failed to produce any output.', false, false);
         }
 
         /* ================================================================
            SEND MESSAGE
            ================================================================ */
         async function sendMessage(userText, forceImage = false, forceVideo = false) {
-            if (!currentUser || currentUser.banned) { addAIMessage('Account banned.'); return; }
-            if (isProcessing) { addAIMessage('Please wait for previous message.'); return; }
+            if (!currentUser || currentUser.banned) { addAIMessage('Account banned.', false, false); return; }
+            if (isProcessing) { addAIMessage('Please wait for previous message.', false, false); return; }
             setProcessing(true);
             const welcome = document.getElementById('welcomeScreen');
             if (welcome) welcome.remove();
@@ -2054,7 +2199,7 @@
                 } finally {
                     if (typing) typing.remove();
                 }
-                addAIMessage(reply);
+                addAIMessage(reply, false, true);
             } finally {
                 setProcessing(false);
             }
@@ -2097,7 +2242,7 @@
         }
 
         /* ================================================================
-           USER SETTINGS MODAL (unchanged)
+           USER SETTINGS MODAL
            ================================================================ */
         async function openUserSettings() {
             let userKeys = await loadUserApiKeys(currentUser.email);
@@ -2452,7 +2597,6 @@
                 }
             });
 
-            /* Toggle rows */
             toolMenu.querySelectorAll('.tool-toggle').forEach(row => {
                 row.onclick = () => {
                     const tool = row.dataset.tool;
@@ -2474,7 +2618,6 @@
                 };
             });
 
-            /* Action rows */
             toolMenu.querySelectorAll('.tool-action').forEach(btn => {
                 btn.onclick = () => {
                     toolMenu.classList.remove('open');
@@ -2497,7 +2640,6 @@
                 };
             });
 
-            /* Sync function keeps toggle menu in sync with state */
             function syncToolMenu() {
                 toolMenu.querySelector('[data-tool="deep"]').classList.toggle('active', deepThink);
                 toolMenu.querySelector('[data-tool="coding"]').classList.toggle('active', bestCodingMode);
