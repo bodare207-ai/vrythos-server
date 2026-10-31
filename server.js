@@ -131,14 +131,15 @@ const tournamentSchema = new mongoose.Schema({
 });
 const Tournament = mongoose.model('Tournament', tournamentSchema);
 
-// Settings (admin password, image credentials, video credentials)
+// Settings (admin password, image credentials, video credentials) — NOW WITH earningsBalance
 const settingSchema = new mongoose.Schema({
     adminPasswordHash: String,
     cloudflareImageAccountId: String,
     cloudflareImageApiToken: String,
     imageModel: String,
     agnesApiKey: { type: String, default: '' },
-    agnesModel: { type: String, default: 'agnes-video-v2.0' }
+    agnesModel: { type: String, default: 'agnes-video-v2.0' },
+    earningsBalance: { type: Number, default: 0 }
 });
 const Setting = mongoose.model('Setting', settingSchema);
 
@@ -170,6 +171,16 @@ const videoUsageSchema = new mongoose.Schema({
     count: { type: Number, default: 0 }
 });
 const VideoUsage = mongoose.model('VideoUsage', videoUsageSchema);
+
+// ===== NEW: Withdrawals (REAL persistence) =====
+const withdrawalSchema = new mongoose.Schema({
+    method: { type: String, required: true },
+    amount: { type: Number, required: true },
+    detail: { type: String, default: '' },
+    status: { type: String, default: 'Success' },
+    timestamp: { type: Date, default: Date.now }
+});
+const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 
 // ========== Helper functions ==========
 function hashPassword(pw) {
@@ -225,7 +236,8 @@ async function initSettings() {
             cloudflareImageApiToken: "",
             imageModel: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
             agnesApiKey: "",
-            agnesModel: "agnes-video-v2.0"
+            agnesModel: "agnes-video-v2.0",
+            earningsBalance: 0
         });
         await settings.save();
     }
@@ -254,7 +266,6 @@ function asyncHandler(fn) {
 // ========== AI PROVIDER HANDLERS ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest. When providing code, always use triple backticks with the language specifier (e.g., \`\`\`html ... \`\`\`). Keep responses complete and do not truncate.`;
 
-// Increase token limit to 20000 for long outputs
 const MAX_TOKENS = 20000;
 
 async function callGroq(module, messages, deepThink) {
@@ -302,9 +313,6 @@ async function callOpenRouter(module, messages, deepThink) {
     return data.choices?.[0]?.message?.content || "No response";
 }
 
-// ────────────────────────────────────────────────────────────────
-//  FIXED: Cloudflare Text handler – supports Kimi, higher tokens
-// ────────────────────────────────────────────────────────────────
 async function callCloudflareText(module, messages, deepThink) {
     let sys = CREATOR_SYSTEM_PROMPT;
     if (deepThink) sys += " Use step-by-step reasoning.";
@@ -312,7 +320,7 @@ async function callCloudflareText(module, messages, deepThink) {
     const formattedMessages = [{ role: "system", content: sys }, ...messages];
     const bodyPayload = {
         messages: formattedMessages,
-        max_tokens: MAX_TOKENS,          // now always sent
+        max_tokens: MAX_TOKENS,
         temperature: 0.7
     };
     const response = await fetch(url, {
@@ -324,7 +332,6 @@ async function callCloudflareText(module, messages, deepThink) {
     if (!response.ok || !data.success) {
         throw new Error(data.errors?.[0]?.message || 'Cloudflare text error');
     }
-    // Try multiple response shapes
     let reply = data.result?.response;
     if (!reply && data.result?.choices) {
         reply = data.result.choices[0]?.message?.content || data.result.choices[0]?.text;
@@ -336,7 +343,7 @@ async function callCloudflareText(module, messages, deepThink) {
     return reply;
 }
 
-// ========== NEW: Video Generation via Agnes API ==========
+// ========== Video Generation via Agnes API ==========
 async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agnesModel) {
     let frameRate = 24;
     let numFrames = Math.round(durationSeconds * frameRate);
@@ -983,7 +990,6 @@ app.post('/api/fallback/image', asyncHandler(async (req, res) => {
 
 // ========== ADMIN ENDPOINTS ==========
 
-// Verify admin password
 app.post('/api/admin/verify', asyncHandler(async (req, res) => {
     const { password } = req.body;
     const settings = await Setting.findOne();
@@ -996,7 +1002,6 @@ app.post('/api/admin/verify', asyncHandler(async (req, res) => {
     }
 }));
 
-// Get admin settings (mask sensitive fields)
 app.get('/api/admin/settings', asyncHandler(async (req, res) => {
     const settings = await Setting.findOne();
     if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
@@ -1009,7 +1014,6 @@ app.get('/api/admin/settings', asyncHandler(async (req, res) => {
     });
 }));
 
-// Update admin settings
 app.post('/api/admin/settings', asyncHandler(async (req, res) => {
     const { adminPassword, newAdminPassword, cloudflareImageAccountId, cloudflareImageApiToken, imageModel, agnesApiKey, agnesModel } = req.body;
     let settings = await Setting.findOne();
@@ -1027,11 +1031,11 @@ app.post('/api/admin/settings', asyncHandler(async (req, res) => {
     if (imageModel !== undefined) settings.imageModel = imageModel;
     if (agnesApiKey !== undefined) settings.agnesApiKey = agnesApiKey;
     if (agnesModel !== undefined) settings.agnesModel = agnesModel;
+    // earningsBalance intentionally NOT touched here — use /api/admin/earnings
     await settings.save();
     res.json({ success: true });
 }));
 
-// Change admin password via email (max 3 per day)
 app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
     const { email, newPassword } = req.body;
     if (email !== 'bodare207@gmail.com') return res.status(403).json({ error: 'Unauthorized email' });
@@ -1052,13 +1056,11 @@ app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
     }
 }));
 
-// Get remaining password change limit
 app.get('/api/admin/password-limit', (req, res) => {
     resetAdminCountIfNeeded();
     res.json({ remaining: 3 - adminPasswordChangeCount });
 });
 
-// Admin analytics: user stats
 app.get('/api/admin/stats', asyncHandler(async (req, res) => {
     const users = await User.find({});
     const now = Date.now();
@@ -1082,7 +1084,6 @@ app.get('/api/admin/stats', asyncHandler(async (req, res) => {
     res.json({ liveUsers, dailyUsers, weeklyUsers, monthlyUsers, totalAccounts });
 }));
 
-// Get user profile (for admin)
 app.get('/api/admin/user/:email', asyncHandler(async (req, res) => {
     const user = await User.findOne({ email: req.params.email });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1098,7 +1099,6 @@ app.get('/api/admin/user/:email', asyncHandler(async (req, res) => {
     });
 }));
 
-// Delete user permanently (admin)
 app.delete('/api/admin/user/:email', asyncHandler(async (req, res) => {
     await User.deleteOne({ email: req.params.email });
     await UserApiKey.deleteOne({ email: req.params.email });
@@ -1107,7 +1107,6 @@ app.delete('/api/admin/user/:email', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// Log admin abuse
 app.post('/api/admin/log-abuse', asyncHandler(async (req, res) => {
     const { reason, score } = req.body;
     const log = new AdminAbuseLog({ timestamp: new Date(), reason, score });
@@ -1118,6 +1117,90 @@ app.post('/api/admin/log-abuse', asyncHandler(async (req, res) => {
         const idsToDelete = oldest.map(d => d._id);
         await AdminAbuseLog.deleteMany({ _id: { $in: idsToDelete } });
     }
+    res.json({ success: true });
+}));
+
+// ========== REAL EARNINGS & WITHDRAWALS ==========
+
+// GET balance + history + usage stats
+app.get('/api/admin/earnings', asyncHandler(async (req, res) => {
+    const settings = await Setting.findOne();
+    if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
+
+    const withdrawals = await Withdrawal.find({}).sort({ timestamp: -1 }).limit(100);
+    const chatUsage = await ChatUsage.find({});
+    const videoUsage = await VideoUsage.find({});
+
+    const totalChats = chatUsage.reduce((s, c) => s + (c.count || 0), 0);
+    const totalVideos = videoUsage.reduce((s, v) => s + (v.count || 0), 0);
+    const userCount = await User.countDocuments({});
+    const totalFreeKeys = await FreeApiKey.countDocuments({});
+
+    res.json({
+        balance: settings.earningsBalance || 0,
+        withdrawals,
+        stats: {
+            totalChats,
+            totalVideos,
+            userCount,
+            totalFreeKeys
+        }
+    });
+}));
+
+// Set / edit balance (requires admin password)
+app.post('/api/admin/earnings', asyncHandler(async (req, res) => {
+    const { password, balance } = req.body;
+    const settings = await Setting.findOne();
+    if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
+    if (!password || hashPassword(password) !== settings.adminPasswordHash) {
+        return res.status(401).json({ error: 'Invalid admin password' });
+    }
+    if (typeof balance !== 'number' || balance < 0 || !isFinite(balance)) {
+        return res.status(400).json({ error: 'Balance must be a non-negative number' });
+    }
+    settings.earningsBalance = Math.round(balance * 100) / 100;
+    await settings.save();
+    res.json({ success: true, balance: settings.earningsBalance });
+}));
+
+// Withdraw funds (real deduction + persistent history)
+app.post('/api/admin/withdraw', asyncHandler(async (req, res) => {
+    const { password, method, amount, detail } = req.body;
+    const settings = await Setting.findOne();
+    if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
+    if (!password || hashPassword(password) !== settings.adminPasswordHash) {
+        return res.status(401).json({ error: 'Invalid admin password' });
+    }
+    if (typeof amount !== 'number' || amount <= 0 || !isFinite(amount)) {
+        return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
+    const currentBalance = settings.earningsBalance || 0;
+    if (amount > currentBalance) {
+        return res.status(400).json({ error: 'Insufficient balance' });
+    }
+    const allowedMethods = ['amazon', 'playstore', 'upi', 'paypal', 'bank'];
+    if (!allowedMethods.includes(method)) {
+        return res.status(400).json({ error: 'Invalid withdrawal method' });
+    }
+
+    settings.earningsBalance = Math.round((currentBalance - amount) * 100) / 100;
+    await settings.save();
+
+    const w = new Withdrawal({
+        method,
+        amount: Math.round(amount * 100) / 100,
+        detail: (detail || '').slice(0, 500),
+        status: 'Success'
+    });
+    await w.save();
+
+    res.json({ success: true, balance: settings.earningsBalance, withdrawal: w });
+}));
+
+// Clear withdrawal history (optional admin tool)
+app.delete('/api/admin/withdrawals', asyncHandler(async (req, res) => {
+    await Withdrawal.deleteMany({});
     res.json({ success: true });
 }));
 
