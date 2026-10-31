@@ -1,19 +1,16 @@
-// agent-module.js — Your AI's "eyes and hands" on the web
-// Add this ONE file to your Vrythos project. No other changes needed.
+// agent-module.js — Vrythos AI Agent (Wikipedia + Web Search)
+// This file gives your AI the ability to look things up and search the web.
 
-// ========== 1. IMPORT SEARCH LIBRARY ==========
-// Install once: npm install @purili/web-search
 import { purili } from '@purili/web-search';
 
-// ========== 2. DEFINE YOUR TOOLS ==========
-// These are the "abilities" your AI can decide to use.
-
+// ========== 1. TOOL DEFINITIONS ==========
+// These tell the AI what it can do.
 const tools = [
   {
     type: "function",
     function: {
       name: "search_wikipedia",
-      description: "Search Wikipedia for facts, biographies, history, science, or any encyclopedic topic. Use this when the user asks a factual question.",
+      description: "Search Wikipedia for facts, biographies, history, science, or any encyclopedic topic. Use when the user asks a factual question.",
       parameters: {
         type: "object",
         properties: {
@@ -27,7 +24,7 @@ const tools = [
     type: "function",
     function: {
       name: "web_search",
-      description: "Search the live web for current events, news, prices, weather, or anything that changes over time. Use this when you need up-to-date information.",
+      description: "Search the live web for current events, news, prices, weather, or anything that changes over time. Use when you need up-to-date information.",
       parameters: {
         type: "object",
         properties: {
@@ -39,43 +36,36 @@ const tools = [
   }
 ];
 
-// ========== 3. IMPLEMENT THE TOOLS ==========
+// ========== 2. TOOL IMPLEMENTATIONS ==========
 
-// Wikipedia search — free, no API key needed
+// Wikipedia search — free, no API key
 async function searchWikipedia(query) {
   try {
-    // Step 1: Find the best matching article title
     const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
     const searchRes = await fetch(searchUrl);
     const searchData = await searchRes.json();
-    
     if (!searchData.query?.search?.length) {
       return "No Wikipedia article found for that query.";
     }
-    
     const bestTitle = searchData.query.search[0].title;
-    
-    // Step 2: Get the summary of that article
     const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(bestTitle)}`;
     const summaryRes = await fetch(summaryUrl, {
       headers: { 'User-Agent': 'VrythosAI/1.0 (https://vrythos-server.onrender.com)' }
     });
     const summaryData = await summaryRes.json();
-    
     return summaryData.extract || "Wikipedia article found but no summary available.";
   } catch (err) {
     return `Wikipedia search failed: ${err.message}`;
   }
 }
 
-// Web search — free, no API key needed (via Purili)
+// Web search — free, no API key (via Purili)
 async function webSearch(query) {
   try {
     const response = await purili.search(query);
     if (!response.results?.length) {
       return "No web results found.";
     }
-    // Return the top 3 results as readable text
     return response.results.slice(0, 3).map(r =>
       `Title: ${r.title}\nURL: ${r.url}\nSnippet: ${r.description || ''}`
     ).join('\n\n');
@@ -84,11 +74,9 @@ async function webSearch(query) {
   }
 }
 
-// ========== 4. THE AGENT LOOP ==========
+// ========== 3. AGENT LOOP ==========
 // This is the core: AI decides → we execute → AI answers.
-
 export async function runAgent(userMessage, conversationHistory = [], groqApiKey) {
-  // Build the message list (system prompt + history + new message)
   const messages = [
     {
       role: "system",
@@ -102,7 +90,7 @@ export async function runAgent(userMessage, conversationHistory = [], groqApiKey
     { role: "user", content: userMessage }
   ];
 
-  // Loop up to 5 times (prevents infinite agent loops)
+  // Loop up to 5 times to prevent infinite agent loops
   for (let step = 0; step < 5; step++) {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -111,10 +99,10 @@ export async function runAgent(userMessage, conversationHistory = [], groqApiKey
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // Groq's best tool-calling model
+        model: 'llama-3.3-70b-versatile',
         messages: messages,
         tools: tools,
-        tool_choice: 'auto', // Let the AI decide when to use a tool
+        tool_choice: 'auto',
         temperature: 0.7
       })
     });
@@ -123,18 +111,14 @@ export async function runAgent(userMessage, conversationHistory = [], groqApiKey
     if (!response.ok) throw new Error(data.error?.message || 'Groq API error');
 
     const aiMessage = data.choices[0].message;
-    messages.push(aiMessage); // Add AI's response to history
+    messages.push(aiMessage);
 
-    // If the AI did NOT call a tool, we're done — return the text answer
+    // If no tool call, return the answer
     if (!aiMessage.tool_calls || aiMessage.tool_calls.length === 0) {
-      return {
-        reply: aiMessage.content,
-        toolUsed: null,
-        steps: step + 1
-      };
+      return { reply: aiMessage.content, toolUsed: null, steps: step + 1 };
     }
 
-    // If the AI DID call a tool, execute it
+    // Execute each tool call
     for (const toolCall of aiMessage.tool_calls) {
       const toolName = toolCall.function.name;
       const toolArgs = JSON.parse(toolCall.function.arguments);
@@ -148,15 +132,12 @@ export async function runAgent(userMessage, conversationHistory = [], groqApiKey
         toolResult = `Unknown tool: ${toolName}`;
       }
 
-      // Send the tool result back to the AI
       messages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
         content: toolResult
       });
     }
-
-    // Loop continues → AI reads tool result → may call another tool or answer
   }
 
   return {
