@@ -236,7 +236,6 @@ async function addAbuseScore(points,reason,context){
   }catch(_){}
   if((abuseScore>=10&&!abuseWarningShown)||points>=5){
     abuseWarningShown=true;
-    // skipHistory=true so warnings don't pollute the AI's conversation context
     addAIMessage(`Warning: suspicious activity detected (score ${abuseScore}%). Repeated violations may lead to a ban.`,false,false,true);
   }
 }
@@ -380,14 +379,13 @@ function showFullOutput(content){
   m.addEventListener('click',e=>{if(e.target===m)close()});
 }
 
-/* REGENERATE HELPER — excludes last assistant from context (Bug fix 3) */
+/* REGENERATE HELPER — pops from real history (Bug fix 2) */
 async function regenerateReply(){
   if(isProcessing||!currentUser)return;
-  let context=[...messagesHistory];
-  while(context.length>0&&context[context.length-1].role==='assistant')context.pop();
-  if(!context.length)return;
+  while(messagesHistory.length>0&&messagesHistory[messagesHistory.length-1].role==='assistant')messagesHistory.pop();
+  if(!messagesHistory.length){showToast('Nothing to regenerate','warning');return}
   showToast('Regenerating…','info');setProcessing(true);
-  try{const r=await callChatWithFallback(context.slice(-12),deepThink);await addAIMessage(r,false,true)}
+  try{const r=await callChatWithFallback(messagesHistory.slice(-12),deepThink);await addAIMessage(r,false,true)}
   catch(e){addAIMessage('Regenerate failed: '+e.message,false,false,true)}
   finally{setProcessing(false)}
 }
@@ -396,10 +394,9 @@ async function regenerateReply(){
 function _addAIMessageInstant(content,isHtml=false,skipHistory=false){
   const container=document.getElementById('messagesContainer');
   const div=document.createElement('div');div.className='message ai-message';
-  // Bug fix 4: no action buttons on HTML (image/video) messages
   if(isHtml){
     div.innerHTML=`<div class="avatar">◆</div><div class="bubble">${content}</div>`;
-    container.appendChild(div);container.scrollTop=container.scrollHeight;
+    container.appendChild(div);smartScroll(container);  /* Bug fix 3 */
     return;
   }
   let bubbleContent='';
@@ -417,10 +414,10 @@ function _addAIMessageInstant(content,isHtml=false,skipHistory=false){
 
 /* TYPING — 4-phase schedule */
 function getTypingDelay(wordIndex){
-  if(wordIndex<21)return 1000/7;    // 0-3s, 7 wps
-  if(wordIndex<61)return 1000/10;   // 3-7s, 10 wps
-  if(wordIndex<161)return 1000/10;  // 7-17s, 10 wps
-  return 1000/20;                    // 17s+, 20 wps
+  if(wordIndex<21)return 1000/7;
+  if(wordIndex<61)return 1000/10;
+  if(wordIndex<161)return 1000/10;
+  return 1000/20;
 }
 async function typeInto(text,targetEl,isAborted){
   const tokens=text.split(/(\s+)/);
@@ -565,19 +562,18 @@ async function handleBestCoding(userText,attachedFilesText){
   else addAIMessage('Best coding chain failed to produce any output.',false,false,true);
 }
 
-/* SEND MESSAGE — fixes forceImage priority (Bug fix 1) + input lock */
+/* SEND MESSAGE — error messages shown instantly (Bug fix 1) */
 async function sendMessage(userText,forceImage=false,forceVideo=false){
   if(!currentUser||currentUser.banned){addAIMessage('Account banned.',false,false,true);return}
   if(isProcessing){addAIMessage('Please wait for the current reply to finish.',false,false,true);return}
   setProcessing(true);
   const welcome=document.getElementById('welcomeScreen');if(welcome)welcome.remove();
   try{
-    // Bug fix 1: forceImage overrides liveVideoMode
     const willVideo=forceVideo||(!forceImage&&liveVideoMode&&isVideoRequest(userText));
     const willImage=(forceImage||(liveImageMode&&isImageRequest(userText)))&&!willVideo;
     if(willVideo){
       let prompt=userText;
-            const m=userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
+      const m=userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
       if(m&&m[2])prompt=m[2];
       addUserMessage(userText);
       await generateVideo(prompt,DEFAULT_VIDEO_DURATION);
@@ -611,11 +607,13 @@ async function sendMessage(userText,forceImage=false,forceVideo=false){
       attachedFiles=[];renderFileBadges();
     }
     const typing=showTyping();
-    let reply='';
+    let reply='';let isErr=false;
     try{reply=await callChatWithFallback(messagesHistory.slice(-12),deepThink)}
-    catch(e){reply=`All AI engines are currently unavailable. Please try again later. Error: ${e.message}`}
+    catch(e){reply=`All AI engines are currently unavailable. Please try again later. Error: ${e.message}`;isErr=true}
     finally{if(typing)typing.remove()}
-    await addAIMessage(reply,false,true);
+    // Bug fix 1: error text shown instantly, real replies streamed
+    if(isErr)addAIMessage(reply,false,false,true);
+    else await addAIMessage(reply,false,true);
   }finally{setProcessing(false)}
 }
 
@@ -747,7 +745,7 @@ async function buildUI(){
         <div class="section"><span class="section-label">Active Engine</span><div class="module-status" id="moduleStatus">Auto-select</div></div>
         <div class="section"><span class="section-label">Reasoning Depth</span><label class="toggle-row"><input type="checkbox" id="deepThinkToggle" /> Step-by-step analysis</label></div>
         <div class="section"><span class="section-label">Live Image Mode</span><label class="toggle-row"><input type="checkbox" id="liveImageToggle" /> Auto-generate images</label></div>
-        <div class="section"><span class="section-label">Live Video Mode</span><label class="toggle-row"><input type="checkbox" id="liveVideoToggle" /> Auto-generate videos</label></div>
+        <div class="section"><span class="section-label">Live Video Mode</span><label class="toggle-row"><input type="checkbox" id="liveVideoToggle" /> Auto-generatevideos</label></div>
         <div class="section"><span class="section-label">Best Coding Mode</span><label class="toggle-row"><input type="checkbox" id="bestCodingToggle" /> Multi-pass refinement</label></div>
         <div class="section" style="margin-top:.25rem;"><span class="section-label">Tournaments</span><div id="tournamentsContainer"></div></div>
         <div class="footer-stats"><span id="sidebarUsername">user</span><span style="color:var(--text-muted);">Unlimited</span></div>
