@@ -9,9 +9,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet" />
     <style>
-        /* ================================================================
-           RESET & ROOT VARIABLES (Claude-inspired warm dark palette)
-           ================================================================ */
         *, *::before, *::after {
             margin: 0;
             padding: 0;
@@ -54,24 +51,12 @@
             font-size: 16px;
             -webkit-font-smoothing: antialiased;
         }
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: var(--border-strong);
-            border-radius: var(--radius-full);
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--text-muted);
-        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-full); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-        /* ================================================================
-           AUTH / LOGIN SCREEN (Claude-inspired minimal premium)
-           ================================================================ */
+        /* ============ AUTH ============ */
         .auth-container {
             display: flex;
             flex-direction: column;
@@ -85,10 +70,7 @@
         .auth-container::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            inset: 0;
             background: radial-gradient(ellipse at 50% 0%, rgba(167, 139, 250, 0.08), transparent 60%);
             pointer-events: none;
         }
@@ -116,11 +98,7 @@
             justify-content: center;
             gap: 0.4rem;
         }
-        .auth-logo::before {
-            content: '◆';
-            color: var(--accent);
-            font-size: 1.6rem;
-        }
+        .auth-logo::before { content: '◆'; color: var(--accent); font-size: 1.6rem; }
         .auth-heading {
             font-family: var(--font-serif);
             font-size: 1.6rem;
@@ -136,9 +114,7 @@
             font-size: 0.9rem;
             margin-bottom: 2rem;
         }
-        .auth-form-group {
-            margin-bottom: 0.75rem;
-        }
+        .auth-form-group { margin-bottom: 0.75rem; }
         .auth-input {
             width: 100%;
             background: var(--bg-card);
@@ -157,9 +133,7 @@
             background: var(--bg-secondary);
             box-shadow: 0 0 0 3px var(--accent-soft);
         }
-        .auth-input::placeholder {
-            color: var(--text-muted);
-        }
+        .auth-input::placeholder { color: var(--text-muted); }
         .auth-btn {
             width: 100%;
             background: var(--accent);
@@ -175,14 +149,8 @@
             font-family: var(--font-sans);
             margin-top: 0.5rem;
         }
-        .auth-btn:hover {
-            background: var(--accent-hover);
-            color: #f5f4ef;
-        }
-        .auth-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
+        .auth-btn:hover { background: var(--accent-hover); color: #f5f4ef; }
+        .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .auth-divider {
             display: flex;
             align-items: center;
@@ -191,8 +159,7 @@
             color: var(--text-muted);
             font-size: 0.75rem;
         }
-        .auth-divider::before,
-        .auth-divider::after {
+        .auth-divider::before, .auth-divider::after {
             content: '';
             flex: 1;
             height: 1px;
@@ -210,14 +177,8 @@
             align-items: center;
             justify-content: center;
         }
-        .auth-switch:hover {
-            color: var(--text-primary);
-        }
-        .auth-switch strong {
-            color: var(--accent);
-            font-weight: 500;
-            margin-left: 0.25rem;
-        }
+        .auth-switch:hover { color: var(--text-primary); }
+        .auth-switch strong { color: var(--accent); font-weight: 500; margin-left: 0.25rem; }
         .auth-forgot {
             text-align: right;
             font-size: 0.8rem;
@@ -226,9 +187,7 @@
             margin-bottom: 0.75rem;
             transition: var(--transition);
         }
-        .auth-forgot:hover {
-            color: var(--text-secondary);
-        }
+        .auth-forgot:hover { color: var(--text-secondary); }
         .auth-footer {
             position: relative;
             z-index: 1;
@@ -243,12 +202,8 @@
             margin: 0 0.5rem;
             transition: var(--transition);
         }
-        .auth-footer a:hover {
-            color: var(--text-primary);
-        }
-        .hidden {
-            display: none !important;
-        }
+        .auth-footer a:hover { color: var(--text-primary); }
+        .hidden { display: none !important; }
         #authMessage {
             margin-top: 1rem;
             font-size: 0.85rem;
@@ -256,34 +211,14 @@
             color: var(--danger);
             min-height: 1.5rem;
         }
-        #authMessage a {
-            color: var(--accent);
-        }
-        .g_id_signin {
-            display: flex;
-            justify-content: center;
-            min-height: 44px;
-            margin-bottom: 0.5rem;
-        }
-        .g_id_signin > div {
-            width: 100% !important;
-            max-width: 100% !important;
-        }
+        #authMessage a { color: var(--accent); }
+        .g_id_signin { display: flex; justify-content: center; min-height: 44px; margin-bottom: 0.5rem; }
+        .g_id_signin > div { width: 100% !important; max-width: 100% !important; }
 
-        /* ================================================================
-           APP LAYOUT
-           ================================================================ */
-        .app {
-            display: flex;
-            height: 100dvh;
-            width: 100%;
-            background: var(--bg-primary);
-            overflow: hidden;
-        }
+        /* ============ APP ============ */
+        .app { display: flex; height: 100dvh; width: 100%; background: var(--bg-primary); overflow: hidden; }
 
-        /* ================================================================
-           SIDEBAR (Claude-inspired clean)
-           ================================================================ */
+        /* ============ SIDEBAR ============ */
         .sidebar {
             width: 260px;
             min-width: 260px;
@@ -309,11 +244,7 @@
             color: var(--text-primary);
             padding: 0.5rem 0.75rem 0.75rem;
         }
-        .sidebar .logo::before {
-            content: '◆';
-            color: var(--accent);
-            font-size: 1rem;
-        }
+        .sidebar .logo::before { content: '◆'; color: var(--accent); font-size: 1rem; }
         .sidebar .new-chat-btn {
             background: transparent;
             border: 1px solid var(--border-subtle);
@@ -331,13 +262,8 @@
             align-items: center;
             gap: 0.5rem;
         }
-        .sidebar .new-chat-btn:hover {
-            background: var(--bg-card);
-            border-color: var(--border-strong);
-        }
-        .sidebar .section {
-            padding: 0.5rem 0.75rem;
-        }
+        .sidebar .new-chat-btn:hover { background: var(--bg-card); border-color: var(--border-strong); }
+        .sidebar .section { padding: 0.5rem 0.75rem; }
         .sidebar .section-label {
             font-size: 0.68rem;
             text-transform: uppercase;
@@ -368,9 +294,7 @@
             transition: var(--transition);
             min-height: 44px;
         }
-        .sidebar .toggle-row:hover {
-            color: var(--text-primary);
-        }
+        .sidebar .toggle-row:hover { color: var(--text-primary); }
         .sidebar .toggle-row input[type="checkbox"] {
             appearance: none;
             width: 32px;
@@ -394,14 +318,8 @@
             border-radius: 50%;
             transition: var(--transition);
         }
-        .sidebar .toggle-row input[type="checkbox"]:checked {
-            background: var(--accent);
-            border-color: var(--accent);
-        }
-        .sidebar .toggle-row input[type="checkbox"]:checked::after {
-            left: 16px;
-            background: var(--bg-primary);
-        }
+        .sidebar .toggle-row input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+        .sidebar .toggle-row input[type="checkbox"]:checked::after { left: 16px; background: var(--bg-primary); }
         .sidebar .footer-stats {
             margin-top: auto;
             padding: 0.75rem;
@@ -413,9 +331,7 @@
             align-items: center;
         }
 
-        /* ================================================================
-           MAIN CHAT
-           ================================================================ */
+        /* ============ MAIN CHAT ============ */
         .main-chat {
             flex: 1;
             display: flex;
@@ -444,11 +360,7 @@
             color: var(--text-primary);
             letter-spacing: -0.01em;
         }
-        .chat-header .ai-status::before {
-            content: '◆';
-            color: var(--accent);
-            font-size: 0.85rem;
-        }
+        .chat-header .ai-status::before { content: '◆'; color: var(--accent); font-size: 0.85rem; }
         .chat-header .model-badge {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
@@ -461,12 +373,7 @@
             gap: 0.35rem;
             font-weight: 500;
         }
-        .chat-header .model-badge .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--success);
-        }
+        .chat-header .model-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
         .chat-header .user-menu-btn {
             background: transparent;
             border: 1px solid var(--border-subtle);
@@ -483,14 +390,9 @@
             min-height: 40px;
             font-family: var(--font-sans);
         }
-        .chat-header .user-menu-btn:hover {
-            border-color: var(--border-strong);
-            color: var(--text-primary);
-        }
+        .chat-header .user-menu-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
 
-        /* ================================================================
-           MESSAGES
-           ================================================================ */
+        /* ============ MESSAGES ============ */
         .messages {
             flex: 1;
             overflow-y: auto;
@@ -509,13 +411,8 @@
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .message.user-message {
-            align-self: flex-end;
-            flex-direction: row-reverse;
-        }
-        .message.ai-message {
-            align-self: flex-start;
-        }
+        .message.user-message { align-self: flex-end; flex-direction: row-reverse; }
+        .message.ai-message { align-self: flex-start; }
         .message .avatar {
             width: 32px;
             height: 32px;
@@ -535,9 +432,7 @@
             border-color: var(--accent);
             font-family: var(--font-serif);
         }
-        .message.user-message .avatar {
-            background: var(--bg-elevated);
-        }
+        .message.user-message .avatar { background: var(--bg-elevated); }
         .message .bubble {
             padding: 0.85rem 1.15rem;
             border-radius: var(--radius-lg);
@@ -559,18 +454,8 @@
             color: var(--text-primary);
             padding-left: 0.4rem;
         }
-        .message .bubble img,
-        .message .bubble video {
-            border-radius: var(--radius-md);
-            max-width: 100%;
-            height: auto;
-        }
-        .message .bubble .btn-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-top: 0.7rem;
-        }
+        .message .bubble img, .message .bubble video { border-radius: var(--radius-md); max-width: 100%; height: auto; }
+        .message .bubble .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.7rem; }
         .message .bubble .btn-row button {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
@@ -583,10 +468,7 @@
             min-height: 34px;
             font-family: var(--font-sans);
         }
-        .message .bubble .btn-row button:hover {
-            border-color: var(--accent);
-            color: var(--text-primary);
-        }
+        .message .bubble .btn-row button:hover { border-color: var(--accent); color: var(--text-primary); }
         .message .bubble .code-block-wrapper {
             background: var(--bg-card);
             border-radius: var(--radius-md);
@@ -604,22 +486,14 @@
             letter-spacing: 0.06em;
             font-weight: 600;
         }
-        .message .bubble .code-block-wrapper pre {
-            margin: 0;
-            overflow-x: auto;
-        }
+        .message .bubble .code-block-wrapper pre { margin: 0; overflow-x: auto; }
         .message .bubble .code-block-wrapper pre code {
             font-family: 'Fira Code', 'Courier New', monospace;
             font-size: 0.82rem;
             color: var(--text-secondary);
             white-space: pre-wrap;
         }
-        .message .bubble .code-block-wrapper .code-actions {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 0.6rem;
-            flex-wrap: wrap;
-        }
+        .message .bubble .code-block-wrapper .code-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
         .message .bubble .code-block-wrapper .code-actions button {
             background: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
@@ -632,10 +506,7 @@
             min-height: 32px;
             font-family: var(--font-sans);
         }
-        .message .bubble .code-block-wrapper .code-actions button:hover {
-            border-color: var(--accent);
-            color: var(--text-primary);
-        }
+        .message .bubble .code-block-wrapper .code-actions button:hover { border-color: var(--accent); color: var(--text-primary); }
         .msg-actions-bar {
             display: flex;
             gap: 0.3rem;
@@ -643,9 +514,7 @@
             opacity: 0;
             transition: opacity 0.15s;
         }
-        .message:hover .msg-actions-bar {
-            opacity: 1;
-        }
+        .message:hover .msg-actions-bar { opacity: 1; }
         .msg-actions-bar button {
             background: transparent;
             border: 1px solid var(--border-subtle);
@@ -658,12 +527,9 @@
             min-height: 26px;
             font-family: var(--font-sans);
         }
-        .msg-actions-bar button:hover {
-            border-color: var(--accent);
-            color: var(--text-primary);
-        }
+        .msg-actions-bar button:hover { border-color: var(--accent); color: var(--text-primary); }
 
-        /* ===== Typing animation cursor ===== */
+        /* Typing cursor */
         .typing-cursor {
             display: inline-block;
             width: 2px;
@@ -679,9 +545,7 @@
             50%, 100% { opacity: 0; }
         }
 
-        /* ================================================================
-           WELCOME SCREEN
-           ================================================================ */
+        /* ============ WELCOME ============ */
         .welcome-screen {
             display: flex;
             flex-direction: column;
@@ -693,10 +557,7 @@
             gap: 1.5rem;
             animation: fade-in 0.4s ease;
         }
-        @keyframes fade-in {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .welcome-screen .welcome-logo {
             font-family: var(--font-serif);
             font-size: 2.8rem;
@@ -709,15 +570,8 @@
             justify-content: center;
             gap: 0.5rem;
         }
-        .welcome-screen .welcome-logo::before {
-            content: '◆';
-            color: var(--accent);
-            font-size: 1.6rem;
-        }
-        .welcome-screen p {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-        }
+        .welcome-screen .welcome-logo::before { content: '◆'; color: var(--accent); font-size: 1.6rem; }
+        .welcome-screen p { color: var(--text-secondary); font-size: 0.95rem; }
         .suggestion-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -738,11 +592,7 @@
             color: var(--text-secondary);
             line-height: 1.5;
         }
-        .suggestion-card:hover {
-            border-color: var(--accent);
-            background: var(--bg-card);
-            color: var(--text-primary);
-        }
+        .suggestion-card:hover { border-color: var(--accent); background: var(--bg-card); color: var(--text-primary); }
         .suggestion-card strong {
             display: block;
             color: var(--text-primary);
@@ -751,9 +601,7 @@
             font-weight: 500;
         }
 
-        /* ================================================================
-           INPUT AREA
-           ================================================================ */
+        /* ============ INPUT ============ */
         .input-area {
             padding: 0.75rem 1.5rem calc(1rem + var(--safe-bottom));
             border-top: 1px solid var(--border-subtle);
@@ -761,12 +609,7 @@
             flex-shrink: 0;
             position: relative;
         }
-        .input-area .file-badge {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 0.6rem;
-        }
+        .input-area .file-badge { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.6rem; }
         .input-area .file-badge .file-tag {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
@@ -788,12 +631,7 @@
             padding: 0.2rem;
             min-height: 24px;
         }
-        .active-tools {
-            display: none;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-            margin-bottom: 0.6rem;
-        }
+        .active-tools { display: none; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
         .active-tool-pill {
             background: var(--accent-soft);
             border: 1px solid var(--accent);
@@ -813,14 +651,11 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg);
-            padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+            padding: 0.5rem;
             transition: var(--transition);
             min-height: 52px;
         }
-        .input-wrapper:focus-within {
-            border-color: var(--border-strong);
-            background: var(--bg-card);
-        }
+        .input-wrapper:focus-within { border-color: var(--border-strong); background: var(--bg-card); }
         .input-wrapper textarea {
             flex: 1;
             background: transparent;
@@ -835,12 +670,8 @@
             line-height: 1.5;
             font-family: var(--font-sans);
         }
-        .input-wrapper textarea::placeholder {
-            color: var(--text-muted);
-        }
-        .input-wrapper textarea:disabled {
-            opacity: 0.5;
-        }
+        .input-wrapper textarea::placeholder { color: var(--text-muted); }
+        .input-wrapper textarea:disabled { opacity: 0.5; cursor: not-allowed; }
         .input-wrapper .plus-btn {
             background: transparent;
             border: 1px solid var(--border-subtle);
@@ -860,17 +691,14 @@
             font-family: var(--font-sans);
             line-height: 1;
         }
-        .input-wrapper .plus-btn:hover {
-            background: var(--bg-elevated);
-            color: var(--text-primary);
-            border-color: var(--border-strong);
-        }
+        .input-wrapper .plus-btn:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-strong); }
         .input-wrapper .plus-btn.open {
             transform: rotate(45deg);
             background: var(--accent);
             border-color: var(--accent);
             color: #1a1917;
         }
+        .input-wrapper .plus-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .input-wrapper .send-btn {
             background: var(--accent);
             border: none;
@@ -889,14 +717,8 @@
             align-self: flex-end;
             font-weight: 700;
         }
-        .input-wrapper .send-btn:hover {
-            background: var(--accent-hover);
-            color: var(--text-primary);
-        }
-        .input-wrapper .send-btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
+        .input-wrapper .send-btn:hover { background: var(--accent-hover); color: var(--text-primary); }
+        .input-wrapper .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .input-area .char-counter {
             font-size: 0.65rem;
             color: var(--text-muted);
@@ -905,9 +727,7 @@
             padding-right: 0.5rem;
         }
 
-        /* ================================================================
-           TOOL MENU (Claude/ChatGPT-style popup with toggles)
-           ================================================================ */
+        /* ============ TOOL MENU ============ */
         .tool-menu {
             position: absolute;
             bottom: calc(100% - 8px);
@@ -924,9 +744,7 @@
             min-width: 260px;
             animation: slide-up 0.15s ease;
         }
-        .tool-menu.open {
-            display: flex;
-        }
+        .tool-menu.open { display: flex; }
         @keyframes slide-up {
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
@@ -949,20 +767,9 @@
             transition: var(--transition);
             min-height: 44px;
         }
-        .tool-toggle:hover {
-            background: var(--bg-elevated);
-        }
-        .tool-toggle .tool-emoji {
-            font-size: 1rem;
-            width: 22px;
-            text-align: center;
-        }
-        .tool-toggle .tool-name {
-            flex: 1;
-            font-size: 0.85rem;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
+        .tool-toggle:hover { background: var(--bg-elevated); }
+        .tool-toggle .tool-emoji { font-size: 1rem; width: 22px; text-align: center; }
+        .tool-toggle .tool-name { flex: 1; font-size: 0.85rem; color: var(--text-primary); font-weight: 500; }
         .tool-toggle .toggle-switch {
             width: 32px;
             height: 18px;
@@ -984,22 +791,10 @@
             border-radius: 50%;
             transition: var(--transition);
         }
-        .tool-toggle.active .toggle-switch {
-            background: var(--accent);
-            border-color: var(--accent);
-        }
-        .tool-toggle.active .toggle-switch::after {
-            left: 16px;
-            background: var(--bg-primary);
-        }
-        .tool-toggle.active .tool-name {
-            color: var(--accent);
-        }
-        .tool-menu-sep {
-            height: 1px;
-            background: var(--border-subtle);
-            margin: 0.4rem 0.4rem;
-        }
+        .tool-toggle.active .toggle-switch { background: var(--accent); border-color: var(--accent); }
+        .tool-toggle.active .toggle-switch::after { left: 16px; background: var(--bg-primary); }
+        .tool-toggle.active .tool-name { color: var(--accent); }
+        .tool-menu-sep { height: 1px; background: var(--border-subtle); margin: 0.4rem 0.4rem; }
         .tool-action {
             display: flex;
             align-items: center;
@@ -1018,19 +813,12 @@
             width: 100%;
             font-weight: 500;
         }
-        .tool-action:hover {
-            background: var(--bg-elevated);
-        }
-        .tool-action.danger {
-            color: var(--danger);
-        }
-        .tool-action.danger:hover {
-            background: rgba(239, 68, 68, 0.1);
-        }
+        .tool-action:hover { background: var(--bg-elevated); }
+        .tool-action.danger { color: var(--danger); }
+        .tool-action.danger:hover { background: rgba(239, 68, 68, 0.1); }
+        .tool-action:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        /* ================================================================
-           MODALS (user settings)
-           ================================================================ */
+        /* ============ MODALS ============ */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -1055,17 +843,8 @@
             box-shadow: var(--shadow-card);
             animation: slide-up 0.25s ease;
         }
-        .modal-content .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.25rem;
-        }
-        .modal-content .modal-header h3 {
-            font-family: var(--font-serif);
-            font-size: 1.3rem;
-            font-weight: 500;
-        }
+        .modal-content .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+        .modal-content .modal-header h3 { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 500; }
         .modal-content .modal-header .close {
             font-size: 1.6rem;
             cursor: pointer;
@@ -1074,9 +853,7 @@
             line-height: 1;
             padding: 0.2rem 0.4rem;
         }
-        .modal-content .modal-header .close:hover {
-            color: var(--text-primary);
-        }
+        .modal-content .modal-header .close:hover { color: var(--text-primary); }
         .modal-content .modal-body {
             max-height: 60dvh;
             overflow-y: auto;
@@ -1090,13 +867,7 @@
             line-height: 1.6;
             color: var(--text-secondary);
         }
-        .modal-content .modal-actions {
-            display: flex;
-            gap: 0.8rem;
-            margin-top: 1rem;
-            justify-content: flex-end;
-            flex-wrap: wrap;
-        }
+        .modal-content .modal-actions { display: flex; gap: 0.8rem; margin-top: 1rem; justify-content: flex-end; flex-wrap: wrap; }
         .modal-content .modal-actions button {
             background: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
@@ -1109,40 +880,18 @@
             min-height: 44px;
             font-family: var(--font-sans);
         }
-        .modal-content .modal-actions button:hover {
-            border-color: var(--border-strong);
-        }
-        .modal-content .modal-actions button.primary {
-            background: var(--accent);
-            border: none;
-            color: #1a1917;
-            font-weight: 600;
-        }
-        .modal-content .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.25rem;
-        }
+        .modal-content .modal-actions button:hover { border-color: var(--border-strong); }
+        .modal-content .modal-actions button.primary { background: var(--accent); border: none; color: #1a1917; font-weight: 600; }
+        .modal-content .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
         .modal-content .card-sm {
             background: var(--bg-primary);
             border-radius: var(--radius-md);
             padding: 1rem 1.1rem;
             border: 1px solid var(--border-subtle);
         }
-        .modal-content .card-sm h4 {
-            font-size: 0.82rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-        }
-        .modal-content .card-sm label {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            display: block;
-            margin-top: 0.5rem;
-        }
-        .modal-content .card-sm input,
-        .modal-content .card-sm textarea {
+        .modal-content .card-sm h4 { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .modal-content .card-sm label { font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 0.5rem; }
+        .modal-content .card-sm input, .modal-content .card-sm textarea {
             width: 100%;
             background: var(--bg-secondary);
             border: 1px solid var(--border-subtle);
@@ -1156,14 +905,8 @@
             min-height: 44px;
             font-family: var(--font-sans);
         }
-        .modal-content .card-sm input:focus,
-        .modal-content .card-sm textarea:focus {
-            border-color: var(--accent);
-        }
-        .modal-content .card-sm textarea {
-            resize: vertical;
-            min-height: 60px;
-        }
+        .modal-content .card-sm input:focus, .modal-content .card-sm textarea:focus { border-color: var(--accent); }
+        .modal-content .card-sm textarea { resize: vertical; min-height: 60px; }
         .modal-content .card-sm .btn-sm {
             width: 100%;
             background: var(--bg-elevated);
@@ -1179,30 +922,11 @@
             min-height: 44px;
             font-family: var(--font-sans);
         }
-        .modal-content .card-sm .btn-sm:hover {
-            border-color: var(--border-strong);
-        }
-        .modal-content .card-sm .btn-sm.primary {
-            background: var(--accent);
-            border: none;
-            color: #1a1917;
-            font-weight: 600;
-        }
-        .modal-content .card-sm .btn-sm.danger {
-            background: #7f1a1a;
-            border: none;
-            color: #fff;
-        }
-        .modal-content .card-sm .btn-sm.success {
-            background: #065f46;
-            border: none;
-            color: #fff;
-        }
-        .modal-content .key-list {
-            max-height: 150px;
-            overflow-y: auto;
-            margin: 0.5rem 0;
-        }
+        .modal-content .card-sm .btn-sm:hover { border-color: var(--border-strong); }
+        .modal-content .card-sm .btn-sm.primary { background: var(--accent); border: none; color: #1a1917; font-weight: 600; }
+        .modal-content .card-sm .btn-sm.danger { background: #7f1a1a; border: none; color: #fff; }
+        .modal-content .card-sm .btn-sm.success { background: #065f46; border: none; color: #fff; }
+        .modal-content .key-list { max-height: 150px; overflow-y: auto; margin: 0.5rem 0; }
         .modal-content .key-list .key-item {
             background: var(--bg-secondary);
             border-radius: var(--radius-sm);
@@ -1216,20 +940,8 @@
             flex-wrap: wrap;
             gap: 0.3rem;
         }
-        .modal-content .key-list .key-item code {
-            color: var(--text-secondary);
-            font-size: 0.7rem;
-            word-break: break-all;
-            font-family: monospace;
-        }
-        .modal-content .key-list .key-item .revoke {
-            background: none;
-            border: none;
-            color: var(--danger);
-            cursor: pointer;
-            font-size: 0.8rem;
-            padding: 0.2rem 0.5rem;
-        }
+        .modal-content .key-list .key-item code { color: var(--text-secondary); font-size: 0.7rem; word-break: break-all; font-family: monospace; }
+        .modal-content .key-list .key-item .revoke { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.8rem; padding: 0.2rem 0.5rem; }
         .modal-content .free-key-box {
             background: var(--bg-secondary);
             border-radius: var(--radius-sm);
@@ -1239,10 +951,7 @@
             border: 1px solid var(--border-subtle);
             word-break: break-all;
         }
-        .modal-content .free-key-box code {
-            color: var(--accent);
-            font-family: monospace;
-        }
+        .modal-content .free-key-box code { color: var(--accent); font-family: monospace; }
         .profile-preview {
             width: 56px;
             height: 56px;
@@ -1254,9 +963,7 @@
             border: 2px solid var(--border-subtle);
         }
 
-        /* ================================================================
-           RESPONSIVE
-           ================================================================ */
+        /* ============ RESPONSIVE ============ */
         .mobile-hamburger {
             display: none;
             background: none;
@@ -1270,16 +977,8 @@
             align-items: center;
             justify-content: center;
         }
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 99;
-        }
-        .sidebar-overlay.active {
-            display: block;
-        }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 99; }
+        .sidebar-overlay.active { display: block; }
         @media (max-width: 820px) {
             .sidebar {
                 position: fixed;
@@ -1292,84 +991,30 @@
                 border-right: 1px solid var(--border-subtle);
                 box-shadow: 4px 0 40px rgba(0, 0, 0, 0.6);
             }
-            .sidebar.open {
-                transform: translateX(0);
-            }
-            .mobile-hamburger {
-                display: flex !important;
-            }
-            .modal-content .grid-2 {
-                grid-template-columns: 1fr;
-            }
-            .message {
-                max-width: 95%;
-            }
-            .auth-card input,
-            .auth-card button {
-                font-size: 16px;
-            }
-            .chat-header .user-menu-btn {
-                font-size: 0.7rem;
-                padding: 0.3rem 0.7rem;
-            }
-            .suggestion-grid {
-                grid-template-columns: 1fr;
-            }
+            .sidebar.open { transform: translateX(0); }
+            .mobile-hamburger { display: flex !important; }
+            .modal-content .grid-2 { grid-template-columns: 1fr; }
+            .message { max-width: 95%; }
+            .auth-card input, .auth-card button { font-size: 16px; }
+            .chat-header .user-menu-btn { font-size: 0.7rem; padding: 0.3rem 0.7rem; }
+            .suggestion-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 480px) {
-            .chat-header {
-                padding: 0.6rem 1rem;
-            }
-            .messages {
-                padding: 1.25rem 0.9rem 0.5rem;
-            }
-            .input-area {
-                padding: 0.6rem 0.9rem calc(0.75rem + var(--safe-bottom));
-            }
-            .input-wrapper {
-                padding: 0.4rem;
-                min-height: 46px;
-            }
-            .input-wrapper textarea {
-                font-size: 0.9rem;
-                padding: 0.4rem;
-                min-height: 38px;
-            }
-            .input-wrapper .send-btn {
-                width: 36px;
-                min-width: 36px;
-                height: 36px;
-                font-size: 0.9rem;
-            }
-            .input-wrapper .plus-btn {
-                width: 36px;
-                min-width: 36px;
-                height: 36px;
-                font-size: 1.15rem;
-            }
-            .message .bubble {
-                font-size: 0.9rem;
-                padding: 0.7rem 0.95rem;
-            }
-            .welcome-screen .welcome-logo {
-                font-size: 2.2rem;
-            }
-            .tool-menu {
-                left: 0.75rem;
-                right: 0.75rem;
-                min-width: unset;
-            }
-            .auth-logo {
-                font-size: 2rem;
-            }
-            .auth-heading {
-                font-size: 1.4rem;
-            }
+            .chat-header { padding: 0.6rem 1rem; }
+            .messages { padding: 1.25rem 0.9rem 0.5rem; }
+            .input-area { padding: 0.6rem 0.9rem calc(0.75rem + var(--safe-bottom)); }
+            .input-wrapper { padding: 0.4rem; min-height: 46px; }
+            .input-wrapper textarea { font-size: 0.9rem; padding: 0.4rem; min-height: 38px; }
+            .input-wrapper .send-btn { width: 36px; min-width: 36px; height: 36px; font-size: 0.9rem; }
+            .input-wrapper .plus-btn { width: 36px; min-width: 36px; height: 36px; font-size: 1.15rem; }
+            .message .bubble { font-size: 0.9rem; padding: 0.7rem 0.95rem; }
+            .welcome-screen .welcome-logo { font-size: 2.2rem; }
+            .tool-menu { left: 0.75rem; right: 0.75rem; min-width: unset; }
+            .auth-logo { font-size: 2rem; }
+            .auth-heading { font-size: 1.4rem; }
         }
 
-        /* ================================================================
-           LOADING / ERROR STATES
-           ================================================================ */
+        /* ============ LOADING / ERROR ============ */
         #app-root.loading {
             display: flex;
             align-items: center;
@@ -1391,16 +1036,8 @@
             text-align: center;
             background: var(--bg-primary);
         }
-        #app-root.error h2 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-            font-family: var(--font-serif);
-            font-weight: 500;
-        }
-        #app-root.error p {
-            max-width: 500px;
-            color: var(--text-secondary);
-        }
+        #app-root.error h2 { font-size: 1.5rem; margin-bottom: 0.5rem; font-family: var(--font-serif); font-weight: 500; }
+        #app-root.error p { max-width: 500px; color: var(--text-secondary); }
         #app-root.error button {
             margin-top: 1.5rem;
             background: var(--accent);
@@ -1420,9 +1057,7 @@
     <div id="app-root" class="loading">Loading Vrythos…</div>
 
     <script>
-        /* ================================================================
-           API HELPERS
-           ================================================================ */
+        /* ============ API HELPERS ============ */
         async function apiGet(endpoint) {
             const res = await fetch(endpoint);
             if (!res.ok) throw new Error(await res.text());
@@ -1455,9 +1090,7 @@
             return res.json();
         }
 
-        /* ================================================================
-           GLOBAL STATE
-           ================================================================ */
+        /* ============ GLOBAL STATE ============ */
         let currentUser = null;
         let modules = [];
         let tournaments = [];
@@ -1479,9 +1112,7 @@
         let messageIdCounter = 0;
         const messageContentStore = {};
 
-        /* ================================================================
-           UTILITIES
-           ================================================================ */
+        /* ============ UTILITIES ============ */
         function escapeHtml(str) {
             return String(str).replace(/[&<>"]/g, m => {
                 if (m === '&') return '&amp;';
@@ -1491,13 +1122,11 @@
                 return m;
             });
         }
-
         async function hashPassword(pw) {
             const enc = new TextEncoder().encode(pw);
             const hash = await crypto.subtle.digest('SHA-256', enc);
             return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
         }
-
         function showToast(msg, type = 'info') {
             const toast = document.createElement('div');
             const bg = type === 'error' ? '#7f1a1a' : type === 'warning' ? '#78350f' : '#2a2926';
@@ -1508,9 +1137,7 @@
             setTimeout(() => toast.remove(), 3200);
         }
 
-        /* ================================================================
-           ABUSE DETECTION
-           ================================================================ */
+        /* ============ ABUSE DETECTION ============ */
         async function addAbuseScore(points, reason, context) {
             if (!currentUser) return;
             abuseScore = Math.min(100, abuseScore + points);
@@ -1552,9 +1179,7 @@
             }
         });
 
-        /* ================================================================
-           DOWNLOAD / COPY GLOBALS
-           ================================================================ */
+        /* ============ DOWNLOAD / COPY GLOBALS ============ */
         window.downloadImage = function(id) {
             const url = imgStore[id];
             if (!url) return;
@@ -1590,9 +1215,7 @@
             } catch (_) { showToast('Copy failed', 'error'); }
         };
 
-        /* ================================================================
-           DATA LOADERS
-           ================================================================ */
+        /* ============ DATA LOADERS ============ */
         async function loadAllData() {
             modules = await apiGet('/api/modules');
             tournaments = await apiGet('/api/tournaments');
@@ -1615,9 +1238,7 @@
         async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
         async function joinTournament(id) { return await apiPost('/api/join-tournament', { email: currentUser.email, tournamentId: id }); }
 
-        /* ================================================================
-           IMAGE GENERATION
-           ================================================================ */
+        /* ============ IMAGE GENERATION ============ */
         async function generateImageWithCloudflare(prompt) {
             try {
                 const res = await fetch('/api/generate/image', {
@@ -1652,9 +1273,7 @@
             }
         }
 
-        /* ================================================================
-           VIDEO GENERATION
-           ================================================================ */
+        /* ============ VIDEO GENERATION ============ */
         async function generateVideo(prompt, duration) {
             addAIMessage('Generating video… (may take 30–60s)', false, false);
             try {
@@ -1681,9 +1300,7 @@
             return /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i.test(text);
         }
 
-        /* ================================================================
-           AI CALL WITH FALLBACK
-           ================================================================ */
+        /* ============ AI CALL ============ */
         async function callChatWithFallback(messages, deep) {
             let attempts = 0;
             let lastError = null;
@@ -1703,7 +1320,6 @@
             }
             throw new Error(lastError ? lastError.message : 'All AI engines unavailable');
         }
-
         async function callChatAPI(module_id, messages, deep) {
             const res = await fetch('/api/chat', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1713,7 +1329,6 @@
             if (!data.success) throw new Error(data.error || 'Chat API error');
             return data.reply;
         }
-
         function updateModuleStatus(name) {
             const el = document.getElementById('moduleStatus');
             if (el) el.textContent = name;
@@ -1721,9 +1336,7 @@
             if (badge) badge.innerHTML = `<span class="dot"></span> ${escapeHtml(name)}`;
         }
 
-        /* ================================================================
-           CODE PROCESSING
-           ================================================================ */
+        /* ============ CODE PROCESSING ============ */
         function processCodeInText(text) {
             const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
             let match;
@@ -1731,9 +1344,7 @@
             let parts = [];
             let hasCode = false;
             while ((match = codeBlockRegex.exec(text)) !== null) {
-                if (match.index > lastIndex) {
-                    parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
-                }
+                if (match.index > lastIndex) parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
                 parts.push({ type: 'code', language: match[1] || 'txt', code: match[2] });
                 hasCode = true;
                 lastIndex = match.index + match[0].length;
@@ -1742,9 +1353,7 @@
             if (!hasCode) return null;
             return parts;
         }
-
         let codeStore = {};
-
         function buildCodeHtml(parts) {
             let html = '';
             for (const part of parts) {
@@ -1760,7 +1369,6 @@
             }
             return html;
         }
-
         window.downloadCode = function(id) {
             const data = codeStore[id];
             if (!data) return;
@@ -1773,7 +1381,6 @@
             a.click();
             URL.revokeObjectURL(url);
         };
-
         window.copyCode = async function(id) {
             const data = codeStore[id];
             if (!data) return;
@@ -1782,30 +1389,31 @@
                 showToast('Code copied', 'info');
             } catch (_) { showToast('Copy failed', 'error'); }
         };
-
         window.debugCode = async function(id) {
             const data = codeStore[id];
             if (!data) return;
+            if (isProcessing) { showToast('Please wait for current reply to finish', 'warning'); return; }
             const { code, language: lang } = data;
             const btn = document.querySelector(`.code-block-wrapper[data-codeid="${id}"] .code-actions button:last-child`);
             if (btn) btn.disabled = true;
             const originalText = btn ? btn.textContent : 'Debug';
             if (btn) btn.textContent = 'Debugging…';
+            setProcessing(true);
             try {
                 const debugPrompt = `Please review the following ${lang} code for errors, bugs, or improvements. Provide the fixed version with explanations. Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
                 messagesHistory.push({ role: 'user', content: debugPrompt });
                 const debugReply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
-                addAIMessage(debugReply, false, true);
+                await addAIMessage(debugReply, false, true);
                 if (btn) { btn.disabled = false; btn.textContent = originalText; }
             } catch (err) {
                 showToast('Debug failed: ' + err.message, 'error');
                 if (btn) { btn.disabled = false; btn.textContent = originalText; }
+            } finally {
+                setProcessing(false);
             }
         };
 
-        /* ================================================================
-           FULL OUTPUT MODAL
-           ================================================================ */
+        /* ============ FULL OUTPUT MODAL ============ */
         function showFullOutput(content) {
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
@@ -1823,9 +1431,7 @@
             modal.addEventListener('click', e => { if (e.target === modal) close(); });
         }
 
-        /* ================================================================
-           AI MESSAGE — INSTANT version (warnings, images, status)
-           ================================================================ */
+        /* ============ AI MESSAGE — INSTANT ============ */
         function _addAIMessageInstant(content, isHtml = false) {
             const container = document.getElementById('messagesContainer');
             const div = document.createElement('div');
@@ -1859,7 +1465,7 @@
                 setProcessing(true);
                 try {
                     const reply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
-                    addAIMessage(reply, false, true);
+                    await addAIMessage(reply, false, true);
                 } catch (e) {
                     addAIMessage('Regenerate failed: ' + e.message, false, false);
                 } finally {
@@ -1874,13 +1480,24 @@
         }
 
         /* ================================================================
-           TYPING HELPER — reveals text word-by-word at 7 words/second
+           TYPING HELPER — Dynamic speed schedule
+           ----------------------------------------------------------------
+           Word index 0-20    (first 21 words, ~3s @ 7 wps)  → 7 wps
+           Word index 21-60   (next 40 words, ~4s @ 10 wps)  → 10 wps
+           Word index 61-160  (next 100 words, ~10s @ 10 wps)→ 10 wps
+           Word index 161+    (remaining, 20 wps)            → 20 wps
            ================================================================ */
-        const MS_PER_WORD = 1000 / 7;   // ~142.86 ms → 7 words/second
+        function getTypingDelay(wordIndex) {
+            if (wordIndex < 21) return 1000 / 7;     // Phase 1: 0-3s, 7 wps
+            if (wordIndex < 61) return 1000 / 10;    // Phase 2: 3-7s, 10 wps
+            if (wordIndex < 161) return 1000 / 10;   // Phase 3: 7-17s, 10 wps
+            return 1000 / 20;                         // Phase 4: 17s+, 20 wps
+        }
 
         async function typeInto(text, targetEl, isAborted) {
             const tokens = text.split(/(\s+)/);
             let buffer = '';
+            let wordCount = 0;
 
             for (let i = 0; i < tokens.length; i++) {
                 const token = tokens[i];
@@ -1899,16 +1516,16 @@
                 if (c) c.scrollTop = c.scrollHeight;
 
                 if (token.trim()) {
-                    await new Promise(r => setTimeout(r, MS_PER_WORD));
+                    const delay = getTypingDelay(wordCount);
+                    wordCount++;
+                    await new Promise(r => setTimeout(r, delay));
                 } else if (token.includes('\n')) {
                     await new Promise(r => setTimeout(r, 25));
                 }
             }
         }
 
-        /* ================================================================
-           AI MESSAGE — STREAMING version (typing animation)
-           ================================================================ */
+        /* ============ AI MESSAGE — STREAMING ============ */
         let currentTypingAbort = null;
 
         async function streamAIMessage(content) {
@@ -1943,7 +1560,7 @@
                 setProcessing(true);
                 try {
                     const reply = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
-                    addAIMessage(reply, false, true);
+                    await addAIMessage(reply, false, true);
                 } catch (e) {
                     addAIMessage('Regenerate failed: ' + e.message, false, false);
                 } finally {
@@ -1990,20 +1607,17 @@
             }
         }
 
-        /* ================================================================
-           Public wrapper — 3rd arg "stream" opts into typing animation
-           ================================================================ */
+        /* Public wrapper — returns Promise when streaming */
         function addAIMessage(content, isHtml = false, stream = false) {
             if (stream && !isHtml) {
-                streamAIMessage(content);
+                return streamAIMessage(content);
             } else {
                 _addAIMessageInstant(content, isHtml);
+                return Promise.resolve();
             }
         }
 
-        /* ================================================================
-           USER MESSAGE
-           ================================================================ */
+        /* ============ USER MESSAGE ============ */
         function addUserMessage(text) {
             const container = document.getElementById('messagesContainer');
             const div = document.createElement('div');
@@ -2033,9 +1647,7 @@
             return div;
         }
 
-        /* ================================================================
-           ACTIVITY TRACKING
-           ================================================================ */
+        /* ============ ACTIVITY TRACKING ============ */
         let activityInterval = null;
         function startActivityTracking() {
             if (activityInterval) clearInterval(activityInterval);
@@ -2050,13 +1662,11 @@
             const btn = document.getElementById('sendBtn');
             if (textarea) textarea.disabled = p;
             if (btn) btn.disabled = p;
-            if (textarea) textarea.placeholder = p ? 'Thinking…' : 'Message Vrythos…';
+            if (textarea) textarea.placeholder = p ? 'Please wait for reply to finish…' : 'Message Vrythos…';
             if (!p && textarea) textarea.focus();
         }
 
-        /* ================================================================
-           ACTIVE TOOLS (pills above input)
-           ================================================================ */
+        /* ============ ACTIVE TOOLS ============ */
         function renderActiveTools() {
             const container = document.getElementById('activeTools');
             if (!container) return;
@@ -2074,9 +1684,7 @@
             }
         }
 
-        /* ================================================================
-           BEST CODING MODE
-           ================================================================ */
+        /* ============ BEST CODING ============ */
         async function handleBestCoding(userText, attachedFilesText) {
             const availableModules = [...modules];
             if (availableModules.length === 0) {
@@ -2126,16 +1734,14 @@
             }
 
             typing.remove();
-            if (currentReply) addAIMessage(currentReply, false, true);
+            if (currentReply) await addAIMessage(currentReply, false, true);
             else addAIMessage('Best coding chain failed to produce any output.', false, false);
         }
 
-        /* ================================================================
-           SEND MESSAGE
-           ================================================================ */
+        /* ============ SEND MESSAGE (with proper input blocking) ============ */
         async function sendMessage(userText, forceImage = false, forceVideo = false) {
             if (!currentUser || currentUser.banned) { addAIMessage('Account banned.', false, false); return; }
-            if (isProcessing) { addAIMessage('Please wait for previous message.', false, false); return; }
+            if (isProcessing) { addAIMessage('Please wait for the current reply to finish.', false, false); return; }
             setProcessing(true);
             const welcome = document.getElementById('welcomeScreen');
             if (welcome) welcome.remove();
@@ -2149,7 +1755,6 @@
                     if (m && m[2]) prompt = m[2];
                     addUserMessage(userText);
                     await generateVideo(prompt, DEFAULT_VIDEO_DURATION);
-                    setProcessing(false);
                     return;
                 }
 
@@ -2159,7 +1764,6 @@
                     const m = userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
                     if (m && m[2]) prompt = m[2];
                     await generateImageAndShow(prompt);
-                    setProcessing(false);
                     return;
                 }
 
@@ -2172,7 +1776,6 @@
                     }
                     addUserMessage(userText);
                     await handleBestCoding(userText, filesText);
-                    setProcessing(false);
                     return;
                 }
 
@@ -2199,15 +1802,15 @@
                 } finally {
                     if (typing) typing.remove();
                 }
-                addAIMessage(reply, false, true);
+                // ⚡ CRITICAL: await the full typing animation
+                await addAIMessage(reply, false, true);
             } finally {
+                // Only runs AFTER streaming completes — input unlocks now
                 setProcessing(false);
             }
         }
 
-        /* ================================================================
-           FILE BADGES
-           ================================================================ */
+        /* ============ FILE BADGES ============ */
         function renderFileBadges() {
             const container = document.getElementById('filePreviewArea');
             if (!container) return;
@@ -2221,9 +1824,7 @@
             });
         }
 
-        /* ================================================================
-           TOURNAMENTS
-           ================================================================ */
+        /* ============ TOURNAMENTS ============ */
         async function renderTournaments() {
             const container = document.getElementById('tournamentsContainer');
             if (!container) return;
@@ -2241,9 +1842,7 @@
             });
         }
 
-        /* ================================================================
-           USER SETTINGS MODAL
-           ================================================================ */
+        /* ============ USER SETTINGS ============ */
         async function openUserSettings() {
             let userKeys = await loadUserApiKeys(currentUser.email);
             const modal = document.createElement('div');
@@ -2343,7 +1942,7 @@
             }
             await refreshFreeKey();
 
-            document.getElementById('generateFreeKeyBtn').onclick = async () => {
+                        document.getElementById('generateFreeKeyBtn').onclick = async () => {
                 try {
                     const res = await apiPost('/api/free-api-key/generate', { email: currentUser.email });
                     if (res.success) {
@@ -2365,9 +1964,7 @@
             };
         }
 
-        /* ================================================================
-           WELCOME SCREEN
-           ================================================================ */
+        /* ============ WELCOME SCREEN ============ */
         function renderWelcomeScreen() {
             const container = document.getElementById('messagesContainer');
             container.innerHTML = `
@@ -2394,9 +1991,7 @@
             });
         }
 
-        /* ================================================================
-           BUILD UI
-           ================================================================ */
+        /* ============ BUILD UI ============ */
         async function buildUI() {
             document.getElementById('app-root').innerHTML = `
                 <div class="app">
@@ -2508,8 +2103,9 @@
 
             /* ---------- SEND ---------- */
             document.getElementById('sendBtn').onclick = () => {
+                if (isProcessing) return;
                 const val = textarea.value.trim();
-                if (val && !isProcessing) sendMessage(val);
+                if (val) sendMessage(val);
                 textarea.value = '';
                 textarea.style.height = 'auto';
                 charCounter.textContent = '0 characters';
@@ -2517,16 +2113,20 @@
 
             textarea.addEventListener('keydown', e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
+                    if (isProcessing) {
+                        e.preventDefault();
+                        return;
+                    }
                     e.preventDefault();
                     const val = textarea.value.trim();
-                    if (val && !isProcessing) sendMessage(val);
+                    if (val) sendMessage(val);
                     textarea.value = '';
                     textarea.style.height = 'auto';
                     charCounter.textContent = '0 characters';
                 }
             });
 
-            /* ---------- SIDEBAR TOGGLES (kept in sync with tool menu) ---------- */
+            /* ---------- SIDEBAR TOGGLES ---------- */
             document.getElementById('deepThinkToggle').onchange = e => {
                 deepThink = e.target.checked;
                 syncToolMenu();
@@ -2620,15 +2220,19 @@
 
             toolMenu.querySelectorAll('.tool-action').forEach(btn => {
                 btn.onclick = () => {
+                    if (isProcessing && btn.dataset.action !== 'clear') {
+                        showToast('Please wait for the current reply to finish', 'warning');
+                        return;
+                    }
                     toolMenu.classList.remove('open');
                     plusBtn.classList.remove('open');
                     const action = btn.dataset.action;
                     const txt = textarea.value.trim();
                     if (action === 'image') {
-                        if (!isProcessing) sendMessage(txt || 'cyberpunk city at night, neon', true);
+                        sendMessage(txt || 'cyberpunk city at night, neon', true);
                         textarea.value = ''; charCounter.textContent = '0 characters';
                     } else if (action === 'video') {
-                        if (!isProcessing) sendMessage(txt || 'cinematic drone shot over mountains at sunset', false, true);
+                        sendMessage(txt || 'cinematic drone shot over mountains at sunset', false, true);
                         textarea.value = ''; charCounter.textContent = '0 characters';
                     } else if (action === 'attach') {
                         document.getElementById('fileInput').click();
@@ -2664,9 +2268,7 @@
             });
         }
 
-        /* ================================================================
-           GOOGLE OAUTH
-           ================================================================ */
+        /* ============ GOOGLE OAUTH ============ */
         window.handleGoogleLogin = async (response) => {
             try {
                 const res = await apiPost('/api/auth/google', { token: response.credential });
@@ -2679,7 +2281,8 @@
                     localStorage.setItem('vrythos_current_session', res.email);
                     await buildUI();
                 } else {
-                    document.getElementById('authMessage').textContent = res.error || 'Google login failed';
+                    const el = document.getElementById('authMessage');
+                    if (el) el.textContent = res.error || 'Google login failed';
                 }
             } catch (e) {
                 const el = document.getElementById('authMessage');
@@ -2687,9 +2290,7 @@
             }
         };
 
-        /* ================================================================
-           AUTH INIT
-           ================================================================ */
+        /* ============ AUTH INIT ============ */
         async function initAuth() {
             const saved = localStorage.getItem('vrythos_current_session');
             if (saved) {
@@ -2713,7 +2314,6 @@
                 }
             }
 
-            /* ========== CLAUDE-INSPIRED LOGIN PAGE ========== */
             document.getElementById('app-root').innerHTML = `
                 <div class="auth-container">
                     <div class="auth-card">
@@ -2876,9 +2476,7 @@
             };
         }
 
-        /* ================================================================
-           BOOT
-           ================================================================ */
+        /* ============ BOOT ============ */
         (async function boot() {
             try {
                 await loadAllData();
