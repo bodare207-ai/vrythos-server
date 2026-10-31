@@ -38,7 +38,6 @@
         .forgot-link { color: #8e9dc2; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 8px; display: inline-block; }
         .forgot-link:hover { color: #c084fc; }
         .video-settings-card input { width: 100%; margin-bottom: 8px; }
-        /* New earnings styles */
         .earning-balance { font-size: 1.5rem; font-weight: bold; color: #10b981; }
         .withdraw-item { background: #0e111b; border-radius: 12px; padding: 8px; margin: 6px 0; }
     </style>
@@ -55,7 +54,6 @@
         <div id="adminMsg" style="color:#f97316; margin-top: 8px;"></div>
     </div>
     <div id="adminContent" style="display:none;">
-        <!-- Stats cards -->
         <div class="stats-row" id="statsContainer">
             <div class="stat-card">Live: <span id="liveUsers">0</span></div>
             <div class="stat-card">Daily: <span id="dailyUsers">0</span></div>
@@ -64,15 +62,18 @@
             <div class="stat-card">Total Accounts: <span id="totalAccounts">0</span></div>
         </div>
 
-        <!-- ===== NEW: Earnings & Withdrawals Panel ===== -->
         <div class="card" id="earningsCard">
-            <h3>💰 Earnings & Withdrawals (Admin)</h3>
+            <h3>💰 Earnings &amp; Withdrawals (Admin — REAL, saved in MongoDB)</h3>
             <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
                 <div class="stat-card" style="flex: 0 0 auto;">
                     <span style="color:#8e9dc2;">Total Earnings:</span><br>
                     <span id="earningsBalance" class="earning-balance">$0.00</span>
                 </div>
                 <button id="editEarningsBtn" style="background:#2d3748;">✏️ Edit Earnings</button>
+                <button id="refreshEarningsBtn" style="background:#2d3748;">🔄 Refresh</button>
+            </div>
+            <div id="earningsLiveStats" style="font-size:12px; color:#8e9dc2; margin-bottom:8px;">
+                Loading platform stats…
             </div>
             <div id="earningsEditArea" style="display:none; margin-bottom: 12px;">
                 <input type="number" id="earningsInput" placeholder="Enter new earnings amount" step="0.01" min="0" style="width: 200px;">
@@ -94,10 +95,11 @@
                 <button id="withdrawBtn" class="success">Withdraw</button>
             </div>
 
-            <h4>Withdrawal History</h4>
+            <h4>Withdrawal History (from MongoDB)</h4>
             <div id="withdrawHistory" style="max-height: 250px; overflow-y: auto; background: #0a0c15; border-radius: 12px; padding: 8px;">
                 <i>No withdrawals yet.</i>
             </div>
+            <button id="clearWithdrawHistoryBtn" style="background:#7f1a1a; margin-top: 8px;">🗑️ Clear Withdrawal History</button>
         </div>
 
         <div class="grid">
@@ -169,7 +171,6 @@
             <button id="refreshStatsBtn">🔄 Refresh Stats</button>
         </div>
 
-        <!-- Admin AI Chat Tester -->
         <div class="card">
             <h3>🤖 Admin AI Chat Tester (same as user experience)</h3>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
@@ -193,7 +194,6 @@
     </div>
 </div>
 
-<!-- Forgot password modal -->
 <div id="forgotModal" class="modal-overlay" style="display:none;">
     <div class="modal-box">
         <h2>🔑 Reset Admin Password</h2>
@@ -220,7 +220,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+            let msg = await res.text();
+            try { const j = JSON.parse(msg); msg = j.error || msg; } catch (_) {}
+            throw new Error(msg);
+        }
         return res.json();
     }
     async function apiPut(endpoint, data) {
@@ -250,11 +254,10 @@
     let adminMessagesHistory = [];
     let adminAttachedFiles = [];
 
-    // ===== NEW: Earnings state (fake, persisted in localStorage) =====
-    let earningsBalance = parseFloat(localStorage.getItem('adminEarningsBalance') || '0');
-    let withdrawals = JSON.parse(localStorage.getItem('adminWithdrawals') || '[]');
+    // Earnings — REAL, loaded from server (MongoDB)
+    let earningsBalance = 0;
+    let withdrawals = [];
 
-    // FIX: imgStore avoids embedding full base64 data URIs in onclick attributes
     const imgStore = {};
     let imgStoreCounter = 0;
     window.downloadImage = function(imgId) {
@@ -284,7 +287,6 @@
         pendingBans = await apiGet('/api/pendingBans');
     }
 
-    // Stats
     async function refreshStats() {
         try {
             const stats = await apiGet('/api/admin/stats');
@@ -296,7 +298,6 @@
         } catch(e) { console.warn('Stats refresh failed:', e.message); }
     }
 
-    // Render modules
     async function renderModules() {
         const container = document.getElementById("modulesList");
         container.innerHTML = "";
@@ -358,7 +359,6 @@
         }
     }
 
-    // User select and info
     async function renderUserSelect() {
         const select = document.getElementById("userSelect");
         select.innerHTML = "";
@@ -414,7 +414,6 @@
         }
     }
 
-    // BUGS
     async function renderBugs() {
         const container = document.getElementById("bugsList");
         container.innerHTML = "";
@@ -520,7 +519,6 @@
         });
     }
 
-    // ADMIN CHAT TESTER
     async function callChatAPI(module_id, messages, deepThink) {
         const res = await fetch('/api/chat', {
             method: 'POST',
@@ -541,7 +539,7 @@
             });
             const data = await res.json();
             if (data.success) return data.image;
-        } catch(e) { /* fall through to pollinations */ }
+        } catch(e) { /* fall through */ }
         const fallback = await fetch('/api/fallback/image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -707,7 +705,7 @@
         });
     }
 
-    // IMAGE SETTINGS & PASSWORD CHANGE
+    // ---------- IMAGE SETTINGS ----------
     async function loadImageSettings() {
         try {
             const settings = await apiGet('/api/admin/settings');
@@ -745,7 +743,7 @@
         setTimeout(() => statusEl.innerText = "", 3000);
     };
 
-    // ===== NEW: Video Settings =====
+    // ---------- VIDEO SETTINGS ----------
     async function loadVideoSettings() {
         try {
             const settings = await apiGet('/api/admin/settings');
@@ -805,7 +803,7 @@
         setTimeout(() => statusEl.innerText = "", 3000);
     };
 
-    // USER MANAGEMENT ACTIONS
+    // ---------- USER ACTIONS ----------
     document.getElementById("grantChat10").onclick = async () => {
         let sel = document.getElementById("userSelect").value;
         if (!sel) return;
@@ -865,7 +863,7 @@
         await refreshAll();
     };
 
-    // SYSTEM ACTIONS
+    // ---------- SYSTEM ACTIONS ----------
     document.getElementById("resetAllChatUsage").onclick = async () => {
         if (!confirm("Reset daily chat usage counters for ALL users?")) return;
         await apiDelete('/api/chatUsage');
@@ -930,7 +928,7 @@
 
     document.getElementById("refreshStatsBtn").onclick = () => refreshStats();
 
-    // ADD MODULE PRESETS
+    // ---------- ADD MODULE PRESETS ----------
     document.getElementById("addFlash").onclick = async () => {
         let primaryKey = prompt("Groq API Key (gsk_)");
         if (!primaryKey) return;
@@ -978,58 +976,61 @@
         await refreshAll();
     };
 
-    // ===== NEW: Earnings Functions =====
-    function saveEarningsToStorage() {
-        localStorage.setItem('adminEarningsBalance', earningsBalance.toFixed(2));
-    }
-
+    // ---------- REAL EARNINGS (server-backed) ----------
     function updateEarningsDisplay() {
-        document.getElementById('earningsBalance').innerText = `$${earningsBalance.toFixed(2)}`;
-    }
-
-    function loadEarnings() {
-        earningsBalance = parseFloat(localStorage.getItem('adminEarningsBalance') || '0');
-        withdrawals = JSON.parse(localStorage.getItem('adminWithdrawals') || '[]');
-        updateEarningsDisplay();
-        renderWithdrawHistory();
+        document.getElementById('earningsBalance').innerText = `$${Number(earningsBalance).toFixed(2)}`;
     }
 
     function renderWithdrawHistory() {
         const container = document.getElementById('withdrawHistory');
-        if (!withdrawals.length) {
+        if (!withdrawals || !withdrawals.length) {
             container.innerHTML = '<i>No withdrawals yet.</i>';
             return;
         }
-        container.innerHTML = withdrawals.map(w => `
+        const labels = {
+            amazon: '🛒 Amazon Gift Card',
+            playstore: '📱 Google Play',
+            upi: '💳 UPI Transfer',
+            paypal: '💵 PayPal',
+            bank: '🏦 Bank Transfer'
+        };
+        container.innerHTML = withdrawals.map(w => {
+            const methodLabel = labels[w.method] || w.method;
+            return `
             <div class="withdraw-item">
-                <strong>${escapeHtml(w.method)}</strong> - $${w.amount.toFixed(2)}<br>
-                <small>${escapeHtml(w.detail)}</small><br>
-                <small style="color:#10b981;">Status: ${escapeHtml(w.status)}</small><br>
+                <strong>${escapeHtml(methodLabel)}</strong> — $${Number(w.amount).toFixed(2)}<br>
+                <small>${escapeHtml(w.detail || '')}</small><br>
+                <small style="color:#10b981;">Status: ${escapeHtml(w.status || 'Success')}</small><br>
                 <small>${new Date(w.timestamp).toLocaleString()}</small>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
-    function generateWithdrawalDetail(method) {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        const rand = length => Array.from({length}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
-        switch(method) {
-            case 'amazon':
-                return `Amazon Code: AMZ-${rand(4)}-${rand(6)}-${rand(4)}`;
-            case 'playstore':
-                return `Google Play Code: GP-${rand(4)}-${rand(6)}-${rand(4)}`;
-            case 'upi':
-                return `UPI Ref: UPI${Date.now()}`;
-            case 'paypal':
-                return `PayPal Transaction ID: PP${Date.now()}`;
-            case 'bank':
-                return `Bank Ref: BK${Date.now()}`;
-            default:
-                return 'N/A';
+    async function loadEarnings() {
+        try {
+            const data = await apiGet('/api/admin/earnings');
+            earningsBalance = Number(data.balance) || 0;
+            withdrawals = data.withdrawals || [];
+            updateEarningsDisplay();
+            renderWithdrawHistory();
+            if (data.stats) {
+                const statsEl = document.getElementById('earningsLiveStats');
+                if (statsEl) {
+                    statsEl.innerHTML = `
+                        💬 ${data.stats.totalChats} chats ·
+                        🎬 ${data.stats.totalVideos} videos ·
+                        👥 ${data.stats.userCount} users ·
+                        🔑 ${data.stats.totalFreeKeys} free keys
+                    `;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load earnings:', e.message);
+            const statsEl = document.getElementById('earningsLiveStats');
+            if (statsEl) statsEl.innerHTML = `<span style="color:#ef4444;">Failed to load: ${escapeHtml(e.message)}</span>`;
         }
     }
 
-    // Earnings event handlers
     document.getElementById('editEarningsBtn').onclick = () => {
         document.getElementById('earningsEditArea').style.display = 'block';
         document.getElementById('earningsInput').value = earningsBalance;
@@ -1039,22 +1040,34 @@
         document.getElementById('earningsEditArea').style.display = 'none';
     };
 
-    document.getElementById('saveEarningsBtn').onclick = () => {
+    document.getElementById('saveEarningsBtn').onclick = async () => {
         const newVal = parseFloat(document.getElementById('earningsInput').value);
         if (isNaN(newVal) || newVal < 0) {
             alert('Please enter a valid non-negative number.');
             return;
         }
-        earningsBalance = newVal;
-        saveEarningsToStorage();
-        updateEarningsDisplay();
-        document.getElementById('earningsEditArea').style.display = 'none';
+        const pwd = prompt('Confirm admin password to save new balance:');
+        if (!pwd) return;
+        try {
+            const res = await apiPost('/api/admin/earnings', { password: pwd, balance: newVal });
+            if (res.success) {
+                earningsBalance = res.balance;
+                updateEarningsDisplay();
+                document.getElementById('earningsEditArea').style.display = 'none';
+                await loadEarnings();
+                alert('✅ Balance updated and saved to database.');
+            }
+        } catch (e) {
+            alert('Failed: ' + e.message);
+        }
     };
 
-    document.getElementById('withdrawBtn').onclick = () => {
+    document.getElementById('refreshEarningsBtn').onclick = () => loadEarnings();
+
+    document.getElementById('withdrawBtn').onclick = async () => {
         const method = document.getElementById('withdrawMethod').value;
         const amount = parseFloat(document.getElementById('withdrawAmount').value);
-        let detail = document.getElementById('withdrawDetail').value.trim();
+        const detail = document.getElementById('withdrawDetail').value.trim();
 
         if (isNaN(amount) || amount <= 0) {
             alert('Enter a valid withdrawal amount.');
@@ -1064,39 +1077,43 @@
             alert('Insufficient earnings balance.');
             return;
         }
-        if (!detail) {
-            detail = generateWithdrawalDetail(method);
-        } else {
-            detail = `${method.toUpperCase()} - ${detail}`;
+        const pwd = prompt('Confirm admin password to process withdrawal:');
+        if (!pwd) return;
+
+        try {
+            const res = await apiPost('/api/admin/withdraw', {
+                password: pwd,
+                method,
+                amount,
+                detail
+            });
+            if (res.success) {
+                earningsBalance = res.balance;
+                updateEarningsDisplay();
+                document.getElementById('withdrawAmount').value = '';
+                document.getElementById('withdrawDetail').value = '';
+                await loadEarnings();
+                alert(`✅ Withdrawal of $${amount.toFixed(2)} processed and saved to database.`);
+            }
+        } catch (e) {
+            alert('Withdrawal failed: ' + e.message);
         }
-
-        // Deduct from balance
-        earningsBalance -= amount;
-        saveEarningsToStorage();
-        updateEarningsDisplay();
-
-        // Add to history
-        withdrawals.unshift({
-            method: method,
-            amount: amount,
-            detail: detail,
-            status: 'Success',
-            timestamp: new Date().toISOString()
-        });
-        localStorage.setItem('adminWithdrawals', JSON.stringify(withdrawals));
-        renderWithdrawHistory();
-
-        // Clear inputs
-        document.getElementById('withdrawAmount').value = '';
-        document.getElementById('withdrawDetail').value = '';
-        alert(`✅ Withdrawal of $${amount.toFixed(2)} processed successfully.\n${detail}`);
     };
 
-    // REFRESH ALL
-    async function refreshAll() {
-        // Load fake earnings from localStorage
-        loadEarnings();
+    document.getElementById('clearWithdrawHistoryBtn').onclick = async () => {
+        if (!confirm('⚠️ Clear all withdrawal history? This does NOT restore the balance.')) return;
+        try {
+            await apiDelete('/api/admin/withdrawals');
+            await loadEarnings();
+            alert('✅ Withdrawal history cleared.');
+        } catch (e) {
+            alert('Failed: ' + e.message);
+        }
+    };
 
+    // ---------- REFRESH ALL ----------
+    async function refreshAll() {
+        await loadEarnings();
         await loadAllData();
         await renderModules();
         await renderUserSelect();
@@ -1110,7 +1127,7 @@
         await refreshStats();
     }
 
-    // ADMIN ABUSE DETECTION (right-click / devtools)
+    // ---------- ADMIN ABUSE DETECTION ----------
     let adminAbuseScore = 0;
     function addAdminAbuseScore(points, reason) {
         adminAbuseScore += points;
@@ -1139,10 +1156,9 @@
         }
     });
 
-    // AUTO-REFRESH STATS
     let statsInterval = null;
 
-    // ======== FORGOT PASSWORD MODAL ========
+    // ---------- FORGOT PASSWORD MODAL ----------
     const forgotModal = document.getElementById('forgotModal');
     const forgotLink = document.getElementById('forgotPwdLink');
     const forgotCloseBtn = document.getElementById('forgotCloseBtn');
@@ -1189,7 +1205,7 @@
         forgotSendBtn.disabled = false;
     };
 
-    // LOGIN
+    // ---------- LOGIN ----------
     document.getElementById("adminPassword").addEventListener("keypress", (e) => {
         if (e.key === "Enter") document.getElementById("adminLoginBtn").click();
     });
