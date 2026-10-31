@@ -223,6 +223,7 @@ let abuseWarningShown=false;
 let messageIdCounter=0;
 const messageContentStore={};
 let currentChatId=null;
+let isGuestMode=false;
 
 function escapeHtml(str){const map={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};return String(str).replace(/[&<>"']/g,m=>map[m])}
 function smartScroll(el){if(!el)return;const threshold=120;if(el.scrollHeight-el.scrollTop-el.clientHeight<threshold)el.scrollTop=el.scrollHeight}
@@ -231,7 +232,7 @@ function showToast(msg,type='info'){const t=document.createElement('div');const 
 
 /* ABUSE */
 async function addAbuseScore(points,reason,context){
-  if(!currentUser)return;
+  if(!currentUser||isGuestMode)return;
   abuseScore=Math.min(100,abuseScore+points);
   try{
     await apiPost('/api/pendingBans',{email:currentUser.email,username:currentUser.username,score:abuseScore,reason,context:(context||'').slice(0,200),timestamp:Date.now(),reviewed:false});
@@ -370,6 +371,7 @@ window.copyCode=async function(id){const d=codeStore[id];if(!d)return;try{await 
 window.debugCode=async function(id){
   const d=codeStore[id];if(!d)return;
   if(isProcessing){showToast('Please wait for current reply to finish','warning');return}
+  if(isGuestMode){showToast('Sign up to use Debug','warning');return}
   const btn=document.querySelector(`.code-block-wrapper[data-codeid="${id}"] .code-actions button:last-child`);
   if(btn)btn.disabled=true;const orig=btn?btn.textContent:'Debug';if(btn)btn.textContent='Debugging…';
   setProcessing(true);
@@ -396,6 +398,7 @@ function showFullOutput(content){
 /* REGENERATE */
 async function regenerateReply(){
   if(isProcessing||!currentUser)return;
+  if(isGuestMode){showToast('Sign up to regenerate replies','warning');return}
   while(messagesHistory.length>0&&messagesHistory[messagesHistory.length-1].role==='assistant')messagesHistory.pop();
   if(!messagesHistory.length){showToast('Nothing to regenerate','warning');return}
   const container=document.getElementById('messagesContainer');
@@ -430,7 +433,7 @@ function _addAIMessageInstant(content,isHtml=false,skipHistory=false){
   if(!skipHistory)messagesHistory.push({role:'assistant',content});
 }
 
-/* TYPING — 4-phase schedule */
+/* TYPING */
 function getTypingDelay(wordIndex){
   if(wordIndex<21)return 1000/7;
   if(wordIndex<61)return 1000/10;
@@ -459,7 +462,7 @@ async function typeInto(text,targetEl,isAborted){
   }
 }
 
-/* STREAMING AI MESSAGE */
+/* STREAMING */
 let currentTypingAbort=null;
 async function streamAIMessage(content){
   if(currentTypingAbort){currentTypingAbort();currentTypingAbort=null}
@@ -553,7 +556,7 @@ function showTyping(){
 
 /* ACTIVITY */
 let activityInterval=null;
-function startActivityTracking(){if(activityInterval)clearInterval(activityInterval);activityInterval=setInterval(async()=>{if(currentUser)await apiPost('/api/user-activity',{email:currentUser.email})},5*60*1000)}
+function startActivityTracking(){if(activityInterval)clearInterval(activityInterval);activityInterval=setInterval(async()=>{if(currentUser&&!isGuestMode)await apiPost('/api/user-activity',{email:currentUser.email})},5*60*1000)}
 
 function setProcessing(p){
   isProcessing=p;
@@ -606,6 +609,23 @@ async function sendMessage(userText,forceImage=false,forceVideo=false){
   setProcessing(true);
   const welcome=document.getElementById('welcomeScreen');if(welcome)welcome.remove();
   try{
+    // Guest: only plain chat, no image/video/tools
+    if(isGuestMode){
+      addUserMessage(userText);
+      const typing=showTyping();
+      let reply='';let isErr=false;
+      try{
+        const res=await fetch('/api/guest/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:messagesHistory.slice(-6)})});
+        const data=await res.json();
+        if(!data.success)throw new Error(data.error||'Guest chat error');
+        reply=data.reply;
+      }catch(e){reply=e.message;isErr=true}
+      finally{if(typing)typing.remove()}
+      if(isErr)addAIMessage(reply,false,false,true);
+      else await addAIMessage(reply,false,true);
+      return;
+    }
+
     const willVideo=forceVideo||(!forceImage&&liveVideoMode&&isVideoRequest(userText));
     const willImage=(forceImage||(liveImageMode&&isImageRequest(userText)))&&!willVideo;
     if(willVideo){
@@ -669,14 +689,22 @@ function renderFileBadges(){
 async function renderTournaments(){
   const c=document.getElementById('tournamentsContainer');if(!c)return;
   if(!tournaments.length){c.innerHTML='<i style="color:var(--text-muted);font-size:.78rem;">No active tournaments.</i>';return}
-  c.innerHTML=tournaments.map(t=>`<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:.6rem .75rem;margin-bottom:.5rem;border:1px solid var(--border-subtle);"><strong style="font-size:.82rem;">${escapeHtml(t.name)}</strong><div style="font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;">${escapeHtml(t.description||'')}</div><div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">Prize: ${escapeHtml(t.prize||'None')}</div>${t.participants?.includes(currentUser.email)?'<span style="color:var(--success);font-size:.68rem;">✓ Joined</span>':`<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent);border:none;border-radius:var(--radius-full);padding:.2rem .7rem;color:#1a1917;font-size:.7rem;cursor:pointer;margin-top:.3rem;min-height:28px;font-weight:600;">Join</button>`}</div>`).join('');
+  c.innerHTML=tournaments.map(t=>`<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:.6rem .75rem;margin-bottom:.5rem;border:1px solid var(--border-subtle);"><strong style="font-size:.82rem;">${escapeHtml(t.name)}</strong><div style="font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;">${escapeHtml(t.description||'')}</div><div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">Prize: ${escapeHtml(t.prize||'None')}</div>${t.participants?.includes(currentUser?.email)?'<span style="color:var(--success);font-size:.68rem;">✓ Joined</span>':`<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent);border:none;border-radius:var(--radius-full);padding:.2rem .7rem;color:#1a1917;font-size:.7rem;cursor:pointer;margin-top:.3rem;min-height:28px;font-weight:600;">Join</button>`}</div>`).join('');
   c.querySelectorAll('.join-tournament-btn').forEach(btn=>{
-    btn.onclick=async()=>{await joinTournament(btn.dataset.id);await loadAllData();renderTournaments()};
+    btn.onclick=async()=>{
+      if(isGuestMode){showToast('Sign up to join tournaments','warning');return}
+      await joinTournament(btn.dataset.id);await loadAllData();renderTournaments();
+    };
   });
 }
 
 /* CHAT HISTORY */
 async function loadChatHistoryList(){
+  if(isGuestMode){
+    const c=document.getElementById('chatHistoryList');
+    if(c)c.innerHTML='<i style="color:var(--text-muted);font-size:.75rem;">Sign up to save chats</i>';
+    return;
+  }
   try{
     const list=await apiGet(`/api/chat-history?email=${encodeURIComponent(currentUser.email)}`);
     const c=document.getElementById('chatHistoryList');if(!c)return;
@@ -722,6 +750,7 @@ async function loadChatHistoryList(){
 let _saveChain=Promise.resolve();
 async function saveCurrentChat(){
   if(!currentUser||!messagesHistory.length)return;
+  if(isGuestMode)return;
   const snapshot=messagesHistory.map(m=>({role:m.role,content:m.content}));
   const titleSnapshot=snapshot[0]?.content?.slice(0,50)||'Untitled chat';
   const emailSnapshot=currentUser.email;
@@ -737,6 +766,7 @@ async function saveCurrentChat(){
 
 /* USER SETTINGS */
 async function openUserSettings(){
+  if(isGuestMode){showToast('Sign up to access account settings','warning');return}
   let userKeys=await loadUserApiKeys(currentUser.email);
   const modal=document.createElement('div');modal.className='modal-overlay';
   modal.innerHTML=`<div class="modal-content"><div class="modal-header"><h3>Account Center</h3><span class="close" id="settingsClose">&times;</span></div><div class="grid-2"><div class="card-sm"><h4>Profile</h4><label>Profile Picture URL</label><input type="text" id="profilePicUrl" placeholder="https://…" value="${escapeHtml(currentUser.profilePic||'')}" /><div class="profile-preview" id="profilePreview" style="background-image:url('${escapeHtml(currentUser.profilePic||'')}');"></div><label>Change Username</label><input type="text" id="newUsername" placeholder="New username" /><button class="btn-sm primary" id="updateUsernameBtn">Update Username</button><button class="btn-sm danger" id="deleteAccountBtn">Delete Account</button></div><div class="card-sm"><h4>Your Stats</h4><div style="font-size:.8rem;line-height:1.8;color:var(--text-secondary);"><div>Extra chat credits: ${currentUser.extraChatCredits||0}</div><div>Extra image credits: ${currentUser.extraImageCredits||0}</div><div>Hours live: ${(currentUser.totalHoursLive||0).toFixed(1)}</div></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>API Keys (max 2)</h4><div class="key-list" id="apiKeysList"></div><button class="btn-sm primary" id="generateApiKeyBtn">+ Generate Key</button><div style="font-size:.62rem;color:var(--text-muted);margin-top:.3rem;">Bearer token · 20 req/day</div></div><div class="card-sm"><h4>Free API Key (100/day)</h4><div id="freeKeyInfo" style="font-size:.75rem;color:var(--text-secondary);"></div><button class="btn-sm success" id="generateFreeKeyBtn">Generate / Regenerate</button><button class="btn-sm danger" id="revokeFreeKeyBtn" style="display:none;">Revoke</button><div class="free-key-box" id="freeKeyDisplay" style="display:none;"><strong>Key:</strong> <code id="freeKeyValue"></code><br><strong>Endpoint:</strong> <code>https://vrythos-server.onrender.com/api/external/chat</code></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>Report Bug / Request Credits</h4><textarea id="bugReportText" placeholder="Describe issue or request…" rows="2"></textarea><button class="btn-sm" id="submitBugBtn">Submit Report</button></div><div class="card-sm"><h4>Legal</h4><div style="font-size:.72rem;color:var(--text-secondary);line-height:1.6;">By using Vrythos AI, you agree to our <a href="#" style="color:var(--accent);">Terms</a> and <a href="#" style="color:var(--accent);">Privacy Policy</a>. All data is securely stored.</div><button class="btn-sm" id="logoutBtn" style="margin-top:.6rem;background:#374151;border:none;color:#fff;">Logout</button></div></div></div>`;
@@ -834,7 +864,7 @@ function renderWelcomeScreen(){
   });
 }
 
-/* BUILD UI — every template element guaranteed present */
+/* BUILD UI */
 async function buildUI(){
   document.getElementById('app-root').innerHTML=`
     <div class="app">
@@ -912,10 +942,22 @@ async function buildUI(){
     }
   });
 
-  document.getElementById('deepThinkToggle').onchange=e=>{deepThink=e.target.checked;syncToolMenu();renderActiveTools()};
-  document.getElementById('liveImageToggle').onchange=e=>{liveImageMode=e.target.checked;syncToolMenu();renderActiveTools()};
-  document.getElementById('liveVideoToggle').onchange=e=>{liveVideoMode=e.target.checked;syncToolMenu();renderActiveTools()};
-  document.getElementById('bestCodingToggle').onchange=e=>{bestCodingMode=e.target.checked;syncToolMenu();renderActiveTools()};
+  document.getElementById('deepThinkToggle').onchange=e=>{
+    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Deep Think','warning');return}
+    deepThink=e.target.checked;syncToolMenu();renderActiveTools()
+  };
+  document.getElementById('liveImageToggle').onchange=e=>{
+    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Live Image','warning');return}
+    liveImageMode=e.target.checked;syncToolMenu();renderActiveTools()
+  };
+  document.getElementById('liveVideoToggle').onchange=e=>{
+    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Live Video','warning');return}
+    liveVideoMode=e.target.checked;syncToolMenu();renderActiveTools()
+  };
+  document.getElementById('bestCodingToggle').onchange=e=>{
+    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Best Coding','warning');return}
+    bestCodingMode=e.target.checked;syncToolMenu();renderActiveTools()
+  };
 
   document.getElementById('fileInput').onchange=e=>{
     if(e.target.files){
@@ -943,6 +985,7 @@ async function buildUI(){
 
   toolMenu.querySelectorAll('.tool-toggle').forEach(row=>{
     row.onclick=()=>{
+      if(isGuestMode){showToast('Sign up to use this tool','warning');return}
       const tool=row.dataset.tool;
       if(tool==='deep'){deepThink=!deepThink;document.getElementById('deepThinkToggle').checked=deepThink}
       else if(tool==='coding'){bestCodingMode=!bestCodingMode;document.getElementById('bestCodingToggle').checked=bestCodingMode}
@@ -955,6 +998,7 @@ async function buildUI(){
   toolMenu.querySelectorAll('.tool-action').forEach(btn=>{
     btn.onclick=()=>{
       if(isProcessing&&btn.dataset.action!=='clear'){showToast('Please wait for the current reply to finish','warning');return}
+      if(isGuestMode && btn.dataset.action!=='clear'){showToast('Sign up to use this tool','warning');return}
       toolMenu.classList.remove('open');plusBtn.classList.remove('open');
       const action=btn.dataset.action;const txt=ta.value.trim();
       if(action==='image'){sendMessage(txt||'cyberpunk city at night, neon',true);ta.value='';cc.textContent='0 characters'}
@@ -976,7 +1020,7 @@ async function buildUI(){
   syncToolMenu();
   renderActiveTools();
 
-  document.getElementById('sidebarUsername').textContent=currentUser.username;
+  document.getElementById('sidebarUsername').textContent=isGuestMode?'Guest (limited)':currentUser.username;
   await renderTournaments();
   await loadChatHistoryList();
   renderWelcomeScreen();
@@ -985,7 +1029,7 @@ async function buildUI(){
   window.addEventListener('resize',()=>{if(window.innerWidth>820){sidebar.classList.remove('open');overlay.classList.remove('active')}});
 }
 
-/* Global tool menu close handler — attached ONCE, never leaks */
+/* Global tool menu close — attached ONCE */
 document.addEventListener('click',e=>{
   const tm=document.getElementById('toolMenu');
   const pb=document.getElementById('plusBtn');
@@ -1000,6 +1044,7 @@ window.handleGoogleLogin=async(response)=>{
   try{
     const res=await apiPost('/api/auth/google',{token:response.credential});
     if(res.success){
+      isGuestMode=false;
       currentUser={email:res.email,username:res.username,name:res.name,profilePic:res.profilePic,extraChatCredits:res.extraChatCredits||0,extraImageCredits:res.extraImageCredits||0,banned:res.banned||false,totalHoursLive:res.totalHoursLive||0};
       localStorage.setItem('vrythos_current_session',res.email);
       await buildUI();
@@ -1017,6 +1062,7 @@ async function initAuth(){
       const users=await loadUsers();
       const dbUser=users.find(u=>u.email===saved&&!u.banned);
       if(dbUser){
+        isGuestMode=false;
         currentUser={email:dbUser.email,username:dbUser.username,name:dbUser.name||'',profilePic:dbUser.profilePic||'',passwordHash:dbUser.passwordHash||null,extraChatCredits:dbUser.extraChatCredits||0,extraImageCredits:dbUser.extraImageCredits||0,banned:dbUser.banned||false,totalHoursLive:dbUser.totalHoursLive||0,authProvider:dbUser.authProvider||'email'};
         await loadAllData();await buildUI();return;
       }
@@ -1038,6 +1084,7 @@ async function initAuth(){
           <div class="auth-forgot" id="forgotPasswordBtn">Forgot password?</div>
           <button class="auth-btn" id="doLoginBtn">Sign in</button>
           <div class="auth-switch" id="showRegisterBtn">Don't have an account?<strong>Sign up</strong></div>
+          <div class="auth-switch" id="guestBtn" style="color:var(--text-secondary);border-top:1px solid var(--border-subtle);padding-top:1rem;margin-top:1rem;">👤 Continue as Guest (no signup)</div>
         </div>
         <div id="registerForm" class="hidden">
           <div class="auth-form-group"><input type="text" class="auth-input" id="regUsername" placeholder="Username" /></div>
@@ -1093,6 +1140,7 @@ async function initAuth(){
     try{
       const res=await apiPost('/api/login',{email,password:pwd,recaptchaToken});
       if(res.success){
+        isGuestMode=false;
         currentUser={email:res.email,username:res.username,name:res.name||'',profilePic:res.profilePic||'',passwordHash:null,extraChatCredits:res.extraChatCredits||0,extraImageCredits:res.extraImageCredits||0,banned:res.banned||false,totalHoursLive:res.totalHoursLive||0,authProvider:res.authProvider||'email'};
         localStorage.setItem('vrythos_current_session',res.email);
         await loadAllData();await buildUI();
@@ -1120,6 +1168,14 @@ async function initAuth(){
     if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
   };
   document.getElementById('forgotPasswordBtn').onclick=()=>{showToast('Password reset not available. Use Google login or contact admin.','warning')};
+
+  document.getElementById('guestBtn').onclick=async()=>{
+    isGuestMode=true;
+    currentUser={email:null,username:'Guest',name:'Guest User',profilePic:'',passwordHash:null,extraChatCredits:0,extraImageCredits:0,banned:false,totalHoursLive:0,isGuest:true};
+    await loadAllData();
+    await buildUI();
+    showToast('Guest mode — 10 messages/hour. Sign up to save chats.','info');
+  };
 
   document.getElementById('doRegisterBtn').onclick=async()=>{
     const username=document.getElementById('regUsername').value.trim();
@@ -1150,7 +1206,7 @@ async function initAuth(){
   };
 }
 
-/* BOOT — improved error message */
+/* BOOT */
 (async function boot(){
   try{await loadAllData();await initAuth()}
   catch(err){
