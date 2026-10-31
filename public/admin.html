@@ -1,1241 +1,947 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vrythos · Admin Panel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: monospace, system-ui; background: #0a0c15; color: #f0f3fa; padding: 2rem; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { margin-bottom: 1rem; color: #8b5cf6; }
-        h2, h3 { margin: 1.5rem 0 0.5rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.3rem; }
-        .card { background: #11141f; border: 1px solid #1e293b; border-radius: 1rem; padding: 1rem; margin-bottom: 1rem; }
-        button, select, input, textarea { background: #0a0c15; border: 1px solid #1e293b; padding: 0.5rem 1rem; border-radius: 2rem; color: white; cursor: pointer; margin: 0.2rem; }
-        button { background: #2d3748; }
-        button.danger { background: #7f1a1a; }
-        button.success { background: #2e5c3e; }
-        .module-item, .user-item, .bug-item { background: #0e111b; margin: 0.5rem 0; padding: 0.7rem; border-radius: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
-        .chat-container { background: #0a0c15; border-radius: 1rem; padding: 1rem; margin-top: 1rem; max-height: 500px; overflow-y: auto; }
-        .message { display: flex; gap: 12px; margin-bottom: 12px; max-width: 80%; }
-        .admin-user-message { justify-content: flex-end; flex-direction: row-reverse; margin-left: auto; }
-        .admin-bubble { padding: 8px 14px; border-radius: 20px; background: #1e293b; }
-        .admin-user-bubble { background: #7c3aed; }
-        .avatar-small { width: 28px; height: 28px; border-radius: 50%; background: #8b5cf6; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .file-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-        .file-tag { background: #2d3748; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
-        .user-profile-details { background: #0e111b; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 13px; }
-        .user-profile-details pre { background: #0a0c15; padding: 8px; border-radius: 12px; overflow-x: auto; font-size: 11px; }
-        .stats-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; margin: 8px 0; }
-        .stat-card { background: #0e111b; padding: 8px 12px; border-radius: 12px; flex: 1; text-align: center; }
-        .warning { color: #f97316; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-        .modal-box { background: #11141f; border: 1px solid #8b5cf6; border-radius: 2rem; padding: 2rem; max-width: 450px; width: 90%; }
-        .modal-box h2 { margin-top: 0; }
-        .modal-box input { width: 100%; margin-bottom: 1rem; }
-        .modal-box button { width: 100%; }
-        .forgot-link { color: #8e9dc2; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 8px; display: inline-block; }
-        .forgot-link:hover { color: #c084fc; }
-        .video-settings-card input { width: 100%; margin-bottom: 8px; }
-        .earning-balance { font-size: 1.5rem; font-weight: bold; color: #10b981; }
-        .withdraw-item { background: #0e111b; border-radius: 12px; padding: 8px; margin: 6px 0; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vrythos · Admin Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:monospace,system-ui;background:#0a0c15;color:#f0f3fa;padding:2rem}
+.container{max-width:1400px;margin:0 auto}
+h1{margin-bottom:1rem;color:#8b5cf6}
+h2,h3{margin:1.5rem 0 .5rem;border-bottom:1px solid #1e293b;padding-bottom:.3rem}
+.card{background:#11141f;border:1px solid #1e293b;border-radius:1rem;padding:1rem;margin-bottom:1rem}
+button,select,input,textarea{background:#0a0c15;border:1px solid #1e293b;padding:.5rem 1rem;border-radius:2rem;color:white;cursor:pointer;margin:.2rem;font-family:monospace}
+button{background:#2d3748}
+button.danger{background:#7f1a1a}
+button.success{background:#2e5c3e}
+.module-item,.user-item,.bug-item{background:#0e111b;margin:.5rem 0;padding:.7rem;border-radius:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+.grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(350px,1fr))}
+.chat-container{background:#0a0c15;border-radius:1rem;padding:1rem;margin-top:1rem;max-height:500px;overflow-y:auto}
+.message{display:flex;gap:12px;margin-bottom:12px;max-width:80%}
+.admin-user-message{justify-content:flex-end;flex-direction:row-reverse;margin-left:auto}
+.admin-bubble{padding:8px 14px;border-radius:20px;background:#1e293b}
+.admin-user-bubble{background:#7c3aed}
+.avatar-small{width:28px;height:28px;border-radius:50%;background:#8b5cf6;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.file-badge{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.file-tag{background:#2d3748;padding:4px 10px;border-radius:20px;font-size:12px;display:inline-flex;align-items:center;gap:6px}
+.user-profile-details{background:#0e111b;border-radius:16px;padding:12px;margin-top:12px;font-size:13px}
+.user-profile-details pre{background:#0a0c15;padding:8px;border-radius:12px;overflow-x:auto;font-size:11px}
+.stats-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between;margin:8px 0}
+.stat-card{background:#0e111b;padding:8px 12px;border-radius:12px;flex:1;text-align:center;min-width:100px}
+.warning{color:#f97316}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:2000}
+.modal-box{background:#11141f;border:1px solid #8b5cf6;border-radius:2rem;padding:2rem;max-width:450px;width:90%}
+.modal-box h2{margin-top:0}
+.modal-box input{width:100%;margin-bottom:1rem}
+.modal-box button{width:100%}
+.forgot-link{color:#8e9dc2;cursor:pointer;font-size:.85rem;text-decoration:underline;margin-top:8px;display:inline-block}
+.forgot-link:hover{color:#c084fc}
+.video-settings-card input{width:100%;margin-bottom:8px}
+.earning-balance{font-size:1.5rem;font-weight:bold;color:#10b981}
+.withdraw-item{background:#0e111b;border-radius:12px;padding:8px;margin:6px 0}
+.badge{padding:.15rem .5rem;border-radius:9999px;font-size:.7rem}
+.badge.live{background:#065f46}
+.badge.pending{background:#78350f}
+</style>
 </head>
 <body>
 <div class="container">
-    <h1>🔐 Vrythos Admin Portal</h1>
-    <div id="authArea">
-        <input type="password" id="adminPassword" placeholder="Master Password">
-        <button id="adminLoginBtn">Login</button>
-        <div style="margin-top: 8px;">
-            <span class="forgot-link" id="forgotPwdLink">🔑 Forgot admin password?</span>
-        </div>
-        <div id="adminMsg" style="color:#f97316; margin-top: 8px;"></div>
-    </div>
-    <div id="adminContent" style="display:none;">
-        <div class="stats-row" id="statsContainer">
-            <div class="stat-card">Live: <span id="liveUsers">0</span></div>
-            <div class="stat-card">Daily: <span id="dailyUsers">0</span></div>
-            <div class="stat-card">Weekly: <span id="weeklyUsers">0</span></div>
-            <div class="stat-card">Monthly: <span id="monthlyUsers">0</span></div>
-            <div class="stat-card">Total Accounts: <span id="totalAccounts">0</span></div>
-        </div>
+<h1>🔐 Vrythos Admin Portal</h1>
 
-        <div class="card" id="earningsCard">
-            <h3>💰 Earnings &amp; Withdrawals (Admin — REAL, saved in MongoDB)</h3>
-            <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
-                <div class="stat-card" style="flex: 0 0 auto;">
-                    <span style="color:#8e9dc2;">Total Earnings:</span><br>
-                    <span id="earningsBalance" class="earning-balance">$0.00</span>
-                </div>
-                <button id="editEarningsBtn" style="background:#2d3748;">✏️ Edit Earnings</button>
-                <button id="refreshEarningsBtn" style="background:#2d3748;">🔄 Refresh</button>
-            </div>
-            <div id="earningsLiveStats" style="font-size:12px; color:#8e9dc2; margin-bottom:8px;">
-                Loading platform stats…
-            </div>
-            <div id="earningsEditArea" style="display:none; margin-bottom: 12px;">
-                <input type="number" id="earningsInput" placeholder="Enter new earnings amount" step="0.01" min="0" style="width: 200px;">
-                <button id="saveEarningsBtn" class="success">Save</button>
-                <button id="cancelEarningsBtn" style="background:#555;">Cancel</button>
-            </div>
-
-            <h4>Withdraw Funds</h4>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-                <select id="withdrawMethod" style="min-width: 160px;">
-                    <option value="amazon">Amazon Gift Card Code</option>
-                    <option value="playstore">Google Play Store Code</option>
-                    <option value="upi">UPI Transfer</option>
-                    <option value="paypal">PayPal</option>
-                    <option value="bank">Bank Transfer</option>
-                </select>
-                <input type="number" id="withdrawAmount" placeholder="Amount" step="0.01" min="0" style="width: 120px;">
-                <input type="text" id="withdrawDetail" placeholder="UPI ID / Email / etc." style="flex: 1; min-width: 150px;">
-                <button id="withdrawBtn" class="success">Withdraw</button>
-            </div>
-
-            <h4>Withdrawal History (from MongoDB)</h4>
-            <div id="withdrawHistory" style="max-height: 250px; overflow-y: auto; background: #0a0c15; border-radius: 12px; padding: 8px;">
-                <i>No withdrawals yet.</i>
-            </div>
-            <button id="clearWithdrawHistoryBtn" style="background:#7f1a1a; margin-top: 8px;">🗑️ Clear Withdrawal History</button>
-        </div>
-
-        <div class="grid">
-            <div class="card">
-                <h3>🤖 AI Engines (dual‑key + failover)</h3>
-                <div id="modulesList"></div>
-                <button id="addFlash">+ Groq Flash (gsk_)</button>
-                <button id="addGemini">+ Gemini (AIza)</button>
-                <button id="addOpenRouter">+ OpenRouter (sk-or-)</button>
-                <button id="addCloudflare">+ ☁️ Cloudflare Text</button>
-                <button id="addCustom">+ Custom Engine</button>
-            </div>
-            <div class="card">
-                <h3>👥 User Management</h3>
-                <select id="userSelect"></select>
-                <button id="grantChat10">+10 Extra Chat Credits</button>
-                <button id="grantImage5">+5 Extra Image Credits</button>
-                <button id="grantChat50">+50 Extra Chat Credits</button>
-                <button id="banUserBtn">🚫 Ban User</button>
-                <button id="unbanUserBtn">🔓 Unban</button>
-                <button id="deleteUserPermanentlyBtn" style="background:#7f1a1a;">🗑️ Delete User Permanently</button>
-                <div id="userInfo"></div>
-                <div id="userProfileDetails" class="user-profile-details" style="display:none;"></div>
-            </div>
-        </div>
-        <div class="card">
-            <h3>🖼️ Image Generation Settings (Cloudflare SD)</h3>
-            <input type="text" id="cfImageAccountId" placeholder="Cloudflare Account ID">
-            <input type="password" id="cfImageApiToken" placeholder="Cloudflare API Token">
-            <input type="text" id="cfImageModel" placeholder="Model (default: @cf/stabilityai/stable-diffusion-xl-base-1.0)">
-            <button id="saveImageSettings">Save Image Settings</button>
-            <div id="imageSettingsStatus" style="font-size:12px; margin-top:8px;"></div>
-        </div>
-
-        <div class="card video-settings-card">
-            <h3>🎬 Video Generation Settings (Agnes AI)</h3>
-            <input type="password" id="agnesApiKey" placeholder="Agnes API Key (sk-...)" style="width:100%;">
-            <input type="text" id="agnesModel" placeholder="Model (default: agnes-video-v2.0)" value="agnes-video-v2.0" style="width:100%; margin-top:8px;">
-            <button id="saveVideoSettings" style="width:100%; margin-top:8px;">Save Video Settings</button>
-            <div id="videoSettingsStatus" style="font-size:12px; margin-top:8px;"></div>
-        </div>
-
-        <div class="card">
-            <h3>🔐 Admin Password Management</h3>
-            <p>Daily password change limit: <span id="pwdLimitStatus">3 remaining</span></p>
-            <input type="email" id="adminEmail" placeholder="Admin Email (bodare207@gmail.com)" value="bodare207@gmail.com">
-            <input type="password" id="newAdminPwd" placeholder="New password">
-            <button id="requestAdminPwdChange">Request Password Change (send email)</button>
-            <div id="pwdChangeStatus" style="font-size:12px; margin-top:8px;"></div>
-        </div>
-        <div class="card">
-            <h3>🐞 Bug Reports (Real = Grant extra, Fake = Penalty)</h3>
-            <div id="bugsList"></div>
-        </div>
-        <div class="card">
-            <h3>⚠️ Suspicious Abuse Reports (auto-detected)</h3>
-            <div id="abuseList"></div>
-        </div>
-        <div class="card">
-            <h3>🚨 Pending Abuse Reviews (needs admin decision)</h3>
-            <div id="pendingBansList"></div>
-        </div>
-        <div class="card">
-            <h3>📊 System Actions</h3>
-            <button id="resetAllChatUsage">Reset Daily Chat Usage (all users)</button>
-            <button id="clearAllReports">Clear All Reports</button>
-            <button id="exportData">Export All Data (JSON)</button>
-            <button id="hardReset">⚠️ Factory Reset (all data)</button>
-            <button id="refreshStatsBtn">🔄 Refresh Stats</button>
-        </div>
-
-        <div class="card">
-            <h3>🤖 Admin AI Chat Tester (same as user experience)</h3>
-            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
-                <select id="adminModuleSelect"></select>
-                <label><input type="checkbox" id="adminDeepThink"> 🔬 Deep Think</label>
-                <label><input type="checkbox" id="adminLiveImage"> 🎨 Live Image Mode</label>
-                <button id="adminNewChatBtn">+ New Chat</button>
-            </div>
-            <div id="adminMessages" class="chat-container" style="height: 400px; overflow-y: auto; background: #0e111b; padding: 1rem;">
-                <div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">Admin chat ready – test any AI engine below.</div></div>
-            </div>
-            <div style="display: flex; gap: 8px; margin-top: 1rem;">
-                <input type="text" id="adminUserInput" placeholder="Type your message..." style="flex:1;">
-                <button id="adminSendBtn">Send</button>
-                <button id="adminImageGenBtn">🎨 Generate Image</button>
-                <input type="file" id="adminFileInput" multiple style="display:none;" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg">
-                <button id="adminAttachBtn">📎 Attach</button>
-            </div>
-            <div id="adminFilePreview" class="file-badge"></div>
-        </div>
-    </div>
+<div id="authArea">
+    <input type="password" id="adminPassword" placeholder="Master Password">
+    <button id="adminLoginBtn">Login</button>
+    <div style="margin-top:8px"><span class="forgot-link" id="forgotPwdLink">🔑 Forgot admin password?</span></div>
+    <div id="adminMsg" style="color:#f97316;margin-top:8px"></div>
 </div>
 
-<div id="forgotModal" class="modal-overlay" style="display:none;">
+<div id="adminContent" style="display:none">
+    <div class="stats-row">
+        <div class="stat-card">Live: <span id="liveUsers">0</span></div>
+        <div class="stat-card">Daily: <span id="dailyUsers">0</span></div>
+        <div class="stat-card">Weekly: <span id="weeklyUsers">0</span></div>
+        <div class="stat-card">Monthly: <span id="monthlyUsers">0</span></div>
+        <div class="stat-card">Total: <span id="totalAccounts">0</span></div>
+    </div>
+
+    <div class="card" id="earningsCard">
+        <h3>💰 Earnings &amp; Withdrawals (MongoDB-backed)</h3>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+            <div class="stat-card" style="flex:0 0 auto"><span style="color:#8e9dc2">Total:</span><br><span id="earningsBalance" class="earning-balance">$0.00</span></div>
+            <button id="editEarningsBtn">✏️ Edit Earnings</button>
+            <button id="refreshEarningsBtn">🔄 Refresh</button>
+        </div>
+        <div id="earningsLiveStats" style="font-size:12px;color:#8e9dc2;margin-bottom:8px">Loading…</div>
+        <div id="earningsEditArea" style="display:none;margin-bottom:12px">
+            <input type="number" id="earningsInput" step="0.01" min="0" placeholder="New balance" style="width:200px">
+            <button id="saveEarningsBtn" class="success">Save</button>
+            <button id="cancelEarningsBtn">Cancel</button>
+        </div>
+        <h4 style="margin-top:.75rem">Withdraw Funds</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <select id="withdrawMethod" style="min-width:160px">
+                <option value="amazon">Amazon Gift Card</option>
+                <option value="playstore">Google Play</option>
+                <option value="upi">UPI Transfer</option>
+                <option value="paypal">PayPal</option>
+                <option value="bank">Bank Transfer</option>
+            </select>
+            <input type="number" id="withdrawAmount" placeholder="Amount" step="0.01" min="0" style="width:120px">
+            <input type="text" id="withdrawDetail" placeholder="UPI ID / Email / etc." style="flex:1;min-width:150px">
+            <button id="withdrawBtn" class="success">Withdraw</button>
+        </div>
+        <h4 style="margin-top:.75rem">History</h4>
+        <div id="withdrawHistory" style="max-height:250px;overflow-y:auto;background:#0a0c15;border-radius:12px;padding:8px">
+            <i>No withdrawals yet.</i>
+        </div>
+        <button id="clearWithdrawHistoryBtn" class="danger" style="margin-top:8px">🗑️ Clear History</button>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>🤖 AI Engines</h3>
+            <div id="modulesList"></div>
+            <button id="addFlash">+ Groq (gsk_)</button>
+            <button id="addGemini">+ Gemini (AIza)</button>
+            <button id="addOpenRouter">+ OpenRouter (sk-or-)</button>
+            <button id="addCloudflare">+ ☁️ Cloudflare</button>
+            <button id="addCustom">+ Custom</button>
+        </div>
+        <div class="card">
+            <h3>👥 User Management</h3>
+            <select id="userSelect"></select>
+            <button id="grantChat10">+10 Chat</button>
+            <button id="grantChat50">+50 Chat</button>
+            <button id="grantImage5">+5 Image</button>
+            <button id="banUserBtn">🚫 Ban</button>
+            <button id="unbanUserBtn">🔓 Unban</button>
+            <button id="deleteUserPermanentlyBtn" class="danger">🗑️ Delete</button>
+            <div id="userProfileDetails" class="user-profile-details" style="display:none"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>🖼️ Image Settings (Cloudflare)</h3>
+        <input type="text" id="cfImageAccountId" placeholder="Account ID" style="width:100%;margin-bottom:6px">
+        <input type="password" id="cfImageApiToken" placeholder="API Token" style="width:100%;margin-bottom:6px">
+        <input type="text" id="cfImageModel" placeholder="Model (default: SDXL)" style="width:100%;margin-bottom:6px">
+        <button id="saveImageSettings">Save</button>
+        <div id="imageSettingsStatus" style="font-size:12px;margin-top:8px"></div>
+    </div>
+
+    <div class="card video-settings-card">
+        <h3>🎬 Video Settings (Agnes)</h3>
+        <input type="password" id="agnesApiKey" placeholder="Agnes API Key" style="width:100%">
+        <input type="text" id="agnesModel" placeholder="agnes-video-v2.0" value="agnes-video-v2.0" style="width:100%;margin-top:8px">
+        <button id="saveVideoSettings" style="width:100%;margin-top:8px">Save</button>
+        <div id="videoSettingsStatus" style="font-size:12px;margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+        <h3>🔐 Admin Password</h3>
+        <p>Daily limit: <span id="pwdLimitStatus">3 remaining</span></p>
+        <input type="email" id="adminEmail" value="bodare207@gmail.com" style="width:100%;margin-bottom:6px">
+        <input type="password" id="newAdminPwd" placeholder="New password" style="width:100%;margin-bottom:6px">
+        <button id="requestAdminPwdChange">Request Password Change</button>
+        <div id="pwdChangeStatus" style="font-size:12px;margin-top:8px"></div>
+    </div>
+
+    <div class="card"><h3>🐞 Bug Reports</h3><div id="bugsList"></div></div>
+    <div class="card"><h3>⚠️ Abuse Reports</h3><div id="abuseList"></div></div>
+    <div class="card"><h3>🚨 Pending Bans</h3><div id="pendingBansList"></div></div>
+
+    <div class="card">
+        <h3>📊 System Actions</h3>
+        <button id="resetAllChatUsage">Reset Chat Usage</button>
+        <button id="clearAllReports">Clear All Reports</button>
+        <button id="exportData">Export JSON</button>
+        <button id="hardReset" class="danger">⚠️ Factory Reset</button>
+        <button id="refreshStatsBtn">🔄 Refresh Stats</button>
+    </div>
+
+    <div class="card">
+        <h3>🤖 Admin AI Chat Tester</h3>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+            <select id="adminModuleSelect"></select>
+            <label><input type="checkbox" id="adminDeepThink"> 🔬 Deep Think</label>
+            <label><input type="checkbox" id="adminLiveImage"> 🎨 Live Image</label>
+            <button id="adminNewChatBtn">+ New Chat</button>
+        </div>
+        <div id="adminMessages" class="chat-container" style="height:400px;background:#0e111b;padding:1rem">
+            <div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">Admin chat ready.</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap">
+            <input type="text" id="adminUserInput" placeholder="Type message..." style="flex:1">
+            <button id="adminSendBtn">Send</button>
+            <button id="adminImageGenBtn">🎨 Image</button>
+            <input type="file" id="adminFileInput" multiple style="display:none" accept=".txt,.md,.json,.csv,.js,.html,.xml,.png,.jpg,.jpeg">
+            <button id="adminAttachBtn">📎 Attach</button>
+        </div>
+        <div id="adminFilePreview" class="file-badge"></div>
+    </div>
+</div>
+</div>
+
+<div id="forgotModal" class="modal-overlay" style="display:none">
     <div class="modal-box">
         <h2>🔑 Reset Admin Password</h2>
-        <p style="color:#8e9dc2; margin-bottom: 1rem;">A new password will be sent to <strong>bodare207@gmail.com</strong></p>
-        <input type="password" id="forgotNewPwd" placeholder="Enter new password">
+        <p style="color:#8e9dc2;margin-bottom:1rem">New password sent to bodare207@gmail.com</p>
+        <input type="password" id="forgotNewPwd" placeholder="New password">
         <button id="forgotSendBtn">Send Reset Email</button>
-        <button id="forgotCloseBtn" style="background:#555; margin-top: 8px;">Cancel</button>
-        <div id="forgotStatus" style="margin-top: 8px; font-size: 14px;"></div>
+        <button id="forgotCloseBtn" style="background:#555;margin-top:8px">Cancel</button>
+        <div id="forgotStatus" style="margin-top:8px;font-size:14px"></div>
     </div>
 </div>
 
 <script>
-    // ------------------------------------------------------------------
-    // BACKEND API HELPERS
-    // ------------------------------------------------------------------
-    async function apiGet(endpoint) {
-        const res = await fetch(endpoint);
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
+// ========== STATE ==========
+let adminToken = null;   // populated after login
+let modules = [];
+let users = [];
+let bugs = [];
+let abuseReports = [];
+let pendingBans = [];
+let earningsBalance = 0;
+let withdrawals = [];
+let adminSelectedModuleId = null;
+let adminDeepThinkFlag = false;
+let adminLiveImageFlag = false;
+let adminMessagesHistory = [];
+let adminAttachedFiles = [];
+const imgStore = {};
+let imgStoreCounter = 0;
+let statsInterval = null;
+let adminAbuseScore = 0;
+
+// ========== API HELPERS — all send token when available ==========
+function authHeaders() {
+    return adminToken ? { 'X-Admin-Token': adminToken } : {};
+}
+function handle401() {
+    adminToken = null;
+    document.getElementById('authArea').style.display = 'block';
+    document.getElementById('adminContent').style.display = 'none';
+    if (statsInterval) clearInterval(statsInterval);
+    const msgEl = document.getElementById('adminMsg');
+    if (msgEl) msgEl.textContent = 'Session expired. Please log in again.';
+}
+async function apiGet(endpoint) {
+    const res = await fetch(endpoint, { headers: authHeaders() });
+    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+async function apiPost(endpoint, data) {
+    const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(data || {})
+    });
+    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (!res.ok) {
+        let msg = await res.text();
+        try { const j = JSON.parse(msg); msg = j.error || msg; } catch(_) {}
+        throw new Error(msg);
     }
-    async function apiPost(endpoint, data) {
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) {
-            let msg = await res.text();
-            try { const j = JSON.parse(msg); msg = j.error || msg; } catch (_) {}
-            throw new Error(msg);
-        }
-        return res.json();
-    }
-    async function apiPut(endpoint, data) {
-        const res = await fetch(endpoint, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-    }
-    async function apiDelete(endpoint) {
-        const res = await fetch(endpoint, { method: 'DELETE' });
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-    }
+    return res.json();
+}
+async function apiPut(endpoint, data) {
+    const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(data || {})
+    });
+    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+async function apiDelete(endpoint) {
+    const res = await fetch(endpoint, { method: 'DELETE', headers: authHeaders() });
+    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
 
-    // Global data
-    let modules = [];
-    let users = [];
-    let bugs = [];
-    let abuseReports = [];
-    let pendingBans = [];
-    let adminSelectedModuleId = null;
-    let adminDeepThinkFlag = false;
-    let adminLiveImageFlag = false;
-    let adminMessagesHistory = [];
-    let adminAttachedFiles = [];
+// ========== UTILS ==========
+function escapeHtml(str) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(str).replace(/[&<>"']/g, m => map[m]);
+}
+window.downloadImage = function(id) {
+    const url = imgStore[id];
+    if (!url) return;
+    const a = document.createElement('a');
+    a.download = 'vrythos_image.png';
+    a.href = url;
+    a.click();
+};
 
-    // Earnings — REAL, loaded from server (MongoDB)
-    let earningsBalance = 0;
-    let withdrawals = [];
+// ========== LOADERS ==========
+async function loadAllData() {
+    modules = await apiGet('/api/modules');
+    users = await apiGet('/api/users');
+    bugs = await apiGet('/api/bugs');
+    abuseReports = await apiGet('/api/abuse');
+    pendingBans = await apiGet('/api/pendingBans');
+}
 
-    const imgStore = {};
-    let imgStoreCounter = 0;
-    window.downloadImage = function(imgId) {
-        const dataUrl = imgStore[imgId];
-        if (!dataUrl) return;
-        const link = document.createElement('a');
-        link.download = 'vrythos_image.png';
-        link.href = dataUrl;
-        link.click();
-    };
+// ========== STATS ==========
+async function refreshStats() {
+    try {
+        const stats = await apiGet('/api/admin/stats');
+        document.getElementById('liveUsers').textContent = stats.liveUsers;
+        document.getElementById('dailyUsers').textContent = stats.dailyUsers;
+        document.getElementById('weeklyUsers').textContent = stats.weeklyUsers;
+        document.getElementById('monthlyUsers').textContent = stats.monthlyUsers;
+        document.getElementById('totalAccounts').textContent = stats.totalAccounts;
+    } catch(e) { console.warn('Stats failed:', e.message); }
+}
 
-    function escapeHtml(str) {
-        return String(str).replace(/[&<>"]/g, m => {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            if (m === '"') return '&quot;';
-            return m;
-        });
-    }
-
-    async function loadAllData() {
-        modules = await apiGet('/api/modules');
-        users = await apiGet('/api/users');
-        bugs = await apiGet('/api/bugs');
-        abuseReports = await apiGet('/api/abuse');
-        pendingBans = await apiGet('/api/pendingBans');
-    }
-
-    async function refreshStats() {
-        try {
-            const stats = await apiGet('/api/admin/stats');
-            document.getElementById("liveUsers").innerText = stats.liveUsers;
-            document.getElementById("dailyUsers").innerText = stats.dailyUsers;
-            document.getElementById("weeklyUsers").innerText = stats.weeklyUsers;
-            document.getElementById("monthlyUsers").innerText = stats.monthlyUsers;
-            document.getElementById("totalAccounts").innerText = stats.totalAccounts;
-        } catch(e) { console.warn('Stats refresh failed:', e.message); }
-    }
-
-    async function renderModules() {
-        const container = document.getElementById("modulesList");
-        container.innerHTML = "";
-        if (!modules.length) {
-            container.innerHTML = "<i style='color:#8e9dc2;'>No engines added yet.</i>";
-            return;
-        }
-        modules.forEach((mod, idx) => {
-            let keyDisplay = "";
-            if (mod.type === "cloudflare") {
-                keyDisplay = `Account ID: ${(mod.accountId || '').substring(0,12)}... | Token: ${(mod.apiToken || '').substring(0,12)}...`;
-            } else {
-                keyDisplay = `Primary: ${(mod.primaryKey || '').substring(0,12)}... | Secondary: ${(mod.secondaryKey || '').substring(0,12) || 'none'}`;
-            }
-            const div = document.createElement("div");
-            div.className = "module-item";
-            div.innerHTML = `
-                <div><strong>${escapeHtml(mod.displayName)}</strong> (${escapeHtml(mod.type)})<br>
-                ${escapeHtml(keyDisplay)}<br>
-                Limit: ${mod.dailyLimitPerUser}/day<br>
-                Model: ${escapeHtml(mod.model || '')}</div>
-                <div>
-                    <button class="editMod" data-idx="${idx}">✏️ Edit</button>
-                    <button class="delMod" data-idx="${idx}">🗑️ Delete</button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-        document.querySelectorAll(".editMod").forEach(btn => btn.onclick = () => editModule(parseInt(btn.dataset.idx)));
-        document.querySelectorAll(".delMod").forEach(btn => btn.onclick = async () => {
-            const idx = parseInt(btn.dataset.idx);
-            await apiDelete(`/api/modules/${modules[idx].id}`);
-            await refreshAll();
-        });
-    }
-
-    async function editModule(idx) {
-        let m = modules[idx];
-        let newName = prompt("Display name", m.displayName);
-        if (!newName) return;
-        let newLimit = parseInt(prompt("Daily limit per user", m.dailyLimitPerUser));
-        if (isNaN(newLimit)) return;
-        let newModel = prompt("Model name", m.model);
-        if (!newModel) return;
-        if (m.type === "cloudflare") {
-            let newAccountId = prompt("Cloudflare Account ID", m.accountId || "");
-            let newApiToken = prompt("Cloudflare API Token", m.apiToken || "");
-            if (newAccountId && newApiToken) {
-                await apiPut(`/api/modules/${m.id}`, { ...m, displayName: newName, dailyLimitPerUser: newLimit, model: newModel, accountId: newAccountId, apiToken: newApiToken });
-                await refreshAll();
-            }
-        } else {
-            let newPrimary = prompt("Primary API Key", m.primaryKey);
-            if (!newPrimary) return;
-            let newSecondary = prompt("Secondary API Key (optional)", m.secondaryKey || "");
-            let newApiUrl = prompt("API URL", m.apiUrl || "");
-            await apiPut(`/api/modules/${m.id}`, { ...m, displayName: newName, dailyLimitPerUser: newLimit, primaryKey: newPrimary, secondaryKey: newSecondary || "", apiUrl: newApiUrl || m.apiUrl, model: newModel });
-            await refreshAll();
-        }
-    }
-
-    async function renderUserSelect() {
-        const select = document.getElementById("userSelect");
-        select.innerHTML = "";
-        if (!users.length) {
-            const opt = document.createElement("option");
-            opt.text = "No users registered";
-            opt.disabled = true;
-            select.appendChild(opt);
-            document.getElementById("userProfileDetails").style.display = "none";
-            return;
-        }
-        users.forEach(u => {
-            let opt = document.createElement("option");
-            opt.value = u.email;
-            let todayCalls = (u.dailyCallsRecord?.date === new Date().toDateString()) ? (u.dailyCallsRecord.count || 0) : 0;
-            opt.textContent = `${u.email} (${u.username}) ${u.banned ? "[BANNED]" : ""} | extraChat:${u.extraChatCredits||0} extraImg:${u.extraImageCredits||0} | used:${todayCalls}/50`;
-            select.appendChild(opt);
-        });
-        select.onchange = () => showUserProfile(select.value);
-        if (select.options.length) showUserProfile(select.value);
-    }
-
-    async function showUserProfile(email) {
-        const container = document.getElementById("userProfileDetails");
-        container.style.display = "block";
-        container.innerHTML = "<i>Loading profile...</i>";
-        try {
-            const userData = await apiGet(`/api/admin/user/${encodeURIComponent(email)}`);
-            const apiKeys = userData.apiKeys || [];
-            const imageQuota = userData.imageQuota || {};
-            const chatUsage = userData.chatUsage || [];
-            const hoursLive = (userData.totalHoursLive || 0).toFixed(1);
-            container.innerHTML = `
-                <strong>👤 User Profile: ${escapeHtml(userData.username)}</strong><br>
-                Email: ${escapeHtml(userData.email)}<br>
-                Name: ${escapeHtml(userData.name || 'N/A')}<br>
-                Auth Provider: ${escapeHtml(userData.authProvider || 'email')}<br>
-                ${userData.passwordHash ? `Password Hash (SHA-256): <code>${escapeHtml(userData.passwordHash)}</code><br>` : ''}
-                Created: ${new Date(userData.createdAt).toLocaleString()}<br>
-                Total hours live: ${hoursLive}<br>
-                Extra chat credits: ${userData.extraChatCredits || 0}<br>
-                Extra image credits: ${userData.extraImageCredits || 0}<br>
-                Banned: ${userData.banned ? '<span style="color:#ef4444;">Yes</span>' : '<span style="color:#10b981;">No</span>'}<br>
-                <hr style="margin:8px 0; border-color:#1e293b;">
-                <strong>🔑 API Keys (${apiKeys.length}/2):</strong><br>
-                ${apiKeys.map(k => `<code>${escapeHtml(k.name)}: ${escapeHtml(k.key)}</code> (used ${k.used||0}/20 today)<br>`).join('') || 'None'}<br>
-                <strong>🖼️ Image Quota:</strong> ${imageQuota.count || 0} used this window (reset every 5h)<br>
-                <strong>💬 Chat Usage (last 7 days):</strong><br>
-                ${chatUsage.slice(-7).map(c => `${escapeHtml(c.date)}: ${c.count} calls on ${escapeHtml(c.moduleId)}`).join('<br>') || 'No data'}
-            `;
-        } catch(e) {
-            container.innerHTML = `<span class="warning">Error loading profile: ${escapeHtml(e.message)}</span>`;
-        }
-    }
-
-    async function renderBugs() {
-        const container = document.getElementById("bugsList");
-        container.innerHTML = "";
-        if (bugs.length === 0) { container.innerHTML = "<i>No pending bug reports.</i>"; return; }
-        bugs.forEach((bug) => {
-            let div = document.createElement("div");
-            div.className = "bug-item";
-            div.dataset.id = bug._id;
-            div.innerHTML = `
-                <div>
-                    <strong>${escapeHtml(bug.username)}</strong> (${escapeHtml(bug.email)})<br>
-                    ${escapeHtml(bug.description)}<br>
-                    <small>${new Date(bug.timestamp).toLocaleString()}</small>
-                </div>
-                <div>
-                    <button class="realBug" data-id="${escapeHtml(bug._id)}" data-email="${escapeHtml(bug.email)}">✅ Real → +10 chat +2 images</button>
-                    <button class="fakeBug" data-id="${escapeHtml(bug._id)}" data-email="${escapeHtml(bug.email)}">❌ Fake → -15 chat credits</button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-
-        document.querySelectorAll(".realBug").forEach(btn => btn.onclick = async () => {
-            const bugId = btn.dataset.id;
-            const email = btn.dataset.email;
-            const user = users.find(u => u.email === email);
-            if (user) {
-                user.extraChatCredits = (user.extraChatCredits || 0) + 10;
-                user.extraImageCredits = (user.extraImageCredits || 0) + 2;
-                await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            }
-            await apiDelete(`/api/bugs/${bugId}`);
-            await refreshAll();
-        });
-
-        document.querySelectorAll(".fakeBug").forEach(btn => btn.onclick = async () => {
-            const bugId = btn.dataset.id;
-            const email = btn.dataset.email;
-            const user = users.find(u => u.email === email);
-            if (user) {
-                let penalty = (user.extraChatCredits || 0) - 15;
-                if (penalty < -10) user.banned = true;
-                user.extraChatCredits = Math.max(-10, penalty);
-                await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            }
-            await apiDelete(`/api/bugs/${bugId}`);
-            await refreshAll();
-        });
-    }
-
-    function renderAbuse() {
-        const container = document.getElementById("abuseList");
-        container.innerHTML = "";
-        if (abuseReports.length === 0) { container.innerHTML = "<i>No suspicious activity flagged.</i>"; return; }
-        abuseReports.forEach(a => {
-            let div = document.createElement("div");
-            div.className = "bug-item";
-            div.innerHTML = `<strong>${escapeHtml(a.username)}</strong> (${escapeHtml(a.email)}) - ${escapeHtml(a.reason)}<br>${escapeHtml(a.context || '')}<br><small>${new Date(a.timestamp).toLocaleString()}</small>`;
-            container.appendChild(div);
-        });
-    }
-
-    async function renderPendingBans() {
-        const container = document.getElementById("pendingBansList");
-        container.innerHTML = "";
-        if (pendingBans.length === 0) { container.innerHTML = "<i>No pending abuse reviews.</i>"; return; }
-        pendingBans.forEach((item) => {
-            let div = document.createElement("div");
-            div.className = "bug-item";
-            div.innerHTML = `
-                <div><strong>${escapeHtml(item.username)}</strong> (${escapeHtml(item.email)})<br>
-                Abuse score: ${item.score}%<br>
-                Reason: ${escapeHtml(item.reason)}<br>
-                Context: &quot;${escapeHtml(item.context || '')}&quot;<br>
-                <small>${new Date(item.timestamp).toLocaleString()}</small>
-                </div>
-                <div>
-                    <button class="approveBan" data-id="${escapeHtml(item._id)}" data-email="${escapeHtml(item.email)}" data-reason="${escapeHtml(item.reason)}" style="background:#ef4444;">🔨 Ban User</button>
-                    <button class="ignoreBan" data-id="${escapeHtml(item._id)}" style="background:#2d3748;">✅ Ignore</button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-
-        document.querySelectorAll(".approveBan").forEach(btn => btn.onclick = async () => {
-            const banId = btn.dataset.id;
-            const email = btn.dataset.email;
-            const reason = btn.dataset.reason;
-            const user = users.find(u => u.email === email);
-            if (user) {
-                user.banned = true;
-                user.banReason = reason;
-                await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            }
-            await apiDelete(`/api/pendingBans/${banId}`);
-            await refreshAll();
-        });
-
-        document.querySelectorAll(".ignoreBan").forEach(btn => btn.onclick = async () => {
-            const banId = btn.dataset.id;
-            await apiDelete(`/api/pendingBans/${banId}`);
-            await refreshAll();
-        });
-    }
-
-    async function callChatAPI(module_id, messages, deepThink) {
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ module_id, messages, deep_think: deepThink })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        return data.reply;
-    }
-
-    async function generateImage(prompt) {
-        try {
-            const res = await fetch('/api/generate/image', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt })
-            });
-            const data = await res.json();
-            if (data.success) return data.image;
-        } catch(e) { /* fall through */ }
-        const fallback = await fetch('/api/fallback/image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
-        const fbData = await fallback.json();
-        if (fbData.success) return fbData.image;
-        throw new Error('Image generation failed');
-    }
-
-    function addAdminMessage(text, isUser = false, isHtml = false) {
-        const container = document.getElementById("adminMessages");
-        const div = document.createElement("div");
-        div.className = "message " + (isUser ? "admin-user-message" : "");
-        if (isHtml) {
-            div.innerHTML = `<div class="avatar-small">${isUser ? '👤' : '🧠'}</div><div class="admin-bubble ${isUser ? 'admin-user-bubble' : ''}">${text}</div>`;
-        } else {
-            div.innerHTML = `<div class="avatar-small">${isUser ? '👤' : '🧠'}</div><div class="admin-bubble ${isUser ? 'admin-user-bubble' : ''}">${escapeHtml(text).replace(/\n/g,"<br>")}</div>`;
-        }
+// ========== MODULES ==========
+async function renderModules() {
+    const container = document.getElementById('modulesList');
+    container.innerHTML = '';
+    if (!modules.length) { container.innerHTML = '<i style="color:#8e9dc2">No engines.</i>'; return; }
+    modules.forEach((mod, idx) => {
+        const div = document.createElement('div');
+        div.className = 'module-item';
+        div.innerHTML = `
+            <div>
+                <strong>${escapeHtml(mod.displayName)}</strong> (${escapeHtml(mod.type)})<br>
+                Limit: ${mod.dailyLimitPerUser}/day · Model: ${escapeHtml(mod.model || '')}
+            </div>
+            <div>
+                <button data-edit="${idx}">✏️ Edit</button>
+                <button data-del="${idx}" class="danger">🗑️ Delete</button>
+            </div>`;
         container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-        if (!isUser && !isHtml) adminMessagesHistory.push({ role: "assistant", content: text });
-        if (isUser) adminMessagesHistory.push({ role: "user", content: text });
-    }
+    });
+    container.querySelectorAll('[data-edit]').forEach(btn => btn.onclick = () => editModule(parseInt(btn.dataset.edit)));
+    container.querySelectorAll('[data-del]').forEach(btn => btn.onclick = async () => {
+        const idx = parseInt(btn.dataset.del);
+        if (!confirm('Delete this engine?')) return;
+        try { await apiDelete(`/api/modules/${modules[idx].id}`); await refreshAll(); }
+        catch(e) { alert('Failed: ' + e.message); }
+    });
+}
 
-    async function adminSendMessage(forceImage = false) {
-        let inp = document.getElementById("adminUserInput");
-        let text = inp.value.trim();
-        if (!text) return;
-        inp.value = "";
-        inp.disabled = true;
-
-        let willImage = (adminLiveImageFlag || forceImage) && text.length > 2;
-        if (willImage) {
-            addAdminMessage(text, true);
-            try {
-                let imgData = await generateImage(text);
-                const imgId = 'img_' + (++imgStoreCounter);
-                imgStore[imgId] = imgData;
-                addAdminMessage(
-                    `<img src="${imgData}" style="max-width:100%; border-radius:16px;" /><br>
-                     <button onclick="downloadImage('${imgId}')">⬇️ Download</button>`,
-                    false, true
-                );
-            } catch(e) {
-                addAdminMessage("❌ Image generation failed: " + e.message, false);
-            }
-            inp.disabled = false;
-            inp.focus();
-            return;
-        }
-
-        let module = modules.find(m => m.id === adminSelectedModuleId);
-        if (!module) {
-            addAdminMessage("❌ No AI engine selected. Please add an engine in the Admin panel.", false);
-            inp.disabled = false;
-            return;
-        }
-
-        let fullText = text;
-        if (adminAttachedFiles.length) {
-            fullText += "\n\n[Attached files]\n" + adminAttachedFiles
-                .map(f => f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`)
-                .join("\n");
-            adminAttachedFiles = [];
-            renderAdminFileBadges();
-        }
-
-        addAdminMessage(text, true);
-        adminMessagesHistory.push({ role: "user", content: fullText });
-
-        let typingDiv = document.createElement("div");
-        typingDiv.className = "message";
-        typingDiv.innerHTML = `<div class="avatar-small">🧠</div><div class="admin-bubble">▮ Thinking...</div>`;
-        document.getElementById("adminMessages").appendChild(typingDiv);
-        document.getElementById("adminMessages").scrollTop = document.getElementById("adminMessages").scrollHeight;
-
-        let reply = "";
-        try {
-            reply = await callChatAPI(adminSelectedModuleId, adminMessagesHistory.slice(-12), adminDeepThinkFlag);
-        } catch(e) {
-            reply = `⚠️ Service error: ${e.message}`;
-        }
-        typingDiv.remove();
-        addAdminMessage(reply, false);
-        inp.disabled = false;
-        inp.focus();
-    }
-
-    function renderAdminModuleDropdown() {
-        let sel = document.getElementById("adminModuleSelect");
-        sel.innerHTML = "";
-        if (!modules.length) {
-            let opt = document.createElement("option");
-            opt.text = "❌ No engines — add one above";
-            opt.disabled = true;
-            sel.appendChild(opt);
-            adminSelectedModuleId = null;
-            return;
-        }
-        modules.forEach(mod => {
-            let opt = document.createElement("option");
-            opt.value = mod.id;
-            opt.textContent = `${mod.displayName} (${mod.dailyLimitPerUser}/day)`;
-            if (adminSelectedModuleId === mod.id) opt.selected = true;
-            sel.appendChild(opt);
-        });
-        if (!adminSelectedModuleId || !modules.find(m => m.id === adminSelectedModuleId)) {
-            adminSelectedModuleId = modules[0].id;
-            sel.value = adminSelectedModuleId;
-        }
-        sel.onchange = (e) => { adminSelectedModuleId = e.target.value; };
-    }
-
-    function refreshAdminChat() {
-        document.getElementById("adminSendBtn").onclick = () => adminSendMessage(false);
-        document.getElementById("adminImageGenBtn").onclick = () => adminSendMessage(true);
-        document.getElementById("adminAttachBtn").onclick = () => document.getElementById("adminFileInput").click();
-        document.getElementById("adminNewChatBtn").onclick = () => {
-            adminMessagesHistory = [];
-            document.getElementById("adminMessages").innerHTML = `<div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">New session started.</div></div>`;
-        };
-
-        const adminInput = document.getElementById("adminUserInput");
-        adminInput.replaceWith(adminInput.cloneNode(true));
-        document.getElementById("adminUserInput").addEventListener("keypress", (e) => {
-            if (e.key === "Enter") adminSendMessage(false);
-        });
-
-        document.getElementById("adminDeepThink").onchange = (e) => adminDeepThinkFlag = e.target.checked;
-        document.getElementById("adminLiveImage").onchange = (e) => adminLiveImageFlag = e.target.checked;
-        document.getElementById("adminFileInput").onchange = (e) => {
-            if (e.target.files) {
-                Array.from(e.target.files).forEach(f => {
-                    let reader = new FileReader();
-                    reader.onload = ev => {
-                        adminAttachedFiles.push({
-                            name: f.name,
-                            content: ev.target.result,
-                            isText: f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i)
-                        });
-                        renderAdminFileBadges();
-                    };
-                    if (f.type.startsWith("text/") || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
-                    else reader.readAsDataURL(f);
-                });
-            }
-        };
-        renderAdminFileBadges();
-    }
-
-    function renderAdminFileBadges() {
-        let container = document.getElementById("adminFilePreview");
-        container.innerHTML = adminAttachedFiles.map((f, idx) =>
-            `<span class="file-tag">📄 ${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:#ef4444; cursor:pointer;">✖</button></span>`
-        ).join("");
-        document.querySelectorAll("#adminFilePreview .file-tag button").forEach(btn => {
-            btn.onclick = () => {
-                let idx = parseInt(btn.dataset.idx);
-                adminAttachedFiles.splice(idx, 1);
-                renderAdminFileBadges();
-            };
-        });
-    }
-
-    // ---------- IMAGE SETTINGS ----------
-    async function loadImageSettings() {
-        try {
-            const settings = await apiGet('/api/admin/settings');
-            document.getElementById("cfImageAccountId").value = settings.cloudflareImageAccountId || '';
-            document.getElementById("cfImageApiToken").value = '';
-            document.getElementById("cfImageModel").value = settings.imageModel || '@cf/stabilityai/stable-diffusion-xl-base-1.0';
-        } catch(e) { console.error('loadImageSettings:', e); }
-    }
-
-    document.getElementById("saveImageSettings").onclick = async () => {
-        const accountId = document.getElementById("cfImageAccountId").value.trim();
-        const apiToken = document.getElementById("cfImageApiToken").value.trim();
-        const model = document.getElementById("cfImageModel").value.trim();
-        const statusEl = document.getElementById("imageSettingsStatus");
-        try {
-            const adminPwd = prompt("Confirm admin password to save image settings:");
-            if (!adminPwd) return;
-            const res = await apiPost('/api/admin/settings', {
-                adminPassword: adminPwd,
-                cloudflareImageAccountId: accountId,
-                cloudflareImageApiToken: apiToken || undefined,
-                imageModel: model
-            });
-            if (res.success) {
-                statusEl.style.color = "#10b981";
-                statusEl.innerText = "✅ Saved!";
-            } else {
-                statusEl.style.color = "#ef4444";
-                statusEl.innerText = "❌ " + (res.error || "Failed");
-            }
-        } catch(e) {
-            statusEl.style.color = "#ef4444";
-            statusEl.innerText = "❌ " + e.message;
-        }
-        setTimeout(() => statusEl.innerText = "", 3000);
-    };
-
-    // ---------- VIDEO SETTINGS ----------
-    async function loadVideoSettings() {
-        try {
-            const settings = await apiGet('/api/admin/settings');
-            document.getElementById("agnesApiKey").value = '';
-            document.getElementById("agnesModel").value = settings.agnesModel || 'agnes-video-v2.0';
-        } catch(e) { console.error('loadVideoSettings:', e); }
-    }
-
-    document.getElementById("saveVideoSettings").onclick = async () => {
-        const apiKey = document.getElementById("agnesApiKey").value.trim();
-        const model = document.getElementById("agnesModel").value.trim() || 'agnes-video-v2.0';
-        const statusEl = document.getElementById("videoSettingsStatus");
-        try {
-            const adminPwd = prompt("Confirm admin password to save video settings:");
-            if (!adminPwd) return;
-            const res = await apiPost('/api/admin/settings', {
-                adminPassword: adminPwd,
-                agnesApiKey: apiKey || undefined,
-                agnesModel: model
-            });
-            if (res.success) {
-                statusEl.style.color = "#10b981";
-                statusEl.innerText = "✅ Video settings saved!";
-            } else {
-                statusEl.style.color = "#ef4444";
-                statusEl.innerText = "❌ " + (res.error || "Failed");
-            }
-        } catch(e) {
-            statusEl.style.color = "#ef4444";
-            statusEl.innerText = "❌ " + e.message;
-        }
-        setTimeout(() => statusEl.innerText = "", 3000);
-    };
-
-    document.getElementById("requestAdminPwdChange").onclick = async () => {
-        const email = document.getElementById("adminEmail").value.trim();
-        const newPwd = document.getElementById("newAdminPwd").value;
-        if (!email || !newPwd) { alert("Enter email and new password"); return; }
-        const statusEl = document.getElementById("pwdChangeStatus");
-        try {
-            const res = await apiPost('/api/admin/change-password', { email, newPassword: newPwd });
-            if (res.success) {
-                statusEl.style.color = "#10b981";
-                statusEl.innerText = "✅ Password change email sent!";
-                const limitRes = await apiGet('/api/admin/password-limit');
-                if (limitRes.remaining !== undefined) {
-                    document.getElementById("pwdLimitStatus").innerText = `${limitRes.remaining} remaining today`;
-                }
-            } else {
-                statusEl.style.color = "#ef4444";
-                statusEl.innerText = "❌ " + (res.error || "Failed");
-            }
-        } catch(e) {
-            statusEl.style.color = "#ef4444";
-            statusEl.innerText = "❌ " + e.message;
-        }
-        setTimeout(() => statusEl.innerText = "", 3000);
-    };
-
-    // ---------- USER ACTIONS ----------
-    document.getElementById("grantChat10").onclick = async () => {
-        let sel = document.getElementById("userSelect").value;
-        if (!sel) return;
-        let user = users.find(u => u.email === sel);
-        if (user) {
-            user.extraChatCredits = (user.extraChatCredits || 0) + 10;
-            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            await refreshAll();
-        }
-    };
-    document.getElementById("grantChat50").onclick = async () => {
-        let sel = document.getElementById("userSelect").value;
-        if (!sel) return;
-        let user = users.find(u => u.email === sel);
-        if (user) {
-            user.extraChatCredits = (user.extraChatCredits || 0) + 50;
-            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            await refreshAll();
-        }
-    };
-    document.getElementById("grantImage5").onclick = async () => {
-        let sel = document.getElementById("userSelect").value;
-        if (!sel) return;
-        let user = users.find(u => u.email === sel);
-        if (user) {
-            user.extraImageCredits = (user.extraImageCredits || 0) + 5;
-            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            await refreshAll();
-        }
-    };
-    document.getElementById("banUserBtn").onclick = async () => {
-        let sel = document.getElementById("userSelect").value;
-        if (!sel) return;
-        let user = users.find(u => u.email === sel);
-        if (user) {
-            user.banned = true;
-            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            await refreshAll();
-        }
-    };
-    document.getElementById("unbanUserBtn").onclick = async () => {
-        let sel = document.getElementById("userSelect").value;
-        if (!sel) return;
-        let user = users.find(u => u.email === sel);
-        if (user) {
-            user.banned = false;
-            user.banReason = "";
-            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
-            await refreshAll();
-        }
-    };
-    document.getElementById("deleteUserPermanentlyBtn").onclick = async () => {
-        let sel = document.getElementById("userSelect").value;
-        if (!sel) return;
-        if (!confirm(`⚠️ Permanently delete user ${sel} and ALL their data? This cannot be undone.`)) return;
-        await apiDelete(`/api/admin/user/${encodeURIComponent(sel)}`);
-        await refreshAll();
-    };
-
-    // ---------- SYSTEM ACTIONS ----------
-    document.getElementById("resetAllChatUsage").onclick = async () => {
-        if (!confirm("Reset daily chat usage counters for ALL users?")) return;
-        await apiDelete('/api/chatUsage');
-        for (let user of users) {
-            user.dailyCallsRecord = { date: "", count: 0 };
-            await apiPut(`/api/users/${encodeURIComponent(user.email)}`, user);
+async function editModule(idx) {
+    const m = modules[idx];
+    const newName = prompt('Display name', m.displayName); if (!newName) return;
+    const newLimit = parseInt(prompt('Daily limit', m.dailyLimitPerUser)); if (isNaN(newLimit)) return;
+    const newModel = prompt('Model', m.model); if (!newModel) return;
+    try {
+        if (m.type === 'cloudflare') {
+            const accountId = prompt('Cloudflare Account ID', m.accountId || ''); if (!accountId) return;
+            const apiToken = prompt('Cloudflare API Token', m.apiToken || ''); if (!apiToken) return;
+            await apiPut(`/api/modules/${m.id}`, { ...m, displayName: newName, dailyLimitPerUser: newLimit, model: newModel, accountId, apiToken });
+        } else {
+            const primaryKey = prompt('Primary API Key', m.primaryKey || ''); if (!primaryKey) return;
+            const secondaryKey = prompt('Secondary key (optional)', m.secondaryKey || '');
+            const apiUrl = prompt('API URL', m.apiUrl || '');
+            await apiPut(`/api/modules/${m.id}`, { ...m, displayName: newName, dailyLimitPerUser: newLimit, model: newModel, primaryKey, secondaryKey, apiUrl });
         }
         await refreshAll();
-        alert("✅ Chat usage reset for all users.");
-    };
+    } catch(e) { alert('Failed: ' + e.message); }
+}
 
-    document.getElementById("clearAllReports").onclick = async () => {
-        if (!confirm("Clear all bug and abuse reports?")) return;
+// ========== USER MANAGEMENT ==========
+async function renderUserSelect() {
+    const select = document.getElementById('userSelect');
+    select.innerHTML = '';
+    if (!users.length) {
+        select.innerHTML = '<option disabled>No users</option>';
+        document.getElementById('userProfileDetails').style.display = 'none';
+        return;
+    }
+    users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.email;
+        opt.textContent = `${u.email} (${u.username})${u.banned ? ' [BANNED]' : ''} · chat:${u.extraChatCredits||0} img:${u.extraImageCredits||0}`;
+        select.appendChild(opt);
+    });
+    select.onchange = () => showUserProfile(select.value);
+    showUserProfile(select.value);
+}
+
+async function showUserProfile(email) {
+    const container = document.getElementById('userProfileDetails');
+    container.style.display = 'block';
+    container.innerHTML = '<i>Loading…</i>';
+    try {
+        const data = await apiGet(`/api/admin/user/${encodeURIComponent(email)}`);
+        container.innerHTML = `
+            <strong>👤 ${escapeHtml(data.username)}</strong><br>
+            Email: ${escapeHtml(data.email)}<br>
+            Name: ${escapeHtml(data.name || 'N/A')}<br>
+            Auth: ${escapeHtml(data.authProvider || 'email')}<br>
+            Created: ${new Date(data.createdAt).toLocaleString()}<br>
+            Hours live: ${(data.totalHoursLive || 0).toFixed(1)}<br>
+            Extra chat: ${data.extraChatCredits || 0} · Extra image: ${data.extraImageCredits || 0}<br>
+            Banned: ${data.banned ? '<span style="color:#ef4444">Yes</span>' : '<span style="color:#10b981">No</span>'}<br>
+            <hr style="margin:8px 0;border-color:#1e293b">
+            <strong>🔑 API Keys:</strong> ${(data.apiKeys || []).map(k => `<code>${escapeHtml(k.name)}: ${escapeHtml(k.key)}</code>`).join('<br>') || 'None'}`;
+    } catch(e) {
+        container.innerHTML = `<span class="warning">Error: ${escapeHtml(e.message)}</span>`;
+    }
+}
+
+// New server endpoints for admin actions
+async function grantCredits(addChat, addImage) {
+    const sel = document.getElementById('userSelect').value;
+    if (!sel) return;
+    try {
+        await apiPost(`/api/admin/users/${encodeURIComponent(sel)}/credits`, { addChat, addImage });
+        await refreshAll();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+document.getElementById('grantChat10').onclick = () => grantCredits(10, 0);
+document.getElementById('grantChat50').onclick = () => grantCredits(50, 0);
+document.getElementById('grantImage5').onclick = () => grantCredits(0, 5);
+document.getElementById('banUserBtn').onclick = async () => {
+    const sel = document.getElementById('userSelect').value; if (!sel) return;
+    try {
+        await apiPost(`/api/admin/users/${encodeURIComponent(sel)}/credits`, { setBanned: true });
+        await refreshAll();
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('unbanUserBtn').onclick = async () => {
+    const sel = document.getElementById('userSelect').value; if (!sel) return;
+    try {
+        await apiPost(`/api/admin/users/${encodeURIComponent(sel)}/credits`, { setBanned: false });
+        await refreshAll();
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('deleteUserPermanentlyBtn').onclick = async () => {
+    const sel = document.getElementById('userSelect').value; if (!sel) return;
+    if (!confirm(`⚠️ Permanently delete ${sel}? Cannot be undone.`)) return;
+    try { await apiDelete(`/api/admin/user/${encodeURIComponent(sel)}`); await refreshAll(); }
+    catch(e) { alert('Failed: ' + e.message); }
+};
+
+// ========== BUGS / ABUSE / BANS ==========
+async function renderBugs() {
+    const container = document.getElementById('bugsList');
+    container.innerHTML = '';
+    if (!bugs.length) { container.innerHTML = '<i>No pending bugs.</i>'; return; }
+    bugs.forEach(bug => {
+        const div = document.createElement('div');
+        div.className = 'bug-item';
+        div.innerHTML = `
+            <div>
+                <strong>${escapeHtml(bug.username)}</strong> (${escapeHtml(bug.email)})<br>
+                ${escapeHtml(bug.description)}<br>
+                <small>${new Date(bug.timestamp).toLocaleString()}</small>
+            </div>
+            <div>
+                <button data-real="${bug._id}" data-email="${bug.email}" class="success">✅ Real (+10/+2)</button>
+                <button data-fake="${bug._id}" data-email="${bug.email}" class="danger">❌ Fake (-15)</button>
+            </div>`;
+        container.appendChild(div);
+    });
+    container.querySelectorAll('[data-real]').forEach(btn => btn.onclick = async () => {
+        const email = btn.dataset.email;
+        try {
+            await apiPost(`/api/admin/users/${encodeURIComponent(email)}/credits`, { addChat: 10, addImage: 2 });
+            await apiDelete(`/api/bugs/${btn.dataset.real}`);
+            await refreshAll();
+        } catch(e) { alert('Failed: ' + e.message); }
+    });
+    container.querySelectorAll('[data-fake]').forEach(btn => btn.onclick = async () => {
+        const email = btn.dataset.email;
+        try {
+            await apiPost(`/api/admin/users/${encodeURIComponent(email)}/credits`, { addChat: -15 });
+            await apiDelete(`/api/bugs/${btn.dataset.fake}`);
+            await refreshAll();
+        } catch(e) { alert('Failed: ' + e.message); }
+    });
+}
+
+function renderAbuse() {
+    const container = document.getElementById('abuseList');
+    container.innerHTML = '';
+    if (!abuseReports.length) { container.innerHTML = '<i>No abuse reports.</i>'; return; }
+    abuseReports.forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'bug-item';
+        div.innerHTML = `<strong>${escapeHtml(a.username)}</strong> (${escapeHtml(a.email)}) — ${escapeHtml(a.reason)}<br><small>${new Date(a.timestamp).toLocaleString()}</small>`;
+        container.appendChild(div);
+    });
+}
+
+async function renderPendingBans() {
+    const container = document.getElementById('pendingBansList');
+    container.innerHTML = '';
+    if (!pendingBans.length) { container.innerHTML = '<i>No pending bans.</i>'; return; }
+    pendingBans.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'bug-item';
+        div.innerHTML = `
+            <div>
+                <strong>${escapeHtml(item.username)}</strong> (${escapeHtml(item.email)})<br>
+                Score: ${item.score}% · Reason: ${escapeHtml(item.reason)}<br>
+                <small>${new Date(item.timestamp).toLocaleString()}</small>
+            </div>
+            <div>
+                <button data-approve="${item._id}" data-email="${item.email}" class="danger">🔨 Ban</button>
+                <button data-ignore="${item._id}">✅ Ignore</button>
+            </div>`;
+        container.appendChild(div);
+    });
+    container.querySelectorAll('[data-approve]').forEach(btn => btn.onclick = async () => {
+        try {
+            await apiPost(`/api/admin/users/${encodeURIComponent(btn.dataset.email)}/credits`, { setBanned: true });
+            await apiDelete(`/api/pendingBans/${btn.dataset.approve}`);
+            await refreshAll();
+        } catch(e) { alert('Failed: ' + e.message); }
+    });
+    container.querySelectorAll('[data-ignore]').forEach(btn => btn.onclick = async () => {
+        try { await apiDelete(`/api/pendingBans/${btn.dataset.ignore}`); await refreshAll(); }
+        catch(e) { alert('Failed: ' + e.message); }
+    });
+}
+
+// ========== EARNINGS ==========
+async function loadEarnings() {
+    try {
+        const data = await apiGet('/api/admin/earnings');
+        earningsBalance = Number(data.balance) || 0;
+        withdrawals = data.withdrawals || [];
+        document.getElementById('earningsBalance').textContent = `$${earningsBalance.toFixed(2)}`;
+        renderWithdrawHistory();
+        const statsEl = document.getElementById('earningsLiveStats');
+        if (statsEl && data.stats) {
+            statsEl.innerHTML = `💬 ${data.stats.totalChats} chats · 🎬 ${data.stats.totalVideos} videos · 👥 ${data.stats.userCount} users · 🔑 ${data.stats.totalFreeKeys} keys`;
+        }
+    } catch(e) {
+        console.warn('Earnings failed:', e.message);
+    }
+}
+
+function renderWithdrawHistory() {
+    const container = document.getElementById('withdrawHistory');
+    if (!withdrawals.length) { container.innerHTML = '<i>No withdrawals.</i>'; return; }
+    const labels = { amazon: '🛒 Amazon', playstore: '📱 Play', upi: '💳 UPI', paypal: '💵 PayPal', bank: '🏦 Bank' };
+    container.innerHTML = withdrawals.map(w => `
+        <div class="withdraw-item">
+            <strong>${escapeHtml(labels[w.method] || w.method)}</strong> — $${Number(w.amount).toFixed(2)}<br>
+            <small>${escapeHtml(w.detail || '')}</small><br>
+            <small style="color:#10b981">${escapeHtml(w.status)}</small><br>
+            <small>${new Date(w.timestamp).toLocaleString()}</small>
+        </div>`).join('');
+}
+
+document.getElementById('editEarningsBtn').onclick = () => {
+    document.getElementById('earningsEditArea').style.display = 'block';
+    document.getElementById('earningsInput').value = earningsBalance;
+};
+document.getElementById('cancelEarningsBtn').onclick = () => {
+    document.getElementById('earningsEditArea').style.display = 'none';
+};
+document.getElementById('saveEarningsBtn').onclick = async () => {
+    const v = parseFloat(document.getElementById('earningsInput').value);
+    if (isNaN(v) || v < 0) { alert('Enter valid non-negative number'); return; }
+    const pwd = prompt('Confirm admin password:');
+    if (!pwd) return;
+    try {
+        const res = await apiPost('/api/admin/earnings', { password: pwd, balance: v });
+        if (res.success) { earningsBalance = res.balance; await loadEarnings(); document.getElementById('earningsEditArea').style.display = 'none'; alert('✅ Saved'); }
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('refreshEarningsBtn').onclick = () => loadEarnings();
+document.getElementById('withdrawBtn').onclick = async () => {
+    const method = document.getElementById('withdrawMethod').value;
+    const amount = parseFloat(document.getElementById('withdrawAmount').value);
+    const detail = document.getElementById('withdrawDetail').value.trim();
+    if (isNaN(amount) || amount <= 0) { alert('Enter valid amount'); return; }
+    if (amount > earningsBalance) { alert('Insufficient balance'); return; }
+    const pwd = prompt('Confirm admin password:');
+    if (!pwd) return;
+    try {
+        const res = await apiPost('/api/admin/withdraw', { password: pwd, method, amount, detail });
+        if (res.success) {
+            earningsBalance = res.balance;
+            document.getElementById('withdrawAmount').value = '';
+            document.getElementById('withdrawDetail').value = '';
+            await loadEarnings();
+            alert(`✅ Withdrew $${amount.toFixed(2)}`);
+        }
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('clearWithdrawHistoryBtn').onclick = async () => {
+    if (!confirm('Clear all withdrawal history? Balance is NOT restored.')) return;
+    try { await apiDelete('/api/admin/withdrawals'); await loadEarnings(); }
+    catch(e) { alert('Failed: ' + e.message); }
+};
+
+// ========== IMAGE / VIDEO SETTINGS ==========
+async function loadImageSettings() {
+    try {
+        const s = await apiGet('/api/admin/settings');
+        document.getElementById('cfImageAccountId').value = s.cloudflareImageAccountId || '';
+        document.getElementById('cfImageApiToken').value = '';
+        document.getElementById('cfImageModel').value = s.imageModel || '@cf/stabilityai/stable-diffusion-xl-base-1.0';
+    } catch(e) { console.warn(e); }
+}
+document.getElementById('saveImageSettings').onclick = async () => {
+    const accountId = document.getElementById('cfImageAccountId').value.trim();
+    const apiToken = document.getElementById('cfImageApiToken').value.trim();
+    const model = document.getElementById('cfImageModel').value.trim();
+    const pwd = prompt('Confirm admin password:');
+    if (!pwd) return;
+    const status = document.getElementById('imageSettingsStatus');
+    try {
+        await apiPost('/api/admin/settings', { adminPassword: pwd, cloudflareImageAccountId: accountId, cloudflareImageApiToken: apiToken || undefined, imageModel: model });
+        status.style.color = '#10b981'; status.textContent = '✅ Saved';
+    } catch(e) {
+        status.style.color = '#ef4444'; status.textContent = '❌ ' + e.message;
+    }
+    setTimeout(() => status.textContent = '', 3000);
+};
+
+async function loadVideoSettings() {
+    try {
+        const s = await apiGet('/api/admin/settings');
+        document.getElementById('agnesApiKey').value = '';
+        document.getElementById('agnesModel').value = s.agnesModel || 'agnes-video-v2.0';
+    } catch(e) { console.warn(e); }
+}
+document.getElementById('saveVideoSettings').onclick = async () => {
+    const apiKey = document.getElementById('agnesApiKey').value.trim();
+    const model = document.getElementById('agnesModel').value.trim() || 'agnes-video-v2.0';
+    const pwd = prompt('Confirm admin password:');
+    if (!pwd) return;
+    const status = document.getElementById('videoSettingsStatus');
+    try {
+        await apiPost('/api/admin/settings', { adminPassword: pwd, agnesApiKey: apiKey || undefined, agnesModel: model });
+        status.style.color = '#10b981'; status.textContent = '✅ Saved';
+    } catch(e) {
+        status.style.color = '#ef4444'; status.textContent = '❌ ' + e.message;
+    }
+    setTimeout(() => status.textContent = '', 3000);
+};
+
+// ========== ADMIN PASSWORD CHANGE ==========
+document.getElementById('requestAdminPwdChange').onclick = async () => {
+    const email = document.getElementById('adminEmail').value.trim();
+    const newPwd = document.getElementById('newAdminPwd').value;
+    if (!email || !newPwd) { alert('Enter email and new password'); return; }
+    const status = document.getElementById('pwdChangeStatus');
+    try {
+        const res = await apiPost('/api/admin/change-password', { email, newPassword: newPwd });
+        if (res.success) {
+            status.style.color = '#10b981'; status.textContent = '✅ Email sent!';
+            adminToken = null;  // Force re-login
+            setTimeout(() => handle401(), 1500);
+        }
+    } catch(e) {
+        status.style.color = '#ef4444'; status.textContent = '❌ ' + e.message;
+    }
+};
+
+// ========== SYSTEM ACTIONS ==========
+document.getElementById('resetAllChatUsage').onclick = async () => {
+    if (!confirm('Reset chat usage for all users?')) return;
+    try { await apiDelete('/api/chatUsage'); alert('✅ Done'); await refreshAll(); }
+    catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('clearAllReports').onclick = async () => {
+    if (!confirm('Clear all bugs, abuse, pending bans?')) return;
+    try {
         await apiDelete('/api/bugs');
         await apiDelete('/api/abuse');
         await apiDelete('/api/pendingBans');
         await refreshAll();
-    };
-
-    document.getElementById("exportData").onclick = async () => {
-        try {
-            let exportObj = {
-                users: await apiGet('/api/users'),
-                modules: await apiGet('/api/modules'),
-                bugs: await apiGet('/api/bugs'),
-                abuse: await apiGet('/api/abuse'),
-                pendingBans: await apiGet('/api/pendingBans'),
-                imageQuotas: await apiGet('/api/imageQuotas'),
-                chatUsage: await apiGet('/api/chatUsage'),
-                userApiKeys: await apiGet('/api/userApiKeys')
-            };
-            let dataStr = JSON.stringify(exportObj, null, 2);
-            let blob = new Blob([dataStr], { type: "application/json" });
-            let url = URL.createObjectURL(blob);
-            let a = document.createElement("a");
-            a.href = url;
-            a.download = `vrythos_backup_${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch(e) { alert("Export failed: " + e.message); }
-    };
-
-    document.getElementById("hardReset").onclick = async () => {
-        if (!confirm("⚠️ FACTORY RESET: This will delete ALL users, modules, reports, API keys. Type 'RESET' to confirm.")) return;
-        let check = prompt("Type RESET to proceed");
-        if (check !== "RESET") return;
-        try {
-            await apiDelete('/api/users');
-            await apiDelete('/api/modules');
-            await apiDelete('/api/bugs');
-            await apiDelete('/api/abuse');
-            await apiDelete('/api/pendingBans');
-            await apiDelete('/api/userApiKeys');
-            await apiDelete('/api/ipRegs');
-            await apiDelete('/api/imageQuotas');
-            await apiDelete('/api/chatUsage');
-            await apiDelete('/api/tournaments');
-            alert("✅ All data erased. Refresh the page.");
-            location.reload();
-        } catch(e) { alert("Factory reset failed: " + e.message); }
-    };
-
-    document.getElementById("refreshStatsBtn").onclick = () => refreshStats();
-
-    // ---------- ADD MODULE PRESETS ----------
-    document.getElementById("addFlash").onclick = async () => {
-        let primaryKey = prompt("Groq API Key (gsk_)");
-        if (!primaryKey) return;
-        await apiPost('/api/modules', { id: "mod_"+Date.now(), displayName: "Vrythos Flash", type: "groq", primaryKey, secondaryKey: "", apiUrl: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile", dailyLimitPerUser: 25 });
-        await refreshAll();
-    };
-    document.getElementById("addGemini").onclick = async () => {
-        let primaryKey = prompt("Gemini API Key (AIza...)");
-        if (!primaryKey) return;
-        await apiPost('/api/modules', { id: "mod_"+Date.now(), displayName: "Gemini 2.0 Flash", type: "gemini", primaryKey, secondaryKey: "", apiUrl: "", model: "gemini-2.0-flash", dailyLimitPerUser: 15 });
-        await refreshAll();
-    };
-    document.getElementById("addOpenRouter").onclick = async () => {
-        let primaryKey = prompt("OpenRouter API Key (sk-or-)");
-        if (!primaryKey) return;
-        await apiPost('/api/modules', { id: "mod_"+Date.now(), displayName: "OpenRouter GPT-OSS", type: "openrouter", primaryKey, secondaryKey: "", apiUrl: "https://openrouter.ai/api/v1/chat/completions", model: "openai/gpt-oss-120b:free", dailyLimitPerUser: 10 });
-        await refreshAll();
-    };
-    document.getElementById("addCloudflare").onclick = async () => {
-        let accountId = prompt("Cloudflare Account ID");
-        let apiToken = prompt("Cloudflare API Token");
-        if (!accountId || !apiToken) return;
-        await apiPost('/api/modules', { id: "mod_"+Date.now(), displayName: "Cloudflare Text", type: "cloudflare", accountId, apiToken, model: "@cf/meta/llama-3.1-8b-instruct", dailyLimitPerUser: 10 });
-        await refreshAll();
-    };
-    document.getElementById("addCustom").onclick = async () => {
-        let displayName = prompt("Engine name");
-        if (!displayName) return;
-        let type = prompt("Type (groq/gemini/openrouter/cloudflare)");
-        if (!type) return;
-        let apiUrl = prompt("API URL");
-        let model = prompt("Model");
-        let primaryKey = prompt("Primary API Key");
-        let dailyLimit = parseInt(prompt("Daily limit", "20"));
-        if (!apiUrl || !model || !primaryKey || isNaN(dailyLimit)) return;
-        let modObj = { id: "mod_"+Date.now(), displayName, type, primaryKey, secondaryKey: "", apiUrl, model, dailyLimitPerUser: dailyLimit };
-        if (type === "cloudflare") {
-            modObj.accountId = primaryKey;
-            modObj.apiToken = apiUrl;
-            delete modObj.primaryKey;
-            delete modObj.secondaryKey;
-            delete modObj.apiUrl;
-        }
-        await apiPost('/api/modules', modObj);
-        await refreshAll();
-    };
-
-    // ---------- REAL EARNINGS (server-backed) ----------
-    function updateEarningsDisplay() {
-        document.getElementById('earningsBalance').innerText = `$${Number(earningsBalance).toFixed(2)}`;
-    }
-
-    function renderWithdrawHistory() {
-        const container = document.getElementById('withdrawHistory');
-        if (!withdrawals || !withdrawals.length) {
-            container.innerHTML = '<i>No withdrawals yet.</i>';
-            return;
-        }
-        const labels = {
-            amazon: '🛒 Amazon Gift Card',
-            playstore: '📱 Google Play',
-            upi: '💳 UPI Transfer',
-            paypal: '💵 PayPal',
-            bank: '🏦 Bank Transfer'
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('exportData').onclick = async () => {
+    try {
+        const data = {
+            users: await apiGet('/api/users'),
+            modules: await apiGet('/api/modules'),
+            bugs: await apiGet('/api/bugs'),
+            abuse: await apiGet('/api/abuse'),
+            pendingBans: await apiGet('/api/pendingBans')
         };
-        container.innerHTML = withdrawals.map(w => {
-            const methodLabel = labels[w.method] || w.method;
-            return `
-            <div class="withdraw-item">
-                <strong>${escapeHtml(methodLabel)}</strong> — $${Number(w.amount).toFixed(2)}<br>
-                <small>${escapeHtml(w.detail || '')}</small><br>
-                <small style="color:#10b981;">Status: ${escapeHtml(w.status || 'Success')}</small><br>
-                <small>${new Date(w.timestamp).toLocaleString()}</small>
-            </div>`;
-        }).join('');
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `vrythos_${new Date().toISOString().slice(0,10)}.json`; a.click();
+        URL.revokeObjectURL(url);
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('hardReset').onclick = async () => {
+    if (!confirm('⚠️ FACTORY RESET — deletes ALL users, modules, reports, chat history.')) return;
+    if (prompt('Type RESET to confirm:') !== 'RESET') return;
+    try {
+        await apiDelete('/api/users');
+        await apiDelete('/api/modules');
+        await apiDelete('/api/bugs');
+        await apiDelete('/api/abuse');
+        await apiDelete('/api/pendingBans');
+        await apiDelete('/api/userApiKeys');
+        await apiDelete('/api/ipRegs');
+        await apiDelete('/api/imageQuotas');
+        await apiDelete('/api/chatUsage');
+        await apiDelete('/api/tournaments');
+        alert('✅ Reset. Refresh the page.');
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('refreshStatsBtn').onclick = () => refreshStats();
+
+// ========== ADD MODULE PRESETS ==========
+document.getElementById('addFlash').onclick = async () => {
+    const key = prompt('Groq API Key (gsk_)'); if (!key) return;
+    try {
+        await apiPost('/api/modules', { id: 'mod_' + Date.now(), displayName: 'Vrythos Flash', type: 'groq', primaryKey: key, secondaryKey: '', apiUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', dailyLimitPerUser: 25 });
+        await refreshAll();
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('addGemini').onclick = async () => {
+    const key = prompt('Gemini API Key (AIza...)'); if (!key) return;
+    try {
+        await apiPost('/api/modules', { id: 'mod_' + Date.now(), displayName: 'Gemini 2.0 Flash', type: 'gemini', primaryKey: key, secondaryKey: '', apiUrl: '', model: 'gemini-2.0-flash', dailyLimitPerUser: 15 });
+        await refreshAll();
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('addOpenRouter').onclick = async () => {
+    const key = prompt('OpenRouter API Key (sk-or-)'); if (!key) return;
+    try {
+        await apiPost('/api/modules', { id: 'mod_' + Date.now(), displayName: 'OpenRouter GPT-OSS', type: 'openrouter', primaryKey: key, secondaryKey: '', apiUrl: 'https://openrouter.ai/api/v1/chat/completions', model: 'openai/gpt-oss-120b:free', dailyLimitPerUser: 10 });
+        await refreshAll();
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('addCloudflare').onclick = async () => {
+    const accountId = prompt('Cloudflare Account ID'); if (!accountId) return;
+    const apiToken = prompt('Cloudflare API Token'); if (!apiToken) return;
+    try {
+        await apiPost('/api/modules', { id: 'mod_' + Date.now(), displayName: 'Cloudflare Text', type: 'cloudflare', accountId, apiToken, model: '@cf/meta/llama-3.1-8b-instruct', dailyLimitPerUser: 10 });
+        await refreshAll();
+    } catch(e) { alert('Failed: ' + e.message); }
+};
+document.getElementById('addCustom').onclick = async () => {
+    const displayName = prompt('Engine name'); if (!displayName) return;
+    const type = prompt('Type (groq/gemini/openrouter/cloudflare)'); if (!type) return;
+    const apiUrl = prompt('API URL');
+    const model = prompt('Model');
+    const primaryKey = prompt('Primary API Key');
+    const dailyLimit = parseInt(prompt('Daily limit', '20'));
+    if (!apiUrl || !model || !primaryKey || isNaN(dailyLimit)) return;
+    const obj = { id: 'mod_' + Date.now(), displayName, type, primaryKey, secondaryKey: '', apiUrl, model, dailyLimitPerUser: dailyLimit };
+    if (type === 'cloudflare') { obj.accountId = primaryKey; obj.apiToken = apiUrl; delete obj.primaryKey; delete obj.apiUrl; }
+    try { await apiPost('/api/modules', obj); await refreshAll(); }
+    catch(e) { alert('Failed: ' + e.message); }
+};
+
+// ========== ADMIN CHAT TESTER ==========
+function renderAdminModuleDropdown() {
+    const sel = document.getElementById('adminModuleSelect');
+    sel.innerHTML = '';
+    if (!modules.length) { sel.innerHTML = '<option disabled>No engines</option>'; adminSelectedModuleId = null; return; }
+    modules.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.displayName} (${m.dailyLimitPerUser}/day)`;
+        sel.appendChild(opt);
+    });
+    if (!adminSelectedModuleId || !modules.find(m => m.id === adminSelectedModuleId)) {
+        adminSelectedModuleId = modules[0].id;
+    }
+    sel.value = adminSelectedModuleId;
+    sel.onchange = e => { adminSelectedModuleId = e.target.value; };
+}
+
+function addAdminMessage(text, isUser = false, isHtml = false) {
+    const container = document.getElementById('adminMessages');
+    const div = document.createElement('div');
+    div.className = 'message ' + (isUser ? 'admin-user-message' : '');
+    if (isHtml) {
+        div.innerHTML = `<div class="avatar-small">${isUser ? '👤' : '🧠'}</div><div class="admin-bubble ${isUser ? 'admin-user-bubble' : ''}">${text}</div>`;
+    } else {
+        div.innerHTML = `<div class="avatar-small">${isUser ? '👤' : '🧠'}</div><div class="admin-bubble ${isUser ? 'admin-user-bubble' : ''}">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+    }
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    if (!isHtml) adminMessagesHistory.push({ role: isUser ? 'user' : 'assistant', content: text });
+}
+
+async function callChatAPI(module_id, messages, deepThink) {
+    const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module_id, messages, deep_think: deepThink })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    return data.reply;
+}
+
+async function generateImage(prompt) {
+    try {
+        const res = await fetch('/api/generate/image', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt })
+        });
+        const data = await res.json();
+        if (data.success) return data.image;
+    } catch(_) {}
+    const fb = await fetch('/api/fallback/image', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt })
+    });
+    const fbData = await fb.json();
+    if (fbData.success) return fbData.image;
+    throw new Error('Image failed');
+}
+
+async function adminSendMessage(forceImage = false) {
+    const inp = document.getElementById('adminUserInput');
+    const text = inp.value.trim();
+    if (!text) return;
+    inp.value = '';
+    inp.disabled = true;
+
+    if ((adminLiveImageFlag || forceImage) && text.length > 2) {
+        addAdminMessage(text, true);
+        try {
+            const imgData = await generateImage(text);
+            const id = 'img_' + (++imgStoreCounter);
+            imgStore[id] = imgData;
+            addAdminMessage(`<img src="${imgData}" style="max-width:100%;border-radius:16px"><br><button onclick="downloadImage('${id}')">⬇️ Download</button>`, false, true);
+        } catch(e) { addAdminMessage('❌ ' + e.message); }
+        inp.disabled = false;
+        return;
     }
 
-    async function loadEarnings() {
-        try {
-            const data = await apiGet('/api/admin/earnings');
-            earningsBalance = Number(data.balance) || 0;
-            withdrawals = data.withdrawals || [];
-            updateEarningsDisplay();
-            renderWithdrawHistory();
-            if (data.stats) {
-                const statsEl = document.getElementById('earningsLiveStats');
-                if (statsEl) {
-                    statsEl.innerHTML = `
-                        💬 ${data.stats.totalChats} chats ·
-                        🎬 ${data.stats.totalVideos} videos ·
-                        👥 ${data.stats.userCount} users ·
-                        🔑 ${data.stats.totalFreeKeys} free keys
-                    `;
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to load earnings:', e.message);
-            const statsEl = document.getElementById('earningsLiveStats');
-            if (statsEl) statsEl.innerHTML = `<span style="color:#ef4444;">Failed to load: ${escapeHtml(e.message)}</span>`;
-        }
+    if (!adminSelectedModuleId) { addAdminMessage('❌ No engine selected'); inp.disabled = false; return; }
+
+    addAdminMessage(text, true);
+    adminMessagesHistory.push({ role: 'user', content: text });
+
+    const typing = document.createElement('div');
+    typing.className = 'message';
+    typing.innerHTML = '<div class="avatar-small">🧠</div><div class="admin-bubble">▮ Thinking…</div>';
+    document.getElementById('adminMessages').appendChild(typing);
+    document.getElementById('adminMessages').scrollTop = 999999;
+
+    try {
+        const reply = await callChatAPI(adminSelectedModuleId, adminMessagesHistory.slice(-12), adminDeepThinkFlag);
+        typing.remove();
+        addAdminMessage(reply);
+    } catch(e) {
+        typing.remove();
+        addAdminMessage('⚠️ ' + e.message);
     }
+    inp.disabled = false;
+    inp.focus();
+}
 
-    document.getElementById('editEarningsBtn').onclick = () => {
-        document.getElementById('earningsEditArea').style.display = 'block';
-        document.getElementById('earningsInput').value = earningsBalance;
-    };
+function renderAdminFileBadges() {
+    const container = document.getElementById('adminFilePreview');
+    container.innerHTML = adminAttachedFiles.map((f, i) =>
+        `<span class="file-tag">📄 ${escapeHtml(f.name)} <button data-i="${i}" style="background:none;border:none;color:#ef4444;cursor:pointer">✖</button></span>`
+    ).join('');
+    container.querySelectorAll('button').forEach(b => b.onclick = () => {
+        adminAttachedFiles.splice(parseInt(b.dataset.i), 1);
+        renderAdminFileBadges();
+    });
+}
 
-    document.getElementById('cancelEarningsBtn').onclick = () => {
-        document.getElementById('earningsEditArea').style.display = 'none';
-    };
-
-    document.getElementById('saveEarningsBtn').onclick = async () => {
-        const newVal = parseFloat(document.getElementById('earningsInput').value);
-        if (isNaN(newVal) || newVal < 0) {
-            alert('Please enter a valid non-negative number.');
-            return;
-        }
-        const pwd = prompt('Confirm admin password to save new balance:');
-        if (!pwd) return;
-        try {
-            const res = await apiPost('/api/admin/earnings', { password: pwd, balance: newVal });
-            if (res.success) {
-                earningsBalance = res.balance;
-                updateEarningsDisplay();
-                document.getElementById('earningsEditArea').style.display = 'none';
-                await loadEarnings();
-                alert('✅ Balance updated and saved to database.');
-            }
-        } catch (e) {
-            alert('Failed: ' + e.message);
-        }
-    };
-
-    document.getElementById('refreshEarningsBtn').onclick = () => loadEarnings();
-
-    document.getElementById('withdrawBtn').onclick = async () => {
-        const method = document.getElementById('withdrawMethod').value;
-        const amount = parseFloat(document.getElementById('withdrawAmount').value);
-        const detail = document.getElementById('withdrawDetail').value.trim();
-
-        if (isNaN(amount) || amount <= 0) {
-            alert('Enter a valid withdrawal amount.');
-            return;
-        }
-        if (amount > earningsBalance) {
-            alert('Insufficient earnings balance.');
-            return;
-        }
-        const pwd = prompt('Confirm admin password to process withdrawal:');
-        if (!pwd) return;
-
-        try {
-            const res = await apiPost('/api/admin/withdraw', {
-                password: pwd,
-                method,
-                amount,
-                detail
-            });
-            if (res.success) {
-                earningsBalance = res.balance;
-                updateEarningsDisplay();
-                document.getElementById('withdrawAmount').value = '';
-                document.getElementById('withdrawDetail').value = '';
-                await loadEarnings();
-                alert(`✅ Withdrawal of $${amount.toFixed(2)} processed and saved to database.`);
-            }
-        } catch (e) {
-            alert('Withdrawal failed: ' + e.message);
-        }
-    };
-
-    document.getElementById('clearWithdrawHistoryBtn').onclick = async () => {
-        if (!confirm('⚠️ Clear all withdrawal history? This does NOT restore the balance.')) return;
-        try {
-            await apiDelete('/api/admin/withdrawals');
-            await loadEarnings();
-            alert('✅ Withdrawal history cleared.');
-        } catch (e) {
-            alert('Failed: ' + e.message);
-        }
-    };
-
-    // ---------- REFRESH ALL ----------
-    async function refreshAll() {
-        await loadEarnings();
-        await loadAllData();
-        await renderModules();
-        await renderUserSelect();
-        await renderBugs();
-        renderAbuse();
-        await renderPendingBans();
-        renderAdminModuleDropdown();
-        refreshAdminChat();
-        await loadImageSettings();
-        await loadVideoSettings();
-        await refreshStats();
+document.getElementById('adminSendBtn').onclick = () => adminSendMessage(false);
+document.getElementById('adminImageGenBtn').onclick = () => adminSendMessage(true);
+document.getElementById('adminNewChatBtn').onclick = () => {
+    adminMessagesHistory = [];
+    document.getElementById('adminMessages').innerHTML = '<div class="message"><div class="avatar-small">🧠</div><div class="admin-bubble">New session.</div></div>';
+};
+document.getElementById('adminDeepThink').onchange = e => adminDeepThinkFlag = e.target.checked;
+document.getElementById('adminLiveImage').onchange = e => adminLiveImageFlag = e.target.checked;
+document.getElementById('adminUserInput').addEventListener('keypress', e => { if (e.key === 'Enter') adminSendMessage(false); });
+document.getElementById('adminAttachBtn').onclick = () => document.getElementById('adminFileInput').click();
+document.getElementById('adminFileInput').onchange = e => {
+    if (e.target.files) {
+        Array.from(e.target.files).forEach(f => {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                adminAttachedFiles.push({ name: f.name, content: ev.target.result, isText: f.type.startsWith('text/') || /\.(txt|json|md)$/i.test(f.name) });
+                renderAdminFileBadges();
+            };
+            if (f.type.startsWith('text/') || /\.(txt|json|md)$/i.test(f.name)) reader.readAsText(f);
+            else reader.readAsDataURL(f);
+        });
     }
+};
 
-    // ---------- ADMIN ABUSE DETECTION ----------
-    let adminAbuseScore = 0;
-    function addAdminAbuseScore(points, reason) {
-        adminAbuseScore += points;
-        console.log(`Admin abuse +${points} -> ${adminAbuseScore}%`);
-        if (adminAbuseScore >= 10) {
-            alert("⚠️ Suspicious admin activity detected. Your admin session may be logged.");
-        }
-        fetch('/api/admin/log-abuse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reason, score: adminAbuseScore })
-        }).catch(e => console.warn('log-abuse failed:', e));
-    }
-    document.addEventListener('contextmenu', (e) => {
+// ========== REFRESH ALL ==========
+async function refreshAll() {
+    await loadEarnings();
+    await loadAllData();
+    await renderModules();
+    await renderUserSelect();
+    await renderBugs();
+    renderAbuse();
+    await renderPendingBans();
+    renderAdminModuleDropdown();
+    await loadImageSettings();
+    await loadVideoSettings();
+    await refreshStats();
+}
+
+// ========== FORGOT PASSWORD MODAL ==========
+const forgotModal = document.getElementById('forgotModal');
+document.getElementById('forgotPwdLink').onclick = () => {
+    forgotModal.style.display = 'flex';
+    document.getElementById('forgotStatus').textContent = '';
+    document.getElementById('forgotNewPwd').value = '';
+};
+document.getElementById('forgotCloseBtn').onclick = () => forgotModal.style.display = 'none';
+forgotModal.addEventListener('click', e => { if (e.target === forgotModal) forgotModal.style.display = 'none'; });
+document.getElementById('forgotSendBtn').onclick = async () => {
+    const newPwd = document.getElementById('forgotNewPwd').value.trim();
+    if (newPwd.length < 4) { document.getElementById('forgotStatus').textContent = 'Min 4 chars'; return; }
+    const status = document.getElementById('forgotStatus');
+    status.textContent = 'Sending…';
+    try {
+        const res = await apiPost('/api/admin/change-password', { email: 'bodare207@gmail.com', newPassword: newPwd });
+        if (res.success) { status.style.color = '#10b981'; status.textContent = `✅ Email sent (${res.remaining} left today)`; setTimeout(() => forgotModal.style.display = 'none', 3000); }
+    } catch(e) { status.style.color = '#ef4444'; status.textContent = '❌ ' + e.message; }
+};
+
+// ========== ABUSE DETECTION (admin panel) ==========
+document.addEventListener('contextmenu', e => { e.preventDefault(); alert('Right-click disabled in admin panel.'); return false; });
+document.addEventListener('keydown', e => {
+    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
         e.preventDefault();
-        addAdminAbuseScore(5, "Right-click in admin panel");
-        alert("Right-click is disabled in admin panel. Your action has been logged.");
+        alert('Developer tools forbidden.');
         return false;
-    });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
-            e.preventDefault();
-            addAdminAbuseScore(10, "Dev tools attempt in admin panel");
-            alert("Developer tools are forbidden in admin panel. Your action has been logged.");
-            return false;
+    }
+});
+
+// ========== LOGIN ==========
+document.getElementById('adminPassword').addEventListener('keypress', e => {
+    if (e.key === 'Enter') document.getElementById('adminLoginBtn').click();
+});
+document.getElementById('adminLoginBtn').onclick = async () => {
+    const pwd = document.getElementById('adminPassword').value;
+    const msgEl = document.getElementById('adminMsg');
+    msgEl.textContent = '';
+    try {
+        const res = await apiPost('/api/admin/verify', { password: pwd });
+        if (res.success && res.token) {
+            adminToken = res.token;
+            document.getElementById('authArea').style.display = 'none';
+            document.getElementById('adminContent').style.display = 'block';
+            await refreshAll();
+            if (statsInterval) clearInterval(statsInterval);
+            statsInterval = setInterval(() => refreshStats(), 30000);
+            try {
+                const limitRes = await apiGet('/api/admin/password-limit');
+                if (limitRes.remaining !== undefined) {
+                    document.getElementById('pwdLimitStatus').textContent = `${limitRes.remaining} remaining today`;
+                }
+            } catch(_) {}
         }
-    });
-
-    let statsInterval = null;
-
-    // ---------- FORGOT PASSWORD MODAL ----------
-    const forgotModal = document.getElementById('forgotModal');
-    const forgotLink = document.getElementById('forgotPwdLink');
-    const forgotCloseBtn = document.getElementById('forgotCloseBtn');
-    const forgotSendBtn = document.getElementById('forgotSendBtn');
-    const forgotNewPwd = document.getElementById('forgotNewPwd');
-    const forgotStatus = document.getElementById('forgotStatus');
-
-    forgotLink.onclick = () => {
-        forgotModal.style.display = 'flex';
-        forgotStatus.innerText = '';
-        forgotNewPwd.value = '';
-    };
-    forgotCloseBtn.onclick = () => { forgotModal.style.display = 'none'; };
-    forgotModal.addEventListener('click', (e) => {
-        if (e.target === forgotModal) forgotModal.style.display = 'none';
-    });
-
-    forgotSendBtn.onclick = async () => {
-        const newPwd = forgotNewPwd.value.trim();
-        if (!newPwd || newPwd.length < 4) {
-            forgotStatus.style.color = '#f97316';
-            forgotStatus.innerText = 'Password must be at least 4 characters.';
-            return;
-        }
-        forgotStatus.innerText = 'Sending...';
-        forgotSendBtn.disabled = true;
-        try {
-            const res = await apiPost('/api/admin/change-password', {
-                email: 'bodare207@gmail.com',
-                newPassword: newPwd
-            });
-            if (res.success) {
-                forgotStatus.style.color = '#10b981';
-                forgotStatus.innerText = `✅ Password reset email sent! Check bodare207@gmail.com. Remaining today: ${res.remaining || '?'}`;
-                setTimeout(() => forgotModal.style.display = 'none', 4000);
-            } else {
-                forgotStatus.style.color = '#ef4444';
-                forgotStatus.innerText = '❌ ' + (res.error || 'Failed');
-            }
-        } catch(e) {
-            forgotStatus.style.color = '#ef4444';
-            forgotStatus.innerText = '❌ Error: ' + e.message;
-        }
-        forgotSendBtn.disabled = false;
-    };
-
-    // ---------- LOGIN ----------
-    document.getElementById("adminPassword").addEventListener("keypress", (e) => {
-        if (e.key === "Enter") document.getElementById("adminLoginBtn").click();
-    });
-
-    document.getElementById("adminLoginBtn").onclick = async () => {
-        let pwd = document.getElementById("adminPassword").value;
-        const msgEl = document.getElementById("adminMsg");
-        try {
-            const res = await apiPost('/api/admin/verify', { password: pwd });
-            if (res.success) {
-                document.getElementById("authArea").style.display = "none";
-                document.getElementById("adminContent").style.display = "block";
-                await refreshAll();
-
-                if (statsInterval) clearInterval(statsInterval);
-                statsInterval = setInterval(() => refreshStats(), 30000);
-
-                try {
-                    const limitRes = await apiGet('/api/admin/password-limit');
-                    if (limitRes.remaining !== undefined) {
-                        document.getElementById("pwdLimitStatus").innerText = `${limitRes.remaining} remaining today`;
-                    }
-                } catch(e) { /* non-critical */ }
-            } else {
-                msgEl.innerText = "Wrong password.";
-            }
-        } catch(e) {
-            msgEl.innerText = "Login failed: " + e.message;
-        }
-    };
+    } catch(e) { msgEl.textContent = 'Login failed: ' + e.message; }
+};
 </script>
 </body>
 </html>
