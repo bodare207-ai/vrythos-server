@@ -169,6 +169,12 @@ async function toolFetchUrl(url) {
                 .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
                 .replace(/\s+/g, ' ').trim();
         }
+        // ✅ FIX 1: Detect JavaScript-rendered SPAs (nearly empty after tag stripping)
+        if (cleaned.length < 100) {
+            return `The page at ${url} appears to be a JavaScript-rendered web app. The raw HTML contains no readable text — its content loads dynamically in the browser, so I cannot read it via a simple HTTP fetch.
+
+If this is your own site, you likely already know its purpose. If you need the actual visible content, you would need a full headless browser (Playwright) which this tool does not use.`;
+        }
         return `Contents of ${url}:\n\n${cleaned}`;
     } catch (err) {
         if (err.name === 'AbortError') return 'Error: Request timed out.';
@@ -239,11 +245,11 @@ YOU HAVE INTERNET ACCESS THROUGH TOOLS. Never say "I cannot browse the internet"
    Use for news, current events, prices, weather, sports.
 
 3. **search_wikipedia** — look up encyclopedic facts. Args: {"query": "..."}
-   Use for people, places, history, science.
+   Use ONLY for well-known people, places, history, and science topics that have Wikipedia articles.
 
 ## HOW TO USE A TOOL:
 
-When you need a tool, output EXACTLY this format and NOTHING ELSE (no "Sure", no "Let me search", just the block):
+When you need a tool, output EXACTLY this format and NOTHING ELSE (no preamble, no explanation, just the block):
 
 \`\`\`tool
 {"tool": "fetch_url", "args": {"url": "https://example.com"}}
@@ -251,16 +257,23 @@ When you need a tool, output EXACTLY this format and NOTHING ELSE (no "Sure", no
 
 You will then receive the tool result and can continue.
 
-## WHEN TO GIVE FINAL ANSWER:
+## IMPORTANT RULES:
 
-When you have enough info, or when no tool is needed, just write your normal answer (no tool block).
+1. **If the user gives a URL** → ALWAYS use fetch_url first.
 
-## RULES:
-- If user gives a URL → use fetch_url
-- If a tool fails → try another approach
-- Never say "I cannot browse" — you can
-- When providing code, use triple backticks with language specifier`;
+2. **If fetch_url returns "appears to be a JavaScript-rendered web app"** → tell the user that the page's content loads dynamically and cannot be read by simple HTTP fetch. Do NOT try to search Wikipedia for it. Just explain the limitation and ask if they can share the content another way.
 
+3. **If the URL is your own product** (Vrythos, vrythos-server.onrender.com) → you already know what Vrythos is (it's you). Just describe yourself directly from your knowledge. Do NOT fetch or search for yourself.
+
+4. **Never search Wikipedia for product names, company names, or app names** unless they are famous and have Wikipedia articles (e.g., "OpenAI", "Microsoft"). For obscure products, just tell the user you could not find information.
+
+5. **If a tool fails** → try another approach or tell the user honestly.
+
+6. **Never say "I cannot browse"** — you can. If a specific site doesn't work, say WHY (JS-rendered, blocked, timed out).
+
+When providing code, use triple backticks with the language specifier.`;
+
+// ✅ FIX 2: Enhanced tool extractor — catches weak-model formats
 function extractToolCall(text) {
     const trimmed = text.trim();
     // Try 1: ```tool ... ```
@@ -284,6 +297,22 @@ function extractToolCall(text) {
     if (m) {
         try {
             const parsed = JSON.parse(trimmed);
+            if (parsed.tool && parsed.args) return parsed;
+        } catch(e) {}
+    }
+    // ✅ Try 4: bare `tool` prefix without backticks (weak models output this)
+    m = trimmed.match(/^tool\s*\n\s*(\{[\s\S]*\})$/);
+    if (m) {
+        try {
+            const parsed = JSON.parse(m[1].trim());
+            if (parsed.tool && parsed.args) return parsed;
+        } catch(e) {}
+    }
+    // ✅ Try 5: JSON tool call buried anywhere in the response
+    const jsonMatch = trimmed.match(/\{"tool"\s*:\s*"[^"]+"\s*,\s*"args"\s*:\s*\{[\s\S]*?\}\s*\}/);
+    if (jsonMatch) {
+        try {
+            const parsed = JSON.parse(jsonMatch[0]);
             if (parsed.tool && parsed.args) return parsed;
         } catch(e) {}
     }
@@ -332,7 +361,7 @@ async function runUniversalAgent(messages, module, deepThink) {
     return { reply: 'I needed more steps to complete this. Please try a more specific question.', toolUsed: 'multiple', steps: 5 };
 }
 
-// ========== AI PROVIDERS (now with customSystemPrompt support) ==========
+// ========== AI PROVIDERS ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest. When providing code, always use triple backticks with the language specifier (e.g., \`\`\`html ... \`\`\`). Keep responses complete and do not truncate.`;
 const MAX_TOKENS = 20000;
 
