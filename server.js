@@ -541,7 +541,15 @@ app.delete('/api/userApiKeys', asyncHandler(async (req, res) => {
 // --- Modules ---
 app.get('/api/modules', asyncHandler(async (req, res) => {
     const modules = await Module.find({});
-    res.json(modules);
+    // Never expose apiToken, accountId, primaryKey, secondaryKey to public clients
+    const safe = modules.map(m => ({
+        id: m.id,
+        displayName: m.displayName,
+        type: m.type,
+        model: m.model,
+        dailyLimitPerUser: m.dailyLimitPerUser
+    }));
+    res.json(safe);
 }));
 app.post('/api/modules', asyncHandler(async (req, res) => {
     await Module.findOneAndUpdate({ id: req.body.id }, req.body, { upsert: true, new: true });
