@@ -22,7 +22,6 @@ mongoose.connect(MONGODB_URI)
 
 // ========== Mongoose Schemas ==========
 
-// User schema
 const userSchema = new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     username: { type: String, unique: true, required: true },
@@ -41,7 +40,6 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// Module schema
 const moduleSchema = new mongoose.Schema({
     id: { type: String, unique: true, required: true },
     displayName: String,
@@ -56,82 +54,47 @@ const moduleSchema = new mongoose.Schema({
 });
 const Module = mongoose.model('Module', moduleSchema);
 
-// Bug reports
 const bugSchema = new mongoose.Schema({
-    email: String,
-    username: String,
-    description: String,
-    timestamp: Date,
-    status: String
+    email: String, username: String, description: String, timestamp: Date, status: String
 });
 const Bug = mongoose.model('Bug', bugSchema);
 
-// Abuse reports
 const abuseSchema = new mongoose.Schema({
-    email: String,
-    username: String,
-    reason: String,
-    context: String,
-    timestamp: Date
+    email: String, username: String, reason: String, context: String, timestamp: Date
 });
 const Abuse = mongoose.model('Abuse', abuseSchema);
 
-// Pending bans
 const pendingBanSchema = new mongoose.Schema({
-    email: String,
-    username: String,
-    score: Number,
-    reason: String,
-    context: String,
-    timestamp: Date,
-    reviewed: Boolean
+    email: String, username: String, score: Number, reason: String, context: String, timestamp: Date, reviewed: Boolean
 });
 const PendingBan = mongoose.model('PendingBan', pendingBanSchema);
 
-// IP registrations
 const ipRegSchema = new mongoose.Schema({
-    ip: String,
-    username: String,
-    month: String,
-    timestamp: Date
+    ip: String, username: String, month: String, timestamp: Date
 });
 const IpReg = mongoose.model('IpReg', ipRegSchema);
 
-// Image quotas
 const imageQuotaSchema = new mongoose.Schema({
-    email: { type: String, unique: true },
-    count: Number,
-    windowStart: Date
+    email: { type: String, unique: true }, count: Number, windowStart: Date
 });
 const ImageQuota = mongoose.model('ImageQuota', imageQuotaSchema);
 
-// Chat usage
 const chatUsageSchema = new mongoose.Schema({
-    email: String,
-    moduleId: String,
-    date: String,
-    count: Number
+    email: String, moduleId: String, date: String, count: Number
 });
 const ChatUsage = mongoose.model('ChatUsage', chatUsageSchema);
 
-// User API keys (external)
 const userApiKeySchema = new mongoose.Schema({
     email: { type: String, unique: true },
     keys: [{ name: String, key: String, used: Number, date: String }]
 });
 const UserApiKey = mongoose.model('UserApiKey', userApiKeySchema);
 
-// Tournaments
 const tournamentSchema = new mongoose.Schema({
-    id: String,
-    name: String,
-    description: String,
-    prize: String,
-    participants: [String]
+    id: String, name: String, description: String, prize: String, participants: [String]
 });
 const Tournament = mongoose.model('Tournament', tournamentSchema);
 
-// Settings (admin password, image credentials, video credentials)
 const settingSchema = new mongoose.Schema({
     adminPasswordHash: String,
     cloudflareImageAccountId: String,
@@ -143,15 +106,11 @@ const settingSchema = new mongoose.Schema({
 });
 const Setting = mongoose.model('Setting', settingSchema);
 
-// Admin abuse logs
 const adminAbuseLogSchema = new mongoose.Schema({
-    timestamp: Date,
-    reason: String,
-    score: Number
+    timestamp: Date, reason: String, score: Number
 });
 const AdminAbuseLog = mongoose.model('AdminAbuseLog', adminAbuseLogSchema);
 
-// Free API Keys (with video_used)
 const freeApiKeySchema = new mongoose.Schema({
     key: { type: String, unique: true, required: true },
     email: { type: String, required: true },
@@ -164,7 +123,6 @@ const freeApiKeySchema = new mongoose.Schema({
 });
 const FreeApiKey = mongoose.model('FreeApiKey', freeApiKeySchema);
 
-// Video Usage per user (for daily limit 5)
 const videoUsageSchema = new mongoose.Schema({
     email: { type: String, required: true },
     date: { type: String, required: true },
@@ -172,7 +130,6 @@ const videoUsageSchema = new mongoose.Schema({
 });
 const VideoUsage = mongoose.model('VideoUsage', videoUsageSchema);
 
-// Withdrawals (REAL persistence)
 const withdrawalSchema = new mongoose.Schema({
     method: { type: String, required: true },
     amount: { type: Number, required: true },
@@ -182,49 +139,41 @@ const withdrawalSchema = new mongoose.Schema({
 });
 const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 
-// ========== NEW: Chat History ==========
+// ========== Chat History (30-day TTL) ==========
 const chatHistorySchema = new mongoose.Schema({
     email: { type: String, required: true, index: true },
     title: { type: String, default: 'Untitled chat' },
     messages: [{ role: String, content: String }],
-    size: { type: Number, default: 0 }, // bytes, enforced ≤ 2MB in app layer
+    size: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
-
-// TTL: delete 30 days after last update (2,592,000 seconds)
-chatHistorySchema.index({ updatedAt: 1 }, { expireAfterSeconds: 2592000 });
-
+chatHistorySchema.index({ updatedAt: 1 }, { expireAfterSeconds: 2592000 }); // 30 days
 const ChatHistory = mongoose.model('ChatHistory', chatHistorySchema);
 
-// ========== Helper functions ==========
+// ========== Helpers ==========
 function hashPassword(pw) {
     return crypto.createHash('sha256').update(pw).digest('hex');
 }
 
-// ========== reCAPTCHA verification ==========
+// reCAPTCHA verification
 const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET || '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe';
 
 async function verifyRecaptcha(token) {
     if (!token) return { success: false, error: 'Missing reCAPTCHA token' };
     try {
-        const params = new URLSearchParams({
-            secret: RECAPTCHA_SECRET,
-            response: token
-        });
+        const params = new URLSearchParams({ secret: RECAPTCHA_SECRET, response: token });
         const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString()
         });
-        const data = await res.json();
-        return data; // { success: true|false, ... }
+        return await res.json();
     } catch (err) {
         return { success: false, error: err.message };
     }
 }
 
-// ========== Helper: get random module (for external API fallback) ==========
 async function getRandomModule(avoidIds = []) {
     const modules = await Module.find({});
     const available = modules.filter(m => !avoidIds.includes(m.id));
@@ -232,7 +181,6 @@ async function getRandomModule(avoidIds = []) {
     return available[Math.floor(Math.random() * available.length)];
 }
 
-// ========== Helper: call AI with fallback ==========
 async function callAIWithFallback(messages, deepThink, attemptedModules = []) {
     const module = await getRandomModule(attemptedModules);
     if (!module) throw new Error('No AI modules available');
@@ -251,7 +199,6 @@ async function callAIWithFallback(messages, deepThink, attemptedModules = []) {
     }
 }
 
-// ========== Email transporter ==========
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
@@ -260,10 +207,8 @@ function sendEmail(to, subject, text) {
     return transporter.sendMail({ from: process.env.EMAIL_USER, to, subject, text });
 }
 
-// ========== Google OAuth ==========
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// ========== Initialize default settings ==========
 async function initSettings() {
     let settings = await Setting.findOne();
     if (!settings) {
@@ -282,7 +227,6 @@ async function initSettings() {
 }
 initSettings().catch(err => console.error('❌ initSettings error:', err));
 
-// Admin password change counter (in-memory, resets daily)
 let adminPasswordChangeCount = 0;
 let lastAdminResetDate = new Date().toDateString();
 function resetAdminCountIfNeeded() {
@@ -293,16 +237,14 @@ function resetAdminCountIfNeeded() {
     }
 }
 
-// ========== Global async error wrapper ==========
 function asyncHandler(fn) {
     return (req, res, next) => {
         Promise.resolve(fn(req, res, next)).catch(next);
     };
 }
 
-// ========== AI PROVIDER HANDLERS ==========
+// ========== AI Providers ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest. When providing code, always use triple backticks with the language specifier (e.g., \`\`\`html ... \`\`\`). Keep responses complete and do not truncate.`;
-
 const MAX_TOKENS = 20000;
 
 async function callGroq(module, messages, deepThink) {
@@ -355,11 +297,7 @@ async function callCloudflareText(module, messages, deepThink) {
     if (deepThink) sys += " Use step-by-step reasoning.";
     const url = `https://api.cloudflare.com/client/v4/accounts/${module.accountId}/ai/run/${module.model}`;
     const formattedMessages = [{ role: "system", content: sys }, ...messages];
-    const bodyPayload = {
-        messages: formattedMessages,
-        max_tokens: MAX_TOKENS,
-        temperature: 0.7
-    };
+    const bodyPayload = { messages: formattedMessages, max_tokens: MAX_TOKENS, temperature: 0.7 };
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${module.apiToken}`, 'Content-Type': 'application/json' },
@@ -380,7 +318,6 @@ async function callCloudflareText(module, messages, deepThink) {
     return reply;
 }
 
-// ========== Video Generation via Agnes API ==========
 async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agnesModel) {
     let frameRate = 24;
     let numFrames = Math.round(durationSeconds * frameRate);
@@ -403,10 +340,7 @@ async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agne
 
     const createResponse = await fetch(createUrl, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${agnesApiKey}`,
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${agnesApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(createPayload)
     });
 
@@ -427,9 +361,7 @@ async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agne
         await new Promise(resolve => setTimeout(resolve, 2000));
         attempts++;
         const pollUrl = `https://apihub.agnes-ai.com/agnesapi?video_id=${videoId}`;
-        const pollResponse = await fetch(pollUrl, {
-            headers: { 'Authorization': `Bearer ${agnesApiKey}` }
-        });
+        const pollResponse = await fetch(pollUrl, { headers: { 'Authorization': `Bearer ${agnesApiKey}` } });
         if (!pollResponse.ok) {
             console.warn(`Poll failed with status ${pollResponse.status}, retrying...`);
             continue;
@@ -453,27 +385,21 @@ async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agne
     return `data:video/mp4;base64,${base64}`;
 }
 
-// ========== API ROUTES ==========
+// ========== USER ROUTES ==========
+// ⚠️ FIX: The duplicate unprotected POST /api/users was REMOVED.
+// Only the reCAPTCHA-protected version at the bottom remains.
 
-// --- Users ---
 app.get('/api/users', asyncHandler(async (req, res) => {
     const users = await User.find({});
     res.json(users);
 }));
-app.post('/api/users', asyncHandler(async (req, res) => {
-    const existing = await User.findOne({ email: req.body.email });
-    if (existing) return res.status(400).json({ error: 'Email already registered' });
-    const existingUsername = await User.findOne({ username: req.body.username });
-    if (existingUsername) return res.status(400).json({ error: 'Username taken' });
-    const user = new User(req.body);
-    await user.save();
-    res.json({ success: true });
-}));
+
 app.put('/api/users/:email', asyncHandler(async (req, res) => {
     const user = await User.findOneAndUpdate({ email: req.params.email }, req.body, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ success: true });
 }));
+
 app.delete('/api/users/:email', asyncHandler(async (req, res) => {
     await User.deleteOne({ email: req.params.email });
     await ImageQuota.deleteOne({ email: req.params.email });
@@ -482,6 +408,7 @@ app.delete('/api/users/:email', asyncHandler(async (req, res) => {
     await ChatHistory.deleteMany({ email: req.params.email });
     res.json({ success: true });
 }));
+
 app.delete('/api/users', asyncHandler(async (req, res) => {
     await User.deleteMany({});
     await ImageQuota.deleteMany({});
@@ -491,7 +418,7 @@ app.delete('/api/users', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// --- Google OAuth ---
+// ========== Google OAuth ==========
 app.post('/api/auth/google', asyncHandler(async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ error: 'No token provided' });
@@ -511,26 +438,17 @@ app.post('/api/auth/google', asyncHandler(async (req, res) => {
                 suffix++;
             }
             user = new User({
-                email,
-                username,
-                name,
-                profilePic: picture,
-                passwordHash: null,
-                authProvider: 'google'
+                email, username, name, profilePic: picture,
+                passwordHash: null, authProvider: 'google'
             });
             await user.save();
         }
         if (user.banned) return res.status(403).json({ error: 'Account banned', banReason: user.banReason });
         res.json({
             success: true,
-            email: user.email,
-            username: user.username,
-            name: user.name,
-            profilePic: user.profilePic,
-            extraChatCredits: user.extraChatCredits || 0,
-            extraImageCredits: user.extraImageCredits || 0,
-            banned: user.banned,
-            totalHoursLive: user.totalHoursLive || 0
+            email: user.email, username: user.username, name: user.name, profilePic: user.profilePic,
+            extraChatCredits: user.extraChatCredits || 0, extraImageCredits: user.extraImageCredits || 0,
+            banned: user.banned, totalHoursLive: user.totalHoursLive || 0
         });
     } catch (err) {
         console.error('Google OAuth error:', err);
@@ -538,7 +456,6 @@ app.post('/api/auth/google', asyncHandler(async (req, res) => {
     }
 }));
 
-// --- User activity ---
 app.post('/api/user-activity', asyncHandler(async (req, res) => {
     const { email } = req.body;
     const user = await User.findOne({ email });
@@ -546,16 +463,13 @@ app.post('/api/user-activity', asyncHandler(async (req, res) => {
         const now = Date.now();
         const last = user.lastActive ? new Date(user.lastActive).getTime() : now;
         const diff = (now - last) / (1000 * 3600);
-        if (diff < (10 / 60)) {
-            user.totalHoursLive += diff;
-        }
+        if (diff < (10 / 60)) user.totalHoursLive += diff;
         user.lastActive = new Date(now);
         await user.save();
     }
     res.json({ success: true });
 }));
 
-// --- User API keys (external) ---
 app.get('/api/userApiKeys', asyncHandler(async (req, res) => {
     const keys = await UserApiKey.find({});
     res.json(keys);
@@ -577,15 +491,12 @@ app.delete('/api/userApiKeys', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// --- Modules (stripped of secrets) ---
+// ========== Modules (secrets stripped) ==========
 app.get('/api/modules', asyncHandler(async (req, res) => {
     const modules = await Module.find({});
     const safe = modules.map(m => ({
-        id: m.id,
-        displayName: m.displayName,
-        type: m.type,
-        model: m.model,
-        dailyLimitPerUser: m.dailyLimitPerUser
+        id: m.id, displayName: m.displayName, type: m.type,
+        model: m.model, dailyLimitPerUser: m.dailyLimitPerUser
     }));
     res.json(safe);
 }));
@@ -606,35 +517,25 @@ app.delete('/api/modules', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// --- Bugs ---
+// ========== Bugs / Abuse / Bans / IPs / Quotas / ChatUsage ==========
 app.get('/api/bugs', asyncHandler(async (req, res) => { res.json(await Bug.find({})); }));
 app.post('/api/bugs', asyncHandler(async (req, res) => { await new Bug(req.body).save(); res.json({ success: true }); }));
-app.delete('/api/bugs/:id', asyncHandler(async (req, res) => {
-    await Bug.deleteOne({ _id: req.params.id });
-    res.json({ success: true });
-}));
+app.delete('/api/bugs/:id', asyncHandler(async (req, res) => { await Bug.deleteOne({ _id: req.params.id }); res.json({ success: true }); }));
 app.delete('/api/bugs', asyncHandler(async (req, res) => { await Bug.deleteMany({}); res.json({ success: true }); }));
 
-// --- Abuse reports ---
 app.get('/api/abuse', asyncHandler(async (req, res) => { res.json(await Abuse.find({})); }));
 app.post('/api/abuse', asyncHandler(async (req, res) => { await new Abuse(req.body).save(); res.json({ success: true }); }));
 app.delete('/api/abuse', asyncHandler(async (req, res) => { await Abuse.deleteMany({}); res.json({ success: true }); }));
 
-// --- Pending bans ---
 app.get('/api/pendingBans', asyncHandler(async (req, res) => { res.json(await PendingBan.find({})); }));
 app.post('/api/pendingBans', asyncHandler(async (req, res) => { await new PendingBan(req.body).save(); res.json({ success: true }); }));
-app.delete('/api/pendingBans/:id', asyncHandler(async (req, res) => {
-    await PendingBan.deleteOne({ _id: req.params.id });
-    res.json({ success: true });
-}));
+app.delete('/api/pendingBans/:id', asyncHandler(async (req, res) => { await PendingBan.deleteOne({ _id: req.params.id }); res.json({ success: true }); }));
 app.delete('/api/pendingBans', asyncHandler(async (req, res) => { await PendingBan.deleteMany({}); res.json({ success: true }); }));
 
-// --- IP registrations ---
 app.get('/api/ipRegs', asyncHandler(async (req, res) => { res.json(await IpReg.find({})); }));
 app.post('/api/ipRegs', asyncHandler(async (req, res) => { await new IpReg(req.body).save(); res.json({ success: true }); }));
 app.delete('/api/ipRegs', asyncHandler(async (req, res) => { await IpReg.deleteMany({}); res.json({ success: true }); }));
 
-// --- Image quotas ---
 app.get('/api/imageQuotas', asyncHandler(async (req, res) => { res.json(await ImageQuota.find({})); }));
 app.post('/api/imageQuotas', asyncHandler(async (req, res) => {
     await ImageQuota.findOneAndUpdate({ email: req.body.email }, req.body, { upsert: true, new: true });
@@ -642,33 +543,25 @@ app.post('/api/imageQuotas', asyncHandler(async (req, res) => {
 }));
 app.delete('/api/imageQuotas', asyncHandler(async (req, res) => { await ImageQuota.deleteMany({}); res.json({ success: true }); }));
 
-// --- Chat usage ---
 app.get('/api/chatUsage', asyncHandler(async (req, res) => { res.json(await ChatUsage.find({})); }));
 app.post('/api/chatUsage', asyncHandler(async (req, res) => {
     await ChatUsage.findOneAndUpdate(
         { email: req.body.email, moduleId: req.body.moduleId, date: req.body.date },
-        req.body,
-        { upsert: true, new: true }
+        req.body, { upsert: true, new: true }
     );
     res.json({ success: true });
 }));
 app.delete('/api/chatUsage', asyncHandler(async (req, res) => { await ChatUsage.deleteMany({}); res.json({ success: true }); }));
 
-// --- Tournaments ---
+// ========== Tournaments ==========
 app.get('/api/tournaments', asyncHandler(async (req, res) => { res.json(await Tournament.find({})); }));
 app.post('/api/tournaments', asyncHandler(async (req, res) => { await new Tournament(req.body).save(); res.json({ success: true }); }));
 app.put('/api/tournaments/:id', asyncHandler(async (req, res) => {
     await Tournament.findOneAndUpdate({ id: req.params.id }, req.body);
     res.json({ success: true });
 }));
-app.delete('/api/tournaments/:id', asyncHandler(async (req, res) => {
-    await Tournament.deleteOne({ id: req.params.id });
-    res.json({ success: true });
-}));
-app.delete('/api/tournaments', asyncHandler(async (req, res) => {
-    await Tournament.deleteMany({});
-    res.json({ success: true });
-}));
+app.delete('/api/tournaments/:id', asyncHandler(async (req, res) => { await Tournament.deleteOne({ id: req.params.id }); res.json({ success: true }); }));
+app.delete('/api/tournaments', asyncHandler(async (req, res) => { await Tournament.deleteMany({}); res.json({ success: true }); }));
 app.post('/api/join-tournament', asyncHandler(async (req, res) => {
     const { email, tournamentId } = req.body;
     const tournament = await Tournament.findOne({ id: tournamentId });
@@ -680,8 +573,7 @@ app.post('/api/join-tournament', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// ========== CHAT HISTORY ROUTES ==========
-// GET list (max 5, sorted by updatedAt)
+// ========== Chat History ==========
 app.get('/api/chat-history', asyncHandler(async (req, res) => {
     const { email } = req.query;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -692,29 +584,24 @@ app.get('/api/chat-history', asyncHandler(async (req, res) => {
     res.json(chats);
 }));
 
-// GET one
 app.get('/api/chat-history/:id', asyncHandler(async (req, res) => {
     const chat = await ChatHistory.findById(req.params.id);
     if (!chat) return res.status(404).json({ error: 'Chat not found' });
     res.json(chat);
 }));
 
-// POST save/update
 app.post('/api/chat-history', asyncHandler(async (req, res) => {
     const { email, id, title, messages } = req.body;
     if (!email || !messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'email and messages required' });
     }
-    // Enforce 2MB limit
     const size = Buffer.byteLength(JSON.stringify(messages), 'utf8');
     if (size > 2 * 1024 * 1024) {
         return res.status(413).json({ error: 'Chat exceeds 2MB limit' });
     }
-    // Enforce max 5 chats per user
     if (!id) {
         const count = await ChatHistory.countDocuments({ email });
         if (count >= 5) {
-            // Delete oldest
             const oldest = await ChatHistory.findOne({ email }).sort({ updatedAt: 1 });
             if (oldest) await ChatHistory.deleteOne({ _id: oldest._id });
         }
@@ -736,13 +623,12 @@ app.post('/api/chat-history', asyncHandler(async (req, res) => {
     res.json({ success: true, id: chat._id });
 }));
 
-// DELETE
 app.delete('/api/chat-history/:id', asyncHandler(async (req, res) => {
     await ChatHistory.deleteOne({ _id: req.params.id });
     res.json({ success: true });
 }));
 
-// ========== CHAT ENDPOINT ==========
+// ========== Chat ==========
 app.post('/api/chat', asyncHandler(async (req, res) => {
     const { module_id, messages, deep_think } = req.body;
     const module = await Module.findOne({ id: module_id });
@@ -760,7 +646,7 @@ app.post('/api/chat', asyncHandler(async (req, res) => {
     }
 }));
 
-// ========== VIDEO GENERATION ENDPOINT (for logged-in users) ==========
+// ========== Video ==========
 app.post('/api/generate/video', asyncHandler(async (req, res) => {
     const { prompt, duration, email } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
@@ -772,9 +658,7 @@ app.post('/api/generate/video', asyncHandler(async (req, res) => {
 
     const today = new Date().toISOString().slice(0, 10);
     let videoUsage = await VideoUsage.findOne({ email, date: today });
-    if (!videoUsage) {
-        videoUsage = new VideoUsage({ email, date: today, count: 0 });
-    }
+    if (!videoUsage) videoUsage = new VideoUsage({ email, date: today, count: 0 });
     if (videoUsage.count >= 5) {
         return res.status(429).json({ error: 'Daily video limit reached (5/day). Please try again tomorrow.' });
     }
@@ -795,7 +679,7 @@ app.post('/api/generate/video', asyncHandler(async (req, res) => {
     }
 }));
 
-// ========== EXTERNAL API (extended for video) ==========
+// ========== External API ==========
 app.post('/api/external/chat', asyncHandler(async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -814,11 +698,8 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
             break;
         }
     }
-
     let foundFreeKey = null;
-    if (!foundUserKey) {
-        foundFreeKey = await FreeApiKey.findOne({ key: token });
-    }
+    if (!foundUserKey) foundFreeKey = await FreeApiKey.findOne({ key: token });
 
     if (!foundUserKey && !foundFreeKey) {
         return res.status(401).json({ error: 'Invalid API key' });
@@ -831,38 +712,29 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
 
     const { module_id, messages, deep_think = false, type = 'chat', prompt, duration } = req.body;
 
-    // --- VIDEO ---
     if (type === 'video') {
         if (!prompt) return res.status(400).json({ error: 'Missing prompt for video generation' });
         const today = new Date().toISOString().slice(0, 10);
         let videoUsage = await VideoUsage.findOne({ email, date: today });
-        if (!videoUsage) {
-            videoUsage = new VideoUsage({ email, date: today, count: 0 });
-        }
+        if (!videoUsage) videoUsage = new VideoUsage({ email, date: today, count: 0 });
         if (videoUsage.count >= videoLimit) {
             return res.status(429).json({ error: `Daily video limit (${videoLimit}) reached for this account` });
         }
-
         const settings = await Setting.findOne();
         if (!settings || !settings.agnesApiKey) {
             return res.status(500).json({ error: 'Video service not configured' });
         }
-
         try {
             const videoData = await generateVideoWithAgnes(prompt, duration || 5, settings.agnesApiKey, settings.agnesModel);
             videoUsage.count += 1;
             await videoUsage.save();
-            if (isFreeKey) {
-                await FreeApiKey.updateOne({ key: token }, { $inc: { video_used: 1 } });
-            }
-            const remaining = videoLimit - videoUsage.count;
-            return res.json({ success: true, video: videoData, remaining });
+            if (isFreeKey) await FreeApiKey.updateOne({ key: token }, { $inc: { video_used: 1 } });
+            return res.json({ success: true, video: videoData, remaining: videoLimit - videoUsage.count });
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }
     }
 
-    // --- IMAGE ---
     if (type === 'image' || (type === 'chat' && prompt && !messages)) {
         if (!prompt) return res.status(400).json({ error: 'Missing prompt for image generation' });
         const today = new Date().toISOString().slice(0, 10);
@@ -874,17 +746,13 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const buffer = await response.arrayBuffer();
                 const base64 = Buffer.from(buffer).toString('base64');
-                if (isFreeKey) {
-                    await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
-                } else {
-                    await UserApiKey.updateOne(
-                        { email: foundUserEmail, 'keys.key': token },
-                        { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
-                    );
-                }
+                if (isFreeKey) await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
+                else await UserApiKey.updateOne(
+                    { email: foundUserEmail, 'keys.key': token },
+                    { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
+                );
                 return res.json({ success: true, image: `data:image/png;base64,${base64}` });
             }
-
             const url = `https://api.cloudflare.com/client/v4/accounts/${settings.cloudflareImageAccountId}/ai/run/${settings.imageModel}`;
             const response = await fetch(url, {
                 method: 'POST',
@@ -897,65 +765,48 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
                 if (!fallbackRes.ok) throw new Error(`Fallback HTTP ${fallbackRes.status}`);
                 const buffer = await fallbackRes.arrayBuffer();
                 const base64 = Buffer.from(buffer).toString('base64');
-                if (isFreeKey) {
-                    await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
-                } else {
-                    await UserApiKey.updateOne(
-                        { email: foundUserEmail, 'keys.key': token },
-                        { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
-                    );
-                }
+                if (isFreeKey) await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
+                else await UserApiKey.updateOne(
+                    { email: foundUserEmail, 'keys.key': token },
+                    { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
+                );
                 return res.json({ success: true, image: `data:image/png;base64,${base64}` });
             }
             const buffer = await response.arrayBuffer();
             const base64 = Buffer.from(buffer).toString('base64');
-            if (isFreeKey) {
-                await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
-            } else {
-                await UserApiKey.updateOne(
-                    { email: foundUserEmail, 'keys.key': token },
-                    { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
-                );
-            }
+            if (isFreeKey) await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
+            else await UserApiKey.updateOne(
+                { email: foundUserEmail, 'keys.key': token },
+                { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
+            );
             return res.json({ success: true, image: `data:image/png;base64,${base64}` });
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }
     }
 
-    // --- CHAT ---
     if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Missing messages array' });
     }
 
     const today = new Date().toISOString().slice(0, 10);
     if (isFreeKey) {
-        if (foundFreeKey.date !== today) {
-            foundFreeKey.used = 0;
-            foundFreeKey.date = today;
-        }
+        if (foundFreeKey.date !== today) { foundFreeKey.used = 0; foundFreeKey.date = today; }
         if (foundFreeKey.used >= foundFreeKey.limit) {
             return res.status(429).json({ error: `Daily chat limit (${foundFreeKey.limit}) reached` });
         }
     } else {
-        if (foundUserKey.date !== today) {
-            foundUserKey.used = 0;
-            foundUserKey.date = today;
-        }
+        if (foundUserKey.date !== today) { foundUserKey.used = 0; foundUserKey.date = today; }
         if (foundUserKey.used >= 20) {
             return res.status(429).json({ error: 'Daily chat limit (20) reached for this API key' });
         }
     }
 
     let moduleToUse = null;
-    if (module_id) {
-        moduleToUse = await Module.findOne({ id: module_id });
-    }
+    if (module_id) moduleToUse = await Module.findOne({ id: module_id });
     if (!moduleToUse) {
         const randomModule = await getRandomModule();
-        if (!randomModule) {
-            return res.status(503).json({ error: 'No AI modules available' });
-        }
+        if (!randomModule) return res.status(503).json({ error: 'No AI modules available' });
         moduleToUse = randomModule;
     }
 
@@ -967,14 +818,11 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
         else if (moduleToUse.type === 'cloudflare') reply = await callCloudflareText(moduleToUse, messages, deep_think);
         else throw new Error('Unsupported module type');
 
-        if (isFreeKey) {
-            await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
-        } else {
-            await UserApiKey.updateOne(
-                { email: foundUserEmail, 'keys.key': token },
-                { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
-            );
-        }
+        if (isFreeKey) await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
+        else await UserApiKey.updateOne(
+            { email: foundUserEmail, 'keys.key': token },
+            { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
+        );
 
         const remaining = (isFreeKey ? foundFreeKey.limit : 20) - (isFreeKey ? (foundFreeKey.used + 1) : (foundUserKey.used + 1));
         res.json({ success: true, reply, remaining });
@@ -982,14 +830,11 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
         if (!module_id) {
             try {
                 const fallbackReply = await callAIWithFallback(messages, deep_think, [moduleToUse.id]);
-                if (isFreeKey) {
-                    await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
-                } else {
-                    await UserApiKey.updateOne(
-                        { email: foundUserEmail, 'keys.key': token },
-                        { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
-                    );
-                }
+                if (isFreeKey) await FreeApiKey.updateOne({ key: token }, { $inc: { used: 1 }, $set: { date: today } });
+                else await UserApiKey.updateOne(
+                    { email: foundUserEmail, 'keys.key': token },
+                    { $inc: { 'keys.$.used': 1 }, $set: { 'keys.$.date': today } }
+                );
                 const remaining = (isFreeKey ? foundFreeKey.limit : 20) - (isFreeKey ? (foundFreeKey.used + 1) : (foundUserKey.used + 1));
                 return res.json({ success: true, reply: fallbackReply, remaining });
             } catch (fallbackErr) {
@@ -1000,36 +845,26 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
     }
 }));
 
-// ========== FREE API KEY endpoints ==========
+// ========== Free API Keys ==========
 app.post('/api/free-api-key/generate', asyncHandler(async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
-
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.banned) return res.status(403).json({ error: 'Account banned' });
 
     await FreeApiKey.deleteOne({ email });
-
     const newKey = 'vrythos_free_' + crypto.randomBytes(16).toString('hex');
     const freeKey = new FreeApiKey({
-        key: newKey,
-        email,
-        used: 0,
-        video_used: 0,
+        key: newKey, email, used: 0, video_used: 0,
         date: new Date().toISOString().slice(0, 10),
-        limit: 100,
-        video_limit: 100
+        limit: 100, video_limit: 100
     });
     await freeKey.save();
 
     const apiUrl = `https://vrythos-server.onrender.com/api/external/chat`;
     res.json({
-        success: true,
-        key: newKey,
-        apiUrl,
-        chat_limit: 100,
-        video_limit: 100,
+        success: true, key: newKey, apiUrl, chat_limit: 100, video_limit: 100,
         instructions: `Use this key as Bearer token. Send POST requests to ${apiUrl} with JSON body: { "messages": [...], "type": "chat" } or for images: { "prompt": "cat", "type": "image" } or for videos: { "prompt": "description", "type": "video", "duration": 5 }.`
     });
 }));
@@ -1040,13 +875,8 @@ app.get('/api/free-api-key/info', asyncHandler(async (req, res) => {
     const key = await FreeApiKey.findOne({ email });
     if (!key) return res.json({ exists: false });
     res.json({
-        exists: true,
-        key: key.key,
-        used: key.used,
-        video_used: key.video_used || 0,
-        limit: key.limit,
-        video_limit: key.video_limit || 100,
-        date: key.date,
+        exists: true, key: key.key, used: key.used, video_used: key.video_used || 0,
+        limit: key.limit, video_limit: key.video_limit || 100, date: key.date,
         remaining: key.limit - key.used,
         video_remaining: (key.video_limit || 100) - (key.video_used || 0)
     });
@@ -1059,7 +889,7 @@ app.post('/api/free-api-key/revoke', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// ========== IMAGE GENERATION (Cloudflare + fallback) ==========
+// ========== Image ==========
 app.post('/api/generate/image', asyncHandler(async (req, res) => {
     const { prompt } = req.body;
     const settings = await Setting.findOne();
@@ -1096,18 +926,13 @@ app.post('/api/fallback/image', asyncHandler(async (req, res) => {
     }
 }));
 
-// ========== ADMIN ENDPOINTS ==========
-
+// ========== Admin ==========
 app.post('/api/admin/verify', asyncHandler(async (req, res) => {
     const { password } = req.body;
     const settings = await Setting.findOne();
     if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
-    const hash = hashPassword(password);
-    if (hash === settings.adminPasswordHash) {
-        res.json({ success: true });
-    } else {
-        res.status(401).json({ error: 'Invalid password' });
-    }
+    if (hashPassword(password) === settings.adminPasswordHash) res.json({ success: true });
+    else res.status(401).json({ error: 'Invalid password' });
 }));
 
 app.get('/api/admin/settings', asyncHandler(async (req, res) => {
@@ -1130,9 +955,7 @@ app.post('/api/admin/settings', asyncHandler(async (req, res) => {
         if (hashPassword(adminPassword) !== settings.adminPasswordHash) {
             return res.status(401).json({ error: 'Current admin password is incorrect' });
         }
-        if (newAdminPassword) {
-            settings.adminPasswordHash = hashPassword(newAdminPassword);
-        }
+        if (newAdminPassword) settings.adminPasswordHash = hashPassword(newAdminPassword);
     }
     if (cloudflareImageAccountId !== undefined) settings.cloudflareImageAccountId = cloudflareImageAccountId;
     if (cloudflareImageApiToken !== undefined && cloudflareImageApiToken !== '********') settings.cloudflareImageApiToken = cloudflareImageApiToken;
@@ -1178,17 +1001,10 @@ app.get('/api/admin/stats', asyncHandler(async (req, res) => {
         const last = u.lastActive ? new Date(u.lastActive).getTime() : 0;
         return (now - last) < 5 * 60 * 1000;
     }).length;
-    const dailyUsers = users.filter(u => {
-        return u.lastActive && new Date(u.lastActive).toDateString() === today;
-    }).length;
-    const weeklyUsers = users.filter(u => {
-        return u.lastActive && new Date(u.lastActive).getTime() > weekAgo;
-    }).length;
-    const monthlyUsers = users.filter(u => {
-        return u.lastActive && new Date(u.lastActive).getTime() > monthAgo;
-    }).length;
-    const totalAccounts = users.length;
-    res.json({ liveUsers, dailyUsers, weeklyUsers, monthlyUsers, totalAccounts });
+    const dailyUsers = users.filter(u => u.lastActive && new Date(u.lastActive).toDateString() === today).length;
+    const weeklyUsers = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() > weekAgo).length;
+    const monthlyUsers = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() > monthAgo).length;
+    res.json({ liveUsers, dailyUsers, weeklyUsers, monthlyUsers, totalAccounts: users.length });
 }));
 
 app.get('/api/admin/user/:email', asyncHandler(async (req, res) => {
@@ -1199,9 +1015,7 @@ app.get('/api/admin/user/:email', asyncHandler(async (req, res) => {
     const chatUsage = await ChatUsage.find({ email: user.email });
     res.json({
         ...user.toObject(),
-        apiKeys: apiKeys.keys,
-        imageQuota,
-        chatUsage,
+        apiKeys: apiKeys.keys, imageQuota, chatUsage,
         totalHoursLive: user.totalHoursLive || 0
     });
 }));
@@ -1222,36 +1036,26 @@ app.post('/api/admin/log-abuse', asyncHandler(async (req, res) => {
     const count = await AdminAbuseLog.countDocuments();
     if (count > 100) {
         const oldest = await AdminAbuseLog.find({}).sort({ timestamp: 1 }).limit(count - 100);
-        const idsToDelete = oldest.map(d => d._id);
-        await AdminAbuseLog.deleteMany({ _id: { $in: idsToDelete } });
+        await AdminAbuseLog.deleteMany({ _id: { $in: oldest.map(d => d._id) } });
     }
     res.json({ success: true });
 }));
 
-// ========== REAL EARNINGS & WITHDRAWALS ==========
-
+// ========== Earnings ==========
 app.get('/api/admin/earnings', asyncHandler(async (req, res) => {
     const settings = await Setting.findOne();
     if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
-
     const withdrawals = await Withdrawal.find({}).sort({ timestamp: -1 }).limit(100);
     const chatUsage = await ChatUsage.find({});
     const videoUsage = await VideoUsage.find({});
-
     const totalChats = chatUsage.reduce((s, c) => s + (c.count || 0), 0);
     const totalVideos = videoUsage.reduce((s, v) => s + (v.count || 0), 0);
     const userCount = await User.countDocuments({});
     const totalFreeKeys = await FreeApiKey.countDocuments({});
-
     res.json({
         balance: settings.earningsBalance || 0,
         withdrawals,
-        stats: {
-            totalChats,
-            totalVideos,
-            userCount,
-            totalFreeKeys
-        }
+        stats: { totalChats, totalVideos, userCount, totalFreeKeys }
     });
 }));
 
@@ -1288,18 +1092,13 @@ app.post('/api/admin/withdraw', asyncHandler(async (req, res) => {
     if (!allowedMethods.includes(method)) {
         return res.status(400).json({ error: 'Invalid withdrawal method' });
     }
-
     settings.earningsBalance = Math.round((currentBalance - amount) * 100) / 100;
     await settings.save();
-
     const w = new Withdrawal({
-        method,
-        amount: Math.round(amount * 100) / 100,
-        detail: (detail || '').slice(0, 500),
-        status: 'Success'
+        method, amount: Math.round(amount * 100) / 100,
+        detail: (detail || '').slice(0, 500), status: 'Success'
     });
     await w.save();
-
     res.json({ success: true, balance: settings.earningsBalance, withdrawal: w });
 }));
 
@@ -1308,8 +1107,8 @@ app.delete('/api/admin/withdrawals', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// ========== reCAPTCHA protected register/login ==========
-// Override the existing /api/users POST with reCAPTCHA check
+// ========== reCAPTCHA-protected registration ==========
+// ⚠️ This is the ONLY POST /api/users route now
 app.post('/api/users', asyncHandler(async (req, res) => {
     const { recaptchaToken, ...userData } = req.body;
     const verify = await verifyRecaptcha(recaptchaToken);
@@ -1325,7 +1124,7 @@ app.post('/api/users', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// Protected login endpoint (email/password)
+// ========== reCAPTCHA-protected login ==========
 app.post('/api/login', asyncHandler(async (req, res) => {
     const { email, password, recaptchaToken } = req.body;
     const verify = await verifyRecaptcha(recaptchaToken);
@@ -1339,33 +1138,25 @@ app.post('/api/login', asyncHandler(async (req, res) => {
     if (user.banned) return res.status(403).json({ error: 'Account banned' });
     res.json({
         success: true,
-        email: user.email,
-        username: user.username,
-        name: user.name,
-        profilePic: user.profilePic,
-        extraChatCredits: user.extraChatCredits || 0,
-        extraImageCredits: user.extraImageCredits || 0,
-        banned: user.banned,
-        totalHoursLive: user.totalHoursLive || 0,
+        email: user.email, username: user.username, name: user.name, profilePic: user.profilePic,
+        extraChatCredits: user.extraChatCredits || 0, extraImageCredits: user.extraImageCredits || 0,
+        banned: user.banned, totalHoursLive: user.totalHoursLive || 0,
         authProvider: user.authProvider || 'email'
     });
 }));
 
-// ========== Global Error Handler ==========
+// ========== Error handler ==========
 app.use((err, req, res, next) => {
     console.error('❌ Server error:', err.stack || err.message);
     res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-// ========== Unhandled Rejection Safety Net ==========
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// ========== FALLBACK ROUTE ==========
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ========== START SERVER ==========
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
