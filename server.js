@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const mongoose = require('mongoose');
 const path = require('path');
+const { runAgent } = require('./agent-module.js'); // NEW: AI agent
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -640,6 +641,37 @@ app.post('/api/chat', asyncHandler(async (req, res) => {
         else throw new Error('Unsupported module type');
         res.json({ success: true, reply });
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+}));
+
+// ===== NEW: AI AGENT ENDPOINT (Wikipedia + Web Search) =====
+app.post('/api/agent/chat', asyncHandler(async (req, res) => {
+    const { messages } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: 'messages array required' });
+    }
+
+    // Get a Groq module from your database (you already have these)
+    const modules = await Module.find({});
+    const groqModule = modules.find(m => m.type === 'groq');
+    if (!groqModule) {
+        return res.status(503).json({ error: 'No Groq module configured. Add one in the admin panel.' });
+    }
+
+    const userMessage = messages[messages.length - 1]?.content || '';
+    const history = messages.slice(0, -1);
+
+    try {
+        const result = await runAgent(userMessage, history, groqModule.primaryKey);
+        res.json({
+            success: true,
+            reply: result.reply,
+            toolUsed: result.toolUsed,
+            steps: result.steps
+        });
+    } catch (err) {
+        console.error('Agent error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 }));
 
 // ========== VIDEO ==========
