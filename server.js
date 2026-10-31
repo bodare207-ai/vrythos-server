@@ -131,7 +131,7 @@ const tournamentSchema = new mongoose.Schema({
 });
 const Tournament = mongoose.model('Tournament', tournamentSchema);
 
-// Settings (admin password, image credentials, video credentials) — NOW WITH earningsBalance
+// Settings (admin password, image credentials, video credentials)
 const settingSchema = new mongoose.Schema({
     adminPasswordHash: String,
     cloudflareImageAccountId: String,
@@ -172,7 +172,7 @@ const videoUsageSchema = new mongoose.Schema({
 });
 const VideoUsage = mongoose.model('VideoUsage', videoUsageSchema);
 
-// ===== NEW: Withdrawals (REAL persistence) =====
+// Withdrawals (REAL persistence)
 const withdrawalSchema = new mongoose.Schema({
     method: { type: String, required: true },
     amount: { type: Number, required: true },
@@ -182,9 +182,46 @@ const withdrawalSchema = new mongoose.Schema({
 });
 const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 
+// ========== NEW: Chat History ==========
+const chatHistorySchema = new mongoose.Schema({
+    email: { type: String, required: true, index: true },
+    title: { type: String, default: 'Untitled chat' },
+    messages: [{ role: String, content: String }],
+    size: { type: Number, default: 0 }, // bytes, enforced ≤ 2MB in app layer
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// TTL: delete 30 days after last update (2,592,000 seconds)
+chatHistorySchema.index({ updatedAt: 1 }, { expireAfterSeconds: 2592000 });
+
+const ChatHistory = mongoose.model('ChatHistory', chatHistorySchema);
+
 // ========== Helper functions ==========
 function hashPassword(pw) {
     return crypto.createHash('sha256').update(pw).digest('hex');
+}
+
+// ========== reCAPTCHA verification ==========
+const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET || '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe';
+
+async function verifyRecaptcha(token) {
+    if (!token) return { success: false, error: 'Missing reCAPTCHA token' };
+    try {
+        const params = new URLSearchParams({
+            secret: RECAPTCHA_SECRET,
+            response: token
+        });
+        const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        });
+        const data = await res.json();
+        return data; // { success: true|false, ... }
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
 }
 
 // ========== Helper: get random module (for external API fallback) ==========
@@ -442,6 +479,7 @@ app.delete('/api/users/:email', asyncHandler(async (req, res) => {
     await ImageQuota.deleteOne({ email: req.params.email });
     await UserApiKey.deleteOne({ email: req.params.email });
     await ChatUsage.deleteMany({ email: req.params.email });
+    await ChatHistory.deleteMany({ email: req.params.email });
     res.json({ success: true });
 }));
 app.delete('/api/users', asyncHandler(async (req, res) => {
@@ -449,6 +487,7 @@ app.delete('/api/users', asyncHandler(async (req, res) => {
     await ImageQuota.deleteMany({});
     await UserApiKey.deleteMany({});
     await ChatUsage.deleteMany({});
+    await ChatHistory.deleteMany({});
     res.json({ success: true });
 }));
 
@@ -538,10 +577,9 @@ app.delete('/api/userApiKeys', asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// --- Modules ---
+// --- Modules (stripped of secrets) ---
 app.get('/api/modules', asyncHandler(async (req, res) => {
     const modules = await Module.find({});
-    // Never expose apiToken, accountId, primaryKey, secondaryKey to public clients
     const safe = modules.map(m => ({
         id: m.id,
         displayName: m.displayName,
@@ -639,6 +677,68 @@ app.post('/api/join-tournament', asyncHandler(async (req, res) => {
     if (tournament.participants.includes(email)) return res.json({ success: false, message: 'Already joined' });
     tournament.participants.push(email);
     await tournament.save();
+    res.json({ success: true });
+}));
+
+// ========== CHAT HISTORY ROUTES ==========
+// GET list (max 5, sorted by updatedAt)
+app.get('/api/chat-history', asyncHandler(async (req, res) => {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    const chats = await ChatHistory.find({ email })
+        .sort({ updatedAt: -1 })
+        .limit(5)
+        .select('_id title updatedAt size');
+    res.json(chats);
+}));
+
+// GET one
+app.get('/api/chat-history/:id', asyncHandler(async (req, res) => {
+    const chat = await ChatHistory.findById(req.params.id);
+    if (!chat) return res.status(404).json({ error: 'Chat not found' });
+    res.json(chat);
+}));
+
+// POST save/update
+app.post('/api/chat-history', asyncHandler(async (req, res) => {
+    const { email, id, title, messages } = req.body;
+    if (!email || !messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: 'email and messages required' });
+    }
+    // Enforce 2MB limit
+    const size = Buffer.byteLength(JSON.stringify(messages), 'utf8');
+    if (size > 2 * 1024 * 1024) {
+        return res.status(413).json({ error: 'Chat exceeds 2MB limit' });
+    }
+    // Enforce max 5 chats per user
+    if (!id) {
+        const count = await ChatHistory.countDocuments({ email });
+        if (count >= 5) {
+            // Delete oldest
+            const oldest = await ChatHistory.findOne({ email }).sort({ updatedAt: 1 });
+            if (oldest) await ChatHistory.deleteOne({ _id: oldest._id });
+        }
+    }
+
+    let chat;
+    if (id) {
+        chat = await ChatHistory.findById(id);
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+        chat.messages = messages;
+        chat.size = size;
+        chat.updatedAt = new Date();
+        if (title) chat.title = title;
+        await chat.save();
+    } else {
+        chat = new ChatHistory({ email, title, messages, size });
+        await chat.save();
+    }
+    res.json({ success: true, id: chat._id });
+}));
+
+// DELETE
+app.delete('/api/chat-history/:id', asyncHandler(async (req, res) => {
+    await ChatHistory.deleteOne({ _id: req.params.id });
     res.json({ success: true });
 }));
 
@@ -1039,7 +1139,6 @@ app.post('/api/admin/settings', asyncHandler(async (req, res) => {
     if (imageModel !== undefined) settings.imageModel = imageModel;
     if (agnesApiKey !== undefined) settings.agnesApiKey = agnesApiKey;
     if (agnesModel !== undefined) settings.agnesModel = agnesModel;
-    // earningsBalance intentionally NOT touched here — use /api/admin/earnings
     await settings.save();
     res.json({ success: true });
 }));
@@ -1112,6 +1211,7 @@ app.delete('/api/admin/user/:email', asyncHandler(async (req, res) => {
     await UserApiKey.deleteOne({ email: req.params.email });
     await ImageQuota.deleteOne({ email: req.params.email });
     await ChatUsage.deleteMany({ email: req.params.email });
+    await ChatHistory.deleteMany({ email: req.params.email });
     res.json({ success: true });
 }));
 
@@ -1130,7 +1230,6 @@ app.post('/api/admin/log-abuse', asyncHandler(async (req, res) => {
 
 // ========== REAL EARNINGS & WITHDRAWALS ==========
 
-// GET balance + history + usage stats
 app.get('/api/admin/earnings', asyncHandler(async (req, res) => {
     const settings = await Setting.findOne();
     if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
@@ -1156,7 +1255,6 @@ app.get('/api/admin/earnings', asyncHandler(async (req, res) => {
     });
 }));
 
-// Set / edit balance (requires admin password)
 app.post('/api/admin/earnings', asyncHandler(async (req, res) => {
     const { password, balance } = req.body;
     const settings = await Setting.findOne();
@@ -1172,7 +1270,6 @@ app.post('/api/admin/earnings', asyncHandler(async (req, res) => {
     res.json({ success: true, balance: settings.earningsBalance });
 }));
 
-// Withdraw funds (real deduction + persistent history)
 app.post('/api/admin/withdraw', asyncHandler(async (req, res) => {
     const { password, method, amount, detail } = req.body;
     const settings = await Setting.findOne();
@@ -1206,10 +1303,52 @@ app.post('/api/admin/withdraw', asyncHandler(async (req, res) => {
     res.json({ success: true, balance: settings.earningsBalance, withdrawal: w });
 }));
 
-// Clear withdrawal history (optional admin tool)
 app.delete('/api/admin/withdrawals', asyncHandler(async (req, res) => {
     await Withdrawal.deleteMany({});
     res.json({ success: true });
+}));
+
+// ========== reCAPTCHA protected register/login ==========
+// Override the existing /api/users POST with reCAPTCHA check
+app.post('/api/users', asyncHandler(async (req, res) => {
+    const { recaptchaToken, ...userData } = req.body;
+    const verify = await verifyRecaptcha(recaptchaToken);
+    if (!verify.success) {
+        return res.status(400).json({ error: 'reCAPTCHA verification failed' });
+    }
+    const existing = await User.findOne({ email: userData.email });
+    if (existing) return res.status(400).json({ error: 'Email already registered' });
+    const existingUsername = await User.findOne({ username: userData.username });
+    if (existingUsername) return res.status(400).json({ error: 'Username taken' });
+    const user = new User(userData);
+    await user.save();
+    res.json({ success: true });
+}));
+
+// Protected login endpoint (email/password)
+app.post('/api/login', asyncHandler(async (req, res) => {
+    const { email, password, recaptchaToken } = req.body;
+    const verify = await verifyRecaptcha(recaptchaToken);
+    if (!verify.success) {
+        return res.status(400).json({ error: 'reCAPTCHA verification failed' });
+    }
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ error: 'User not found' });
+    if (!user.passwordHash) return res.status(401).json({ error: 'Use Google login' });
+    if (hashPassword(password) !== user.passwordHash) return res.status(401).json({ error: 'Incorrect password' });
+    if (user.banned) return res.status(403).json({ error: 'Account banned' });
+    res.json({
+        success: true,
+        email: user.email,
+        username: user.username,
+        name: user.name,
+        profilePic: user.profilePic,
+        extraChatCredits: user.extraChatCredits || 0,
+        extraImageCredits: user.extraImageCredits || 0,
+        banned: user.banned,
+        totalHoursLive: user.totalHoursLive || 0,
+        authProvider: user.authProvider || 'email'
+    });
 }));
 
 // ========== Global Error Handler ==========
