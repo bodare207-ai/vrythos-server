@@ -192,14 +192,12 @@ function asyncHandler(fn) {
     return (req, res, next) => { Promise.resolve(fn(req, res, next)).catch(next); };
 }
 
-// ========== ADMIN SESSION (in-memory, 8h TTL) ==========
-// Sessions are cleared on server restart. Admin must re-login.
+// ========== ADMIN SESSION ==========
 const adminSessions = new Map();
 
 function createAdminSession() {
     const token = crypto.randomBytes(32).toString('hex');
-    adminSessions.set(token, Date.now() + 8 * 3600 * 1000); // 8 hours
-    // Clean expired sessions opportunistically
+    adminSessions.set(token, Date.now() + 8 * 3600 * 1000);
     for (const [t, exp] of adminSessions.entries()) {
         if (exp < Date.now()) adminSessions.delete(t);
     }
@@ -217,6 +215,48 @@ function requireAdmin(req, res, next) {
     }
     next();
 }
+
+// ========== GUEST MODE (no auth, IP rate-limited, no DB writes) ==========
+const guestRateLimit = new Map();
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of guestRateLimit.entries()) {
+        if (entry.resetAt < now) guestRateLimit.delete(ip);
+    }
+}, 15 * 60 * 1000);
+
+app.post('/api/guest/chat', asyncHandler(async (req, res) => {
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || req.connection.remoteAddress || 'unknown';
+    const now = Date.now();
+    let limit = guestRateLimit.get(ip);
+    if (!limit || limit.resetAt < now) {
+        limit = { count: 0, resetAt: now + 3600 * 1000 };
+        guestRateLimit.set(ip, limit);
+    }
+    if (limit.count >= 10) {
+        return res.status(429).json({ error: 'Guest limit reached (10 messages/hour). Please sign up to continue.' });
+    }
+
+    const { messages } = req.body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: 'messages array required' });
+    }
+
+    const trimmed = messages.slice(-6).map(m => ({ role: m.role, content: String(m.content || '') }));
+
+    const module = await getRandomModule();
+    if (!module) return res.status(503).json({ error: 'No AI available right now. Please try again later.' });
+
+    try {
+        const reply = await callCloudflareText(module, trimmed, false);
+        limit.count++;
+        res.json({ success: true, reply, remaining: 10 - limit.count });
+    } catch (err) {
+        console.error('Guest chat error:', err);
+        res.status(500).json({ error: err.message });
+    }
+}));
 
 // ========== AI Providers ==========
 const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest. When providing code, always use triple backticks with the language specifier (e.g., \`\`\`html ... \`\`\`). Keep responses complete and do not truncate.`;
@@ -338,9 +378,8 @@ async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agne
 app.get('/api/users', asyncHandler(async (req, res) => { res.json(await User.find({})); }));
 
 app.put('/api/users/:email', asyncHandler(async (req, res) => {
-    // Prevent privilege escalation on self-service update
     const { email, ...safeUpdates } = req.body;
-    delete safeUpdates.passwordHash; // passwords updated only via dedicated routes
+    delete safeUpdates.passwordHash;
     delete safeUpdates.banned;
     delete safeUpdates.banReason;
     delete safeUpdates.extraChatCredits;
@@ -368,7 +407,6 @@ app.delete('/api/users', requireAdmin, asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// Admin user credit grant — requires admin token
 app.post('/api/admin/users/:email/credits', requireAdmin, asyncHandler(async (req, res) => {
     const { addChat, addImage, setBanned } = req.body;
     const user = await User.findOne({ email: req.params.email });
@@ -445,7 +483,6 @@ app.delete('/api/userApiKeys', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // ========== MODULES ==========
-// GET is public (returns stripped data — no secrets)
 app.get('/api/modules', asyncHandler(async (req, res) => {
     const modules = await Module.find({});
     res.json(modules.map(m => ({
@@ -453,7 +490,6 @@ app.get('/api/modules', asyncHandler(async (req, res) => {
         model: m.model, dailyLimitPerUser: m.dailyLimitPerUser
     })));
 }));
-// Admin-only writes
 app.post('/api/modules', requireAdmin, asyncHandler(async (req, res) => {
     await Module.findOneAndUpdate({ id: req.body.id }, req.body, { upsert: true, new: true });
     res.json({ success: true });
@@ -531,7 +567,6 @@ app.post('/api/join-tournament', asyncHandler(async (req, res) => {
 }));
 
 // ========== CHAT HISTORY ==========
-// List — filtered by email
 app.get('/api/chat-history', asyncHandler(async (req, res) => {
     const { email } = req.query;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -539,7 +574,6 @@ app.get('/api/chat-history', asyncHandler(async (req, res) => {
     res.json(chats);
 }));
 
-// Get one — REQUIRES matching email (ownership check)
 app.get('/api/chat-history/:id', asyncHandler(async (req, res) => {
     const { email } = req.query;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -549,7 +583,6 @@ app.get('/api/chat-history/:id', asyncHandler(async (req, res) => {
     res.json(chat);
 }));
 
-// Save — validates body
 app.post('/api/chat-history', asyncHandler(async (req, res) => {
     const { email, id, title, messages } = req.body;
     if (!email || !messages || !Array.isArray(messages)) {
@@ -583,7 +616,6 @@ app.post('/api/chat-history', asyncHandler(async (req, res) => {
     res.json({ success: true, id: chat._id });
 }));
 
-// Delete — REQUIRES matching email (ownership check)
 app.delete('/api/chat-history/:id', asyncHandler(async (req, res) => {
     const { email } = req.query;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -836,7 +868,6 @@ app.post('/api/fallback/image', asyncHandler(async (req, res) => {
 }));
 
 // ========== ADMIN AUTH ==========
-// Verify password → returns session token
 app.post('/api/admin/verify', asyncHandler(async (req, res) => {
     const { password } = req.body;
     const settings = await Setting.findOne();
@@ -848,13 +879,11 @@ app.post('/api/admin/verify', asyncHandler(async (req, res) => {
     res.json({ success: true, token });
 }));
 
-// Public read of password change limit
 app.get('/api/admin/password-limit', (req, res) => {
     resetAdminCountIfNeeded();
     res.json({ remaining: 3 - adminPasswordChangeCount });
 });
 
-// Password change by email
 app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
     const { email, newPassword } = req.body;
     if (email !== 'bodare207@gmail.com') return res.status(403).json({ error: 'Unauthorized email' });
@@ -867,7 +896,6 @@ app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
     settings.adminPasswordHash = hashPassword(newPassword);
     await settings.save();
     adminPasswordChangeCount++;
-    // Invalidate ALL existing admin sessions
     adminSessions.clear();
     try {
         await sendEmail(email, 'Vrythos Admin New Password', `Your new admin password is: ${newPassword}\nPlease change it after login.`);
@@ -875,7 +903,6 @@ app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Failed to send email' }); }
 }));
 
-// Settings GET — now requires admin token
 app.get('/api/admin/settings', requireAdmin, asyncHandler(async (req, res) => {
     const settings = await Setting.findOne();
     if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
@@ -888,7 +915,6 @@ app.get('/api/admin/settings', requireAdmin, asyncHandler(async (req, res) => {
     });
 }));
 
-// Settings POST — has adminPassword in body (double check) + admin token required
 app.post('/api/admin/settings', requireAdmin, asyncHandler(async (req, res) => {
     const { adminPassword, newAdminPassword, cloudflareImageAccountId, cloudflareImageApiToken, imageModel, agnesApiKey, agnesModel } = req.body;
     let settings = await Setting.findOne();
@@ -911,7 +937,6 @@ app.post('/api/admin/settings', requireAdmin, asyncHandler(async (req, res) => {
     res.json({ success: true });
 }));
 
-// Stats — admin only
 app.get('/api/admin/stats', requireAdmin, asyncHandler(async (req, res) => {
     const users = await User.find({});
     const now = Date.now();
@@ -1061,7 +1086,6 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// SPA fallback
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
