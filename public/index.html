@@ -15,11 +15,13 @@
 html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);overflow:hidden;font-size:16px;-webkit-font-smoothing:antialiased}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:var(--radius-full)}::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
 .auth-container{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:1.5rem;background:var(--bg-primary);position:relative}
-.auth-card{width:100%;max-width:400px;position:relative;z-index:1}
-.auth-logo{font-family:var(--font-serif);font-size:2.2rem;font-weight:500;text-align:center;letter-spacing:-.02em;color:var(--text-primary);margin-bottom:1.5rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
-.auth-logo::before{content:'◆';color:var(--accent);font-size:1.4rem}
-.auth-heading{font-family:var(--font-serif);font-size:1.4rem;font-weight:500;text-align:center;color:var(--text-primary);margin-bottom:.4rem;letter-spacing:-.01em}
-.auth-subheading{text-align:center;color:var(--text-secondary);font-size:.85rem;margin-bottom:1.5rem}
+.auth-container::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(167,139,250,0.08),transparent 60%);pointer-events:none}
+.auth-card{width:100%;max-width:400px;position:relative;z-index:1;animation:auth-fade .4s ease}
+@keyframes auth-fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.auth-logo{font-family:var(--font-serif);font-size:2.4rem;font-weight:500;text-align:center;letter-spacing:-.02em;color:var(--text-primary);margin-bottom:2rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
+.auth-logo::before{content:'◆';color:var(--accent);font-size:1.6rem}
+.auth-heading{font-family:var(--font-serif);font-size:1.6rem;font-weight:500;text-align:center;color:var(--text-primary);margin-bottom:.4rem;letter-spacing:-.01em}
+.auth-subheading{text-align:center;color:var(--text-secondary);font-size:.9rem;margin-bottom:2rem}
 .auth-form-group{margin-bottom:.75rem}
 .auth-input{width:100%;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:.85rem 1rem;font-size:.95rem;color:var(--text-primary);outline:none;transition:var(--transition);font-family:var(--font-sans);min-height:48px}
 .auth-input:focus{border-color:var(--accent);background:var(--bg-secondary);box-shadow:0 0 0 3px var(--accent-soft)}
@@ -27,17 +29,22 @@ html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);
 .auth-btn{width:100%;background:var(--accent);border:none;border-radius:var(--radius-md);padding:.9rem 1rem;font-weight:600;font-size:.95rem;color:#1a1917;cursor:pointer;transition:var(--transition);min-height:48px;font-family:var(--font-sans);margin-top:.5rem}
 .auth-btn:hover{background:var(--accent-hover);color:#f5f4ef}
 .auth-btn:disabled{opacity:.6;cursor:not-allowed}
-.auth-divider{display:flex;align-items:center;gap:1rem;margin:1rem 0;color:var(--text-muted);font-size:.75rem}
+.auth-divider{display:flex;align-items:center;gap:1rem;margin:1.25rem 0;color:var(--text-muted);font-size:.75rem}
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border-subtle)}
-.auth-switch{text-align:center;margin-top:1rem;font-size:.85rem;color:var(--text-secondary);cursor:pointer;transition:var(--transition);min-height:44px;display:flex;align-items:center;justify-content:center}
+.auth-switch{text-align:center;margin-top:1.25rem;font-size:.85rem;color:var(--text-secondary);cursor:pointer;transition:var(--transition);min-height:44px;display:flex;align-items:center;justify-content:center}
 .auth-switch:hover{color:var(--text-primary)}
 .auth-switch strong{color:var(--accent);font-weight:500;margin-left:.25rem}
+.auth-forgot{text-align:right;font-size:.8rem;color:var(--text-muted);cursor:pointer;margin-bottom:.75rem;transition:var(--transition)}
+.auth-forgot:hover{color:var(--text-secondary)}
+.auth-footer{position:relative;z-index:1;margin-top:2rem;font-size:.75rem;color:var(--text-muted);text-align:center}
+.auth-footer a{color:var(--text-secondary);text-decoration:none;margin:0 .5rem;transition:var(--transition)}
+.auth-footer a:hover{color:var(--text-primary)}
 .hidden{display:none!important}
-#authMessage{margin-top:.75rem;font-size:.82rem;text-align:center;color:var(--danger);min-height:1.25rem}
+#authMessage{margin-top:1rem;font-size:.85rem;text-align:center;color:var(--danger);min-height:1.5rem}
 #authMessage a{color:var(--accent)}
 .g_id_signin{display:flex;justify-content:center;min-height:44px;margin-bottom:.5rem}
 .g_id_signin>div{width:100%!important;max-width:100%!important}
-.recaptcha-wrap{display:flex;justify-content:center;margin:.75rem 0;transform:scale(.9);transform-origin:center}
+.recaptcha-wrap{display:flex;justify-content:center;margin:.75rem 0}
 .app{display:flex;height:100dvh;width:100%;background:var(--bg-primary);overflow:hidden}
 .sidebar{width:260px;min-width:260px;background:var(--bg-secondary);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;padding:1rem .75rem;gap:.5rem;overflow-y:auto;flex-shrink:0;transition:transform .3s ease;z-index:100}
 .sidebar .logo{display:flex;align-items:center;gap:.5rem;font-family:var(--font-serif);font-size:1.4rem;font-weight:500;letter-spacing:-.02em;color:var(--text-primary);padding:.5rem .75rem .75rem}
@@ -54,22 +61,14 @@ html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);
 .sidebar .toggle-row input[type="checkbox"]:checked{background:var(--accent);border-color:var(--accent)}
 .sidebar .toggle-row input[type="checkbox"]:checked::after{left:16px;background:var(--bg-primary)}
 .sidebar .footer-stats{margin-top:auto;padding:.75rem;border-top:1px solid var(--border-subtle);font-size:.75rem;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center}
-.guest-banner{background:linear-gradient(135deg,rgba(167,139,250,.12),rgba(167,139,250,.04));border:1px solid var(--accent);border-radius:var(--radius-md);padding:.85rem;margin:.5rem .75rem}
-.guest-banner .gb-label{font-size:.68rem;color:var(--accent);font-weight:700;letter-spacing:.06em;margin-bottom:.4rem;text-transform:uppercase}
-.guest-banner .gb-text{font-size:.78rem;color:var(--text-secondary);line-height:1.45}
-.guest-banner .gb-counter{margin-top:.6rem;font-size:.72rem;color:var(--text-muted)}
-.guest-banner .gb-counter strong{color:var(--accent)}
 .main-chat{flex:1;display:flex;flex-direction:column;background:var(--bg-primary);min-width:0;height:100dvh}
 .chat-header{padding:.85rem 1.5rem;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;background:var(--bg-primary);flex-shrink:0;min-height:60px}
 .chat-header .ai-status{display:flex;align-items:center;gap:.6rem;font-family:var(--font-serif);font-weight:500;font-size:1.05rem;color:var(--text-primary);letter-spacing:-.01em}
 .chat-header .ai-status::before{content:'◆';color:var(--accent);font-size:.85rem}
 .chat-header .model-badge{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-full);padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary);display:inline-flex;align-items:center;gap:.35rem;font-weight:500}
 .chat-header .model-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
-.chat-header .model-badge.guest-badge{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .chat-header .user-menu-btn{background:transparent;border:1px solid var(--border-subtle);border-radius:var(--radius-full);padding:.45rem .9rem;font-size:.78rem;font-weight:500;color:var(--text-secondary);cursor:pointer;transition:var(--transition);display:flex;align-items:center;gap:.5rem;min-height:40px;font-family:var(--font-sans)}
 .chat-header .user-menu-btn:hover{border-color:var(--border-strong);color:var(--text-primary)}
-.chat-header .user-menu-btn.login-highlight{background:var(--accent);color:#1a1917;border-color:var(--accent);font-weight:600}
-.chat-header .user-menu-btn.login-highlight:hover{background:var(--accent-hover);color:#fff}
 .messages{flex:1;overflow-y:auto;padding:2rem 1.5rem 1rem;display:flex;flex-direction:column;gap:1.25rem}
 .message{display:flex;gap:.85rem;max-width:85%;animation:msg-in .25s ease}
 @keyframes msg-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -147,19 +146,15 @@ html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);
 .tool-toggle.active .toggle-switch{background:var(--accent);border-color:var(--accent)}
 .tool-toggle.active .toggle-switch::after{left:16px;background:var(--bg-primary)}
 .tool-toggle.active .tool-name{color:var(--accent)}
-.tool-toggle.locked{opacity:.55}
-.tool-toggle.locked .toggle-switch{background:var(--bg-primary)!important;border-color:var(--border-strong)!important}
-.tool-toggle.locked .toggle-switch::after{left:2px!important;background:var(--text-muted)!important}
 .tool-menu-sep{height:1px;background:var(--border-subtle);margin:.4rem .4rem}
 .tool-action{display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);min-height:44px;background:transparent;border:none;color:var(--text-primary);font-size:.85rem;text-align:left;font-family:var(--font-sans);width:100%;font-weight:500}
 .tool-action:hover{background:var(--bg-elevated)}
 .tool-action.danger{color:var(--danger)}
 .tool-action.danger:hover{background:rgba(239,68,68,.1)}
-.tool-action.locked{opacity:.55}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:2000;padding:1.5rem;animation:fade-in .2s ease;overflow-y:auto}
-.modal-content{background:var(--bg-secondary);border:1px solid var(--border-strong);border-radius:var(--radius-lg);max-width:440px;width:100%;max-height:90dvh;overflow-y:auto;padding:1.75rem 1.5rem;box-shadow:var(--shadow-card);animation:slide-up .25s ease;position:relative}
-.modal-content .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
-.modal-content .modal-header h3{font-family:var(--font-serif);font-size:1.3rem;font-weight:500;color:var(--text-primary)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:2000;padding:1.5rem;animation:fade-in .2s ease}
+.modal-content{background:var(--bg-secondary);border:1px solid var(--border-strong);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:90dvh;overflow-y:auto;padding:1.75rem 1.5rem;box-shadow:var(--shadow-card);animation:slide-up .25s ease}
+.modal-content .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem}
+.modal-content .modal-header h3{font-family:var(--font-serif);font-size:1.3rem;font-weight:500}
 .modal-content .modal-header .close{font-size:1.6rem;cursor:pointer;color:var(--text-muted);transition:var(--transition);line-height:1;padding:.2rem .4rem}
 .modal-content .modal-header .close:hover{color:var(--text-primary)}
 .modal-content .modal-body{max-height:60dvh;overflow-y:auto;background:var(--bg-primary);border-radius:var(--radius-md);padding:1rem;border:1px solid var(--border-subtle);white-space:pre-wrap;word-break:break-word;font-size:.85rem;line-height:1.6;color:var(--text-secondary)}
@@ -189,8 +184,8 @@ html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);
 .mobile-hamburger{display:none;background:none;border:none;color:var(--text-primary);font-size:1.4rem;cursor:pointer;padding:.2rem .4rem;min-height:44px;min-width:44px;align-items:center;justify-content:center}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
 .sidebar-overlay.active{display:block}
-@media (max-width:820px){.sidebar{position:fixed;top:0;left:0;bottom:0;z-index:100;transform:translateX(-100%);width:260px;border-right:1px solid var(--border-subtle);box-shadow:4px 0 40px rgba(0,0,0,.6)}.sidebar.open{transform:translateX(0)}.mobile-hamburger{display:flex!important}.modal-content .grid-2{grid-template-columns:1fr}.message{max-width:95%}.chat-header .user-menu-btn{font-size:.7rem;padding:.3rem .7rem}.suggestion-grid{grid-template-columns:1fr}}
-@media (max-width:480px){.chat-header{padding:.6rem 1rem}.messages{padding:1.25rem .9rem .5rem}.input-area{padding:.6rem .9rem calc(.75rem + var(--safe-bottom))}.input-wrapper{padding:.4rem;min-height:46px}.input-wrapper textarea{font-size:.9rem;padding:.4rem;min-height:38px}.input-wrapper .send-btn{width:36px;min-width:36px;height:36px;font-size:.9rem}.input-wrapper .plus-btn{width:36px;min-width:36px;height:36px;font-size:1.15rem}.message .bubble{font-size:.9rem;padding:.7rem .95rem}.welcome-screen .welcome-logo{font-size:2.2rem}.tool-menu{left:.75rem;right:.75rem;min-width:unset}.auth-logo{font-size:1.8rem}.auth-heading{font-size:1.2rem}}
+@media (max-width:820px){.sidebar{position:fixed;top:0;left:0;bottom:0;z-index:100;transform:translateX(-100%);width:260px;border-right:1px solid var(--border-subtle);box-shadow:4px 0 40px rgba(0,0,0,.6)}.sidebar.open{transform:translateX(0)}.mobile-hamburger{display:flex!important}.modal-content .grid-2{grid-template-columns:1fr}.message{max-width:95%}.auth-card input,.auth-card button{font-size:16px}.chat-header .user-menu-btn{font-size:.7rem;padding:.3rem .7rem}.suggestion-grid{grid-template-columns:1fr}}
+@media (max-width:480px){.chat-header{padding:.6rem 1rem}.messages{padding:1.25rem .9rem .5rem}.input-area{padding:.6rem .9rem calc(.75rem + var(--safe-bottom))}.input-wrapper{padding:.4rem;min-height:46px}.input-wrapper textarea{font-size:.9rem;padding:.4rem;min-height:38px}.input-wrapper .send-btn{width:36px;min-width:36px;height:36px;font-size:.9rem}.input-wrapper .plus-btn{width:36px;min-width:36px;height:36px;font-size:1.15rem}.message .bubble{font-size:.9rem;padding:.7rem .95rem}.welcome-screen .welcome-logo{font-size:2.2rem}.tool-menu{left:.75rem;right:.75rem;min-width:unset}.auth-logo{font-size:2rem}.auth-heading{font-size:1.4rem}}
 #app-root.loading{display:flex;align-items:center;justify-content:center;height:100dvh;font-size:1rem;color:var(--text-secondary);background:var(--bg-primary);font-family:var(--font-serif)}
 #app-root.error{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100dvh;color:var(--danger);padding:2rem;text-align:center;background:var(--bg-primary)}
 #app-root.error h2{font-size:1.5rem;margin-bottom:.5rem;font-family:var(--font-serif);font-weight:500}
@@ -203,60 +198,40 @@ html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);
 <div id="app-root" class="loading">Loading Vrythos…</div>
 
 <script>
-// ========== API HELPERS ==========
 async function apiGet(endpoint){const res=await fetch(endpoint);if(!res.ok)throw new Error(await res.text());return res.json()}
 async function apiPost(endpoint,data){const res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error||'Request failed')}return res.json()}
 async function apiPut(endpoint,data){const res=await fetch(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!res.ok)throw new Error(await res.text());return res.json()}
 async function apiDelete(endpoint){const res=await fetch(endpoint,{method:'DELETE'});if(!res.ok)throw new Error(await res.text());return res.json()}
 
-// ========== STATE ==========
-let currentUser = null;
-let isGuest = true;
-const GUEST_CHAT_LIMIT = 10;
-let guestChatCount = parseInt(localStorage.getItem('vrythos_guest_chats') || '0');
-let modules = [];
-let tournaments = [];
-let deepThink = false;
-let liveImageMode = false;
-let liveVideoMode = false;
-let bestCodingMode = false;
-let messagesHistory = [];
-let attachedFiles = [];
-let isProcessing = false;
-const DEFAULT_VIDEO_DURATION = 5;
-const imgStore = {};
-let imgStoreCounter = 0;
-const videoStore = {};
-let videoStoreCounter = 0;
-let abuseScore = 0;
-let abuseWarningShown = false;
-let messageIdCounter = 0;
-const messageContentStore = {};
-let currentChatId = null;
-let recaptchaWidgets = { login: null, register: null };
+let currentUser=null;
+let modules=[];
+let tournaments=[];
+let deepThink=false;
+let liveImageMode=false;
+let liveVideoMode=false;
+let bestCodingMode=false;
+let messagesHistory=[];
+let attachedFiles=[];
+let isProcessing=false;
+const DEFAULT_VIDEO_DURATION=5;
+const imgStore={};
+let imgStoreCounter=0;
+const videoStore={};
+let videoStoreCounter=0;
+let abuseScore=0;
+let abuseWarningShown=false;
+let messageIdCounter=0;
+const messageContentStore={};
+let currentChatId=null;
 
-// ========== UTILITIES ==========
 function escapeHtml(str){const map={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};return String(str).replace(/[&<>"']/g,m=>map[m])}
 function smartScroll(el){if(!el)return;const threshold=120;if(el.scrollHeight-el.scrollTop-el.clientHeight<threshold)el.scrollTop=el.scrollHeight}
 async function hashPassword(pw){const enc=new TextEncoder().encode(pw);const h=await crypto.subtle.digest('SHA-256',enc);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
 function showToast(msg,type='info'){const t=document.createElement('div');const bg=type==='error'?'#7f1a1a':type==='warning'?'#78350f':'#2a2926';t.style.cssText=`position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:${bg};color:#f5f4ef;padding:.65rem 1.25rem;border-radius:9999px;font-size:.82rem;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:90%;text-align:center;border:1px solid #3a3833;min-height:44px;display:flex;align-items:center;justify-content:center;font-family:'Inter',system-ui,sans-serif`;t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s'},2800);setTimeout(()=>t.remove(),3200)}
 
-function updateGuestCounter(){
-  const remaining = Math.max(0, GUEST_CHAT_LIMIT - guestChatCount);
-  const sidebarEl = document.getElementById('guestCounter');
-  const headerEl = document.getElementById('guestHeaderCounter');
-  if (sidebarEl) sidebarEl.textContent = remaining;
-  if (headerEl) headerEl.textContent = remaining;
-}
-
-function promptLogin(feature){
-  showToast(`🔐 Login required to use ${feature}`, 'warning');
-  setTimeout(() => showAuthModal('login'), 350);
-}
-
-// ========== ABUSE (only for logged-in users) ==========
+/* ABUSE */
 async function addAbuseScore(points,reason,context){
-  if(isGuest||!currentUser)return;
+  if(!currentUser)return;
   abuseScore=Math.min(100,abuseScore+points);
   try{
     await apiPost('/api/pendingBans',{email:currentUser.email,username:currentUser.username,score:abuseScore,reason,context:(context||'').slice(0,200),timestamp:Date.now(),reviewed:false});
@@ -267,28 +242,18 @@ async function addAbuseScore(points,reason,context){
     addAIMessage(`Warning: suspicious activity detected (score ${abuseScore}%). Repeated violations may lead to a ban.`,false,false,true);
   }
 }
-document.addEventListener('contextmenu',e=>{if(isGuest)return;e.preventDefault();addAbuseScore(5,'Right-click attempt','User right-clicked');showToast('Right-click is prohibited','warning');return false});
-function detectDevTools(){if(isGuest)return;const t=160;if(window.outerWidth-window.innerWidth>t||window.outerHeight-window.innerHeight>t){addAbuseScore(10,'Developer tools detected','DevTools opened');showToast('Developer tools detected','error')}}
+document.addEventListener('contextmenu',e=>{e.preventDefault();addAbuseScore(5,'Right-click attempt','User right-clicked');showToast('Right-click is prohibited','warning');return false});
+function detectDevTools(){const t=160;if(window.outerWidth-window.innerWidth>t||window.outerHeight-window.innerHeight>t){addAbuseScore(10,'Developer tools detected','DevTools opened');showToast('Developer tools detected','error')}}
 setInterval(detectDevTools,2000);
-document.addEventListener('keydown',e=>{if(isGuest)return;if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&e.key==='I')||(e.ctrlKey&&e.key==='U')){e.preventDefault();addAbuseScore(10,'View source attempt','Tried to view page source');showToast('Viewing source is forbidden','error');return false}});
+document.addEventListener('keydown',e=>{if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&e.key==='I')||(e.ctrlKey&&e.key==='U')){e.preventDefault();addAbuseScore(10,'View source attempt','Tried to view page source');showToast('Viewing source is forbidden','error');return false}});
 
-// Persistent outside-click handler for tool menu (registered ONCE)
-document.addEventListener('click', e => {
-  const tm = document.getElementById('toolMenu');
-  const pb = document.getElementById('plusBtn');
-  if (tm && pb && !tm.contains(e.target) && e.target !== pb) {
-    tm.classList.remove('open');
-    pb.classList.remove('open');
-  }
-});
-
-// ========== DOWNLOAD/COPY ==========
+/* DOWNLOAD/COPY */
 window.downloadImage=function(id){const u=imgStore[id];if(!u)return;const a=document.createElement('a');a.download='vrythos_image.png';a.href=u;a.click()};
 window.copyImageToClipboard=async function(id){const u=imgStore[id];if(!u)return;try{const b=await(await fetch(u)).blob();await navigator.clipboard.write([new ClipboardItem({[b.type]:b})]);showToast('Image copied','info')}catch(_){showToast('Copy failed','error')}};
 window.downloadVideo=function(id){const u=videoStore[id];if(!u)return;const a=document.createElement('a');a.download='vrythos_video.mp4';a.href=u;a.click()};
 window.copyVideoToClipboard=async function(id){const u=videoStore[id];if(!u)return;try{const b=await(await fetch(u)).blob();await navigator.clipboard.write([new ClipboardItem({[b.type]:b})]);showToast('Video copied','info')}catch(_){showToast('Copy failed','error')}};
 
-// ========== LOADERS ==========
+/* LOADERS */
 async function loadAllData(){modules=await apiGet('/api/modules');tournaments=await apiGet('/api/tournaments')}
 async function loadUsers(){return await apiGet('/api/users')}
 async function updateUser(email,updates){return await apiPut(`/api/users/${email}`,updates)}
@@ -298,7 +263,7 @@ async function saveUserApiKeys(email,keys){await apiPost('/api/userApiKeys',{ema
 async function addBugReport(bug){return await apiPost('/api/bugs',bug)}
 async function joinTournament(id){return await apiPost('/api/join-tournament',{email:currentUser.email,tournamentId:id})}
 
-// ========== IMAGE (blocked for guest at call site) ==========
+/* IMAGE */
 async function generateImageWithCloudflare(prompt){try{const r=await fetch('/api/generate/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(d.success)return d.image}catch(_){}return null}
 async function generateImageWithPollinations(prompt){try{const r=await fetch('/api/fallback/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(d.success)return d.image}catch(_){}return null}
 async function generateImageAndShow(prompt,live=false){
@@ -318,7 +283,7 @@ async function generateImageAndShow(prompt,live=false){
   }
 }
 
-// ========== VIDEO (blocked for guest at call site) ==========
+/* VIDEO */
 async function generateVideo(prompt,duration){
   addAIMessage('Generating video… (may take 30–60s)',false,false,true);
   try{
@@ -335,7 +300,7 @@ async function generateVideo(prompt,duration){
 function isVideoRequest(t){return /(video|animate|animation|make a video|create a video|generate a video|render|cinematic|short film|motion|sequence|clip|movie)/i.test(t)}
 function isImageRequest(t){return /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i.test(t)}
 
-// ========== AI CALL ==========
+/* AI CALL */
 async function callChatWithFallback(messages,deep){
   let attempts=0;let lastError=null;
   const maxAttempts=Math.min(modules.length,3);
@@ -358,7 +323,7 @@ function updateModuleStatus(name){
   const b=document.getElementById('modelBadge');if(b)b.innerHTML=`<span class="dot"></span> ${escapeHtml(name)}`;
 }
 
-// ========== CODE ==========
+/* CODE */
 function processCodeInText(text){
   const re=/```(\w+)?\n([\s\S]*?)```/g;
   let m,last=0,parts=[],has=false;
@@ -378,17 +343,12 @@ function buildCodeHtml(parts){
     else{
       const id='code_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
       codeStore[id]={language:p.language||'txt',code:p.code};
-      if(isGuest){
-        html+=`<div class="code-block-wrapper"><span class="code-lang">${escapeHtml(p.language||'txt')}</span><pre><code>${escapeHtml(p.code)}</code></pre></div>`;
-      }else{
-        html+=`<div class="code-block-wrapper" data-codeid="${id}"><span class="code-lang">${escapeHtml(p.language||'txt')}</span><pre><code>${escapeHtml(p.code)}</code></pre><div class="code-actions"><button onclick="previewCode('${id}')">👁️ Preview</button><button onclick="downloadCode('${id}')">Download</button><button onclick="copyCode('${id}')">Copy</button><button onclick="debugCode('${id}')">Debug</button></div></div>`;
-      }
+      html+=`<div class="code-block-wrapper" data-codeid="${id}"><span class="code-lang">${escapeHtml(p.language||'txt')}</span><pre><code>${escapeHtml(p.code)}</code></pre><div class="code-actions"><button onclick="previewCode('${id}')">👁️ Preview</button><button onclick="downloadCode('${id}')">Download</button><button onclick="copyCode('${id}')">Copy</button><button onclick="debugCode('${id}')">Debug</button></div></div>`;
     }
   }
   return html;
 }
 window.previewCode=function(id){
-  if(isGuest){promptLogin('code preview');return}
   const d=codeStore[id];if(!d)return;
   const modal=document.createElement('div');modal.className='modal-overlay';
   modal.innerHTML=`<div class="modal-content" style="max-width:900px;"><div class="modal-header"><h3>Code Preview (${escapeHtml(d.language)})</h3><span class="close" id="previewClose">&times;</span></div><div class="modal-body" style="max-height:70dvh;">${escapeHtml(d.code)}</div><div class="modal-actions"><button class="primary" id="previewCopy">Copy Code</button><button id="previewCloseBtn">Close</button></div></div>`;
@@ -400,20 +360,14 @@ window.previewCode=function(id){
   modal.addEventListener('click',e=>{if(e.target===modal)close()});
 };
 window.downloadCode=function(id){
-  if(isGuest){promptLogin('code download');return}
   const d=codeStore[id];if(!d)return;
   const blob=new Blob([d.code],{type:'text/plain'});const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;
   const ext={html:'html',css:'css',js:'js',javascript:'js',python:'py',py:'py',java:'java',c:'c',cpp:'cpp','c++':'cpp',go:'go',rust:'rs',php:'php',ruby:'rb',rb:'rb',swift:'swift',ts:'ts',typescript:'ts',json:'json',xml:'xml',sh:'sh',bash:'sh',txt:'txt'};
   a.download=`code.${ext[d.language]||'txt'}`;a.click();URL.revokeObjectURL(url);
 };
-window.copyCode=async function(id){
-  if(isGuest){promptLogin('code copy');return}
-  const d=codeStore[id];if(!d)return;
-  try{await navigator.clipboard.writeText(d.code);showToast('Code copied','info')}catch(_){showToast('Copy failed','error')}
-};
+window.copyCode=async function(id){const d=codeStore[id];if(!d)return;try{await navigator.clipboard.writeText(d.code);showToast('Code copied','info')}catch(_){showToast('Copy failed','error')}};
 window.debugCode=async function(id){
-  if(isGuest){promptLogin('code debugging');return}
   const d=codeStore[id];if(!d)return;
   if(isProcessing){showToast('Please wait for current reply to finish','warning');return}
   const btn=document.querySelector(`.code-block-wrapper[data-codeid="${id}"] .code-actions button:last-child`);
@@ -428,9 +382,8 @@ window.debugCode=async function(id){
   finally{setProcessing(false);await saveCurrentChat()}
 };
 
-// ========== FULL OUTPUT ==========
+/* FULL OUTPUT */
 function showFullOutput(content){
-  if(isGuest){promptLogin('full output view');return}
   const m=document.createElement('div');m.className='modal-overlay';
   m.innerHTML=`<div class="modal-content" style="max-width:800px;"><div class="modal-header"><h3>Full Output</h3><span class="close" id="foClose">&times;</span></div><div class="modal-body">${escapeHtml(content)}</div><div class="modal-actions"><button class="primary" id="foCopy">Copy Full Text</button><button id="foCloseBtn">Close</button></div></div>`;
   document.body.appendChild(m);
@@ -440,13 +393,11 @@ function showFullOutput(content){
   m.addEventListener('click',e=>{if(e.target===m)close()});
 }
 
-// ========== REGENERATE ==========
+/* REGENERATE */
 async function regenerateReply(){
-  if(isGuest){promptLogin('regenerate');return}
   if(isProcessing||!currentUser)return;
   while(messagesHistory.length>0&&messagesHistory[messagesHistory.length-1].role==='assistant')messagesHistory.pop();
   if(!messagesHistory.length){showToast('Nothing to regenerate','warning');return}
-  // Remove last AI message from DOM so it matches popped history
   const container=document.getElementById('messagesContainer');
   const allAI=container.querySelectorAll('.ai-message');
   if(allAI.length>0)allAI[allAI.length-1].remove();
@@ -456,9 +407,10 @@ async function regenerateReply(){
   finally{setProcessing(false);await saveCurrentChat()}
 }
 
-// ========== INSTANT AI MESSAGE ==========
+/* INSTANT AI MESSAGE */
 function _addAIMessageInstant(content,isHtml=false,skipHistory=false){
   const container=document.getElementById('messagesContainer');
+  if(!container){console.error('_addAIMessageInstant: #messagesContainer missing');return}
   const div=document.createElement('div');div.className='message ai-message';
   if(isHtml){
     div.innerHTML=`<div class="avatar">◆</div><div class="bubble">${content}</div>`;
@@ -470,18 +422,15 @@ function _addAIMessageInstant(content,isHtml=false,skipHistory=false){
   bubbleContent=parts?buildCodeHtml(parts):escapeHtml(content).replace(/\n/g,'<br>');
   const msgId='msg_'+(++messageIdCounter);
   messageContentStore[msgId]=content;
-  const actionsHtml = isGuest ? '' : `<div class="msg-actions-bar"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div>`;
-  div.innerHTML=`<div class="avatar">◆</div><div class="bubble">${bubbleContent}${actionsHtml}</div>`;
+  div.innerHTML=`<div class="avatar">◆</div><div class="bubble">${bubbleContent}<div class="msg-actions-bar"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
   container.appendChild(div);container.scrollTop=container.scrollHeight;
-  if(!isGuest){
-    div.querySelector(`[data-copy="${msgId}"]`).onclick=async()=>{try{await navigator.clipboard.writeText(messageContentStore[msgId]||'');showToast('Copied','info')}catch(_){showToast('Copy failed','error')}};
-    div.querySelector(`[data-regen="${msgId}"]`).onclick=regenerateReply;
-    div.querySelector(`[data-full="${msgId}"]`).onclick=()=>showFullOutput(messageContentStore[msgId]||'');
-  }
+  div.querySelector(`[data-copy="${msgId}"]`).onclick=async()=>{try{await navigator.clipboard.writeText(messageContentStore[msgId]||'');showToast('Copied','info')}catch(_){showToast('Copy failed','error')}};
+  div.querySelector(`[data-regen="${msgId}"]`).onclick=regenerateReply;
+  div.querySelector(`[data-full="${msgId}"]`).onclick=()=>showFullOutput(messageContentStore[msgId]||'');
   if(!skipHistory)messagesHistory.push({role:'assistant',content});
 }
 
-// ========== TYPING — 4-phase schedule ==========
+/* TYPING — 4-phase schedule */
 function getTypingDelay(wordIndex){
   if(wordIndex<21)return 1000/7;
   if(wordIndex<61)return 1000/10;
@@ -510,24 +459,22 @@ async function typeInto(text,targetEl,isAborted){
   }
 }
 
-// ========== STREAMING AI MESSAGE — fixed to not overwrite earlier parts ==========
+/* STREAMING AI MESSAGE */
 let currentTypingAbort=null;
 async function streamAIMessage(content){
   if(currentTypingAbort){currentTypingAbort();currentTypingAbort=null}
   const container=document.getElementById('messagesContainer');
+  if(!container){console.error('streamAIMessage: #messagesContainer missing');return}
   const div=document.createElement('div');div.className='message ai-message';
   const msgId='msg_'+(++messageIdCounter);
   messageContentStore[msgId]=content;
   const parts=processCodeInText(content);
-  const actionsHtml = isGuest ? `<div class="msg-actions-bar" style="display:none;"></div>` : `<div class="msg-actions-bar" style="display:none;"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div>`;
-  div.innerHTML=`<div class="avatar">◆</div><div class="bubble"><span class="typing-content"></span><span class="typing-cursor"></span>${actionsHtml}</div>`;
+  div.innerHTML=`<div class="avatar">◆</div><div class="bubble"><span class="typing-content"></span><span class="typing-cursor"></span><div class="msg-actions-bar" style="display:none;"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
   container.appendChild(div);container.scrollTop=container.scrollHeight;
   messagesHistory.push({role:'assistant',content});
-  if(!isGuest){
-    div.querySelector(`[data-copy="${msgId}"]`).onclick=async()=>{try{await navigator.clipboard.writeText(messageContentStore[msgId]||'');showToast('Copied','info')}catch(_){showToast('Copy failed','error')}};
-    div.querySelector(`[data-regen="${msgId}"]`).onclick=regenerateReply;
-    div.querySelector(`[data-full="${msgId}"]`).onclick=()=>showFullOutput(messageContentStore[msgId]||'');
-  }
+  div.querySelector(`[data-copy="${msgId}"]`).onclick=async()=>{try{await navigator.clipboard.writeText(messageContentStore[msgId]||'');showToast('Copied','info')}catch(_){showToast('Copy failed','error')}};
+  div.querySelector(`[data-regen="${msgId}"]`).onclick=regenerateReply;
+  div.querySelector(`[data-full="${msgId}"]`).onclick=()=>showFullOutput(messageContentStore[msgId]||'');
   const typingContent=div.querySelector('.typing-content');
   const cursorEl=div.querySelector('.typing-cursor');
   let aborted=false;currentTypingAbort=()=>{aborted=true};
@@ -568,8 +515,7 @@ async function streamAIMessage(content){
     }
   }finally{
     if(cursorEl.parentNode)cursorEl.remove();
-    const bar = div.querySelector('.msg-actions-bar');
-    if(bar) bar.style.display='flex';
+    div.querySelector('.msg-actions-bar').style.display='flex';
     smartScroll(container);
     if(!aborted)currentTypingAbort=null;
   }
@@ -580,59 +526,44 @@ function addAIMessage(content,isHtml=false,stream=false,skipHistory=false){
   return Promise.resolve();
 }
 
-// ========== USER MESSAGE ==========
+/* USER MESSAGE */
 function addUserMessage(text){
   const container=document.getElementById('messagesContainer');
+  if(!container){console.error('addUserMessage: #messagesContainer missing');return}
   const div=document.createElement('div');div.className='message user-message';
-  const initial=(currentUser?.username?.charAt(0)||'G').toUpperCase();
-  const actionsHtml = isGuest ? '' : `<div class="msg-actions-bar" style="justify-content:flex-end;"><button data-edit="1">Edit</button></div>`;
-  div.innerHTML=`<div class="avatar">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(text).replace(/\n/g,'<br>')}${actionsHtml}</div>`;
+  const initial=(currentUser?.username?.charAt(0)||'U').toUpperCase();
+  div.innerHTML=`<div class="avatar">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(text).replace(/\n/g,'<br>')}<div class="msg-actions-bar" style="justify-content:flex-end;"><button data-edit="1">Edit</button></div></div>`;
   container.appendChild(div);container.scrollTop=container.scrollHeight;
-  if(!isGuest){
-    div.querySelector('[data-edit="1"]').onclick=()=>{
-      if(isProcessing){showToast('Please wait for current reply to finish','warning');return}
-      const t=document.getElementById('userInput');if(!t)return;
-      t.value=text;t.dispatchEvent(new Event('input'));t.focus();
-    };
-  }
+  div.querySelector('[data-edit="1"]').onclick=()=>{
+    if(isProcessing){showToast('Please wait for current reply to finish','warning');return}
+    const t=document.getElementById('userInput');if(!t)return;
+    t.value=text;t.dispatchEvent(new Event('input'));t.focus();
+  };
   messagesHistory.push({role:'user',content:text});
 }
 
 function showTyping(){
   const container=document.getElementById('messagesContainer');
+  if(!container)return null;
   const div=document.createElement('div');div.id='typingMsg';div.className='message ai-message';
   div.innerHTML=`<div class="avatar">◆</div><div class="bubble" style="color:var(--text-muted);">Thinking…</div>`;
   container.appendChild(div);container.scrollTop=container.scrollHeight;
   return div;
 }
 
-// ========== ACTIVITY ==========
+/* ACTIVITY */
 let activityInterval=null;
-function startActivityTracking(){
-  if(activityInterval)clearInterval(activityInterval);
-  if(isGuest)return;
-  activityInterval=setInterval(async()=>{if(currentUser)await apiPost('/api/user-activity',{email:currentUser.email})},5*60*1000);
-}
+function startActivityTracking(){if(activityInterval)clearInterval(activityInterval);activityInterval=setInterval(async()=>{if(currentUser)await apiPost('/api/user-activity',{email:currentUser.email})},5*60*1000)}
 
 function setProcessing(p){
   isProcessing=p;
   const ta=document.getElementById('userInput');const btn=document.getElementById('sendBtn');
-  if(!ta)return;
-  ta.disabled=p;
-  if(btn)btn.disabled=p;
-  if(p){
-    ta.placeholder='Please wait for reply to finish…';
-  }else if(isGuest && guestChatCount >= GUEST_CHAT_LIMIT){
-    ta.disabled=true;
-    if(btn)btn.disabled=true;
-    ta.placeholder='Guest limit reached. Login to continue.';
-  }else{
-    ta.placeholder=isGuest?'Message Vrythos (guest)…':'Message Vrythos…';
-    ta.focus();
-  }
+  if(ta)ta.disabled=p;if(btn)btn.disabled=p;
+  if(ta)ta.placeholder=p?'Please wait for reply to finish…':'Message Vrythos…';
+  if(!p&&ta)ta.focus();
 }
 
-// ========== ACTIVE TOOLS ==========
+/* ACTIVE TOOLS */
 function renderActiveTools(){
   const c=document.getElementById('activeTools');if(!c)return;
   const tools=[];
@@ -644,19 +575,18 @@ function renderActiveTools(){
   else{c.style.display='none';c.innerHTML=''}
 }
 
-// ========== BEST CODING ==========
+/* BEST CODING */
 async function handleBestCoding(userText,attachedFilesText){
-  if(isGuest){promptLogin('best coding mode');return}
   const avail=[...modules];
   if(!avail.length){addAIMessage('No AI engines available. Please add at least one engine in the admin panel.',false,false,true);return}
   let initial=userText;if(attachedFilesText)initial+='\n\n'+attachedFilesText;
   let reply=null;let used=[];let step=0;const maxSteps=Math.min(4,avail.length);let attempts=0;const maxA=avail.length*2;
-  const typing=showTyping();const bubble=typing.querySelector('.bubble');
+  const typing=showTyping();const bubble=typing?typing.querySelector('.bubble'):null;
   while(step<maxSteps&&attempts<maxA){
     attempts++;let found=false;
     for(const mod of avail){
       if(used.includes(mod.id))continue;
-      bubble.textContent=`Step ${step+1}/${maxSteps} with ${mod.displayName}…`;
+      if(bubble)bubble.textContent=`Step ${step+1}/${maxSteps} with ${mod.displayName}…`;
       try{
         const r=step===0?await callChatAPI(mod.id,[{role:'user',content:initial}],deepThink):await callChatAPI(mod.id,[{role:'user',content:`Original request: "${userText}"\n\nPrevious output:\n${reply}\n\nPlease review, fix bugs, improve the code, add more features, and make it more professional. Provide the final improved version.`}],deepThink);
         reply=r;used.push(mod.id);step++;found=true;updateModuleStatus(mod.displayName);break;
@@ -664,70 +594,52 @@ async function handleBestCoding(userText,attachedFilesText){
     }
     if(!found)break;
   }
-  typing.remove();
+  if(typing)typing.remove();
   if(reply)await addAIMessage(reply,false,true);
   else addAIMessage('Best coding chain failed to produce any output.',false,false,true);
 }
 
-// ========== SEND MESSAGE ==========
+/* SEND MESSAGE */
 async function sendMessage(userText,forceImage=false,forceVideo=false){
-  // Guest checks
-  if(isGuest){
-    if(guestChatCount >= GUEST_CHAT_LIMIT){
-      showToast('Guest limit reached. Please login.', 'warning');
-      setTimeout(() => showAuthModal('login'), 500);
-      return;
-    }
-    // Force disable all tools for guests
-    forceImage = false;
-    forceVideo = false;
-    bestCodingMode = false;
-    liveImageMode = false;
-    liveVideoMode = false;
-    deepThink = false;
-  } else {
-    if(!currentUser||currentUser.banned){addAIMessage('Account banned.',false,false,true);return}
-  }
-  if(isProcessing)return;
+  if(!currentUser||currentUser.banned){addAIMessage('Account banned.',false,false,true);return}
+  if(isProcessing){addAIMessage('Please wait for the current reply to finish.',false,false,true);return}
   setProcessing(true);
   const welcome=document.getElementById('welcomeScreen');if(welcome)welcome.remove();
   try{
-    if(!isGuest){
-      const willVideo=forceVideo||(!forceImage&&liveVideoMode&&isVideoRequest(userText));
-      const willImage=(forceImage||(liveImageMode&&isImageRequest(userText)))&&!willVideo;
-      if(willVideo){
-        let prompt=userText;
-        const m=userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
-        if(m&&m[2])prompt=m[2];
-        addUserMessage(userText);
-        await generateVideo(prompt,DEFAULT_VIDEO_DURATION);
-        return;
+    const willVideo=forceVideo||(!forceImage&&liveVideoMode&&isVideoRequest(userText));
+    const willImage=(forceImage||(liveImageMode&&isImageRequest(userText)))&&!willVideo;
+    if(willVideo){
+      let prompt=userText;
+      const m=userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
+      if(m&&m[2])prompt=m[2];
+      addUserMessage(userText);
+      await generateVideo(prompt,DEFAULT_VIDEO_DURATION);
+      return;
+    }
+    if(willImage){
+      addUserMessage(userText);
+      let prompt=userText;
+      const m=userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
+      if(m&&m[2])prompt=m[2];
+      await generateImageAndShow(prompt,liveImageMode||forceImage);
+      return;
+    }
+    if(bestCodingMode&&modules.length>0){
+      let filesText='';
+      if(attachedFiles.length){
+        filesText=attachedFiles.map(f=>f.isText?`${f.name}:\n${f.content}`:`${f.name} (binary)`).join('\n');
+        attachedFiles=[];renderFileBadges();
       }
-      if(willImage){
-        addUserMessage(userText);
-        let prompt=userText;
-        const m=userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
-        if(m&&m[2])prompt=m[2];
-        await generateImageAndShow(prompt,liveImageMode||forceImage);
-        return;
-      }
-      if(bestCodingMode&&modules.length>0){
-        let filesText='';
-        if(attachedFiles.length){
-          filesText=attachedFiles.map(f=>f.isText?`${f.name}:\n${f.content}`:`${f.name} (binary)`).join('\n');
-          attachedFiles=[];renderFileBadges();
-        }
-        addUserMessage(userText);
-        await handleBestCoding(userText,filesText);
-        return;
-      }
+      addUserMessage(userText);
+      await handleBestCoding(userText,filesText);
+      return;
     }
     let modifiedText=userText;
     const codeKeywords=['code','html','css','javascript','python','java','c++','c#','php','ruby','go','rust','swift','typescript','js','py','cpp'];
     if(codeKeywords.some(kw=>userText.toLowerCase().includes(kw)))modifiedText+="\n\n(Please format any code you provide with triple backticks and language specifier, e.g., ```html ... ```)";
     addUserMessage(userText);
     let fullMsg=modifiedText;
-    if(!isGuest && attachedFiles.length){
+    if(attachedFiles.length){
       fullMsg+='\n\n[Attached files]\n'+attachedFiles.map(f=>f.isText?`${f.name}:\n${f.content}`:`${f.name} (binary)`).join('\n');
       attachedFiles=[];renderFileBadges();
     }
@@ -740,23 +652,11 @@ async function sendMessage(userText,forceImage=false,forceVideo=false){
     else await addAIMessage(reply,false,true);
   }finally{
     setProcessing(false);
-    if(isGuest){
-      guestChatCount++;
-      localStorage.setItem('vrythos_guest_chats', guestChatCount.toString());
-      updateGuestCounter();
-      if(guestChatCount >= GUEST_CHAT_LIMIT){
-        setTimeout(() => {
-          showToast('🎁 Guest limit reached. Login to continue.', 'warning');
-          showAuthModal('login');
-        }, 1200);
-      }
-    }else{
-      await saveCurrentChat();
-    }
+    await saveCurrentChat();
   }
 }
 
-// ========== FILE BADGES ==========
+/* FILE BADGES */
 function renderFileBadges(){
   const c=document.getElementById('filePreviewArea');if(!c)return;
   c.innerHTML=attachedFiles.map((f,idx)=>`<span class="file-tag">${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:var(--danger);cursor:pointer;">×</button></span>`).join('');
@@ -765,26 +665,23 @@ function renderFileBadges(){
   });
 }
 
-// ========== TOURNAMENTS ==========
+/* TOURNAMENTS */
 async function renderTournaments(){
   const c=document.getElementById('tournamentsContainer');if(!c)return;
   if(!tournaments.length){c.innerHTML='<i style="color:var(--text-muted);font-size:.78rem;">No active tournaments.</i>';return}
-  c.innerHTML=tournaments.map(t=>`<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:.6rem .75rem;margin-bottom:.5rem;border:1px solid var(--border-subtle);"><strong style="font-size:.82rem;">${escapeHtml(t.name)}</strong><div style="font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;">${escapeHtml(t.description||'')}</div><div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">Prize: ${escapeHtml(t.prize||'None')}</div>${isGuest?'<span style="color:var(--text-muted);font-size:.68rem;">🔐 Login to join</span>':(t.participants?.includes(currentUser.email)?'<span style="color:var(--success);font-size:.68rem;">✓ Joined</span>':`<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent);border:none;border-radius:var(--radius-full);padding:.2rem .7rem;color:#1a1917;font-size:.7rem;cursor:pointer;margin-top:.3rem;min-height:28px;font-weight:600;">Join</button>`)}</div>`).join('');
+  c.innerHTML=tournaments.map(t=>`<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:.6rem .75rem;margin-bottom:.5rem;border:1px solid var(--border-subtle);"><strong style="font-size:.82rem;">${escapeHtml(t.name)}</strong><div style="font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;">${escapeHtml(t.description||'')}</div><div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">Prize: ${escapeHtml(t.prize||'None')}</div>${t.participants?.includes(currentUser.email)?'<span style="color:var(--success);font-size:.68rem;">✓ Joined</span>':`<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent);border:none;border-radius:var(--radius-full);padding:.2rem .7rem;color:#1a1917;font-size:.7rem;cursor:pointer;margin-top:.3rem;min-height:28px;font-weight:600;">Join</button>`}</div>`).join('');
   c.querySelectorAll('.join-tournament-btn').forEach(btn=>{
     btn.onclick=async()=>{await joinTournament(btn.dataset.id);await loadAllData();renderTournaments()};
   });
 }
 
-// ========== CHAT HISTORY ==========
+/* CHAT HISTORY */
 async function loadChatHistoryList(){
-  if(isGuest)return;
   try{
     const list=await apiGet(`/api/chat-history?email=${encodeURIComponent(currentUser.email)}`);
     const c=document.getElementById('chatHistoryList');if(!c)return;
     if(!list.length){c.innerHTML='<i style="color:var(--text-muted);font-size:.78rem;">No saved chats.</i>';return}
     c.innerHTML=list.map(ch=>`<div class="history-item" data-id="${ch._id}" style="padding:.5rem .75rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);margin-bottom:.4rem;cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">${escapeHtml(ch.title||'Untitled chat')}</div><button class="delete-chat" data-delid="${ch._id}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.9rem;padding:.1rem .3rem;flex-shrink:0;">×</button></div><div style="font-size:.65rem;color:var(--text-muted);">${new Date(ch.updatedAt).toLocaleDateString()} · ${(ch.size/1024).toFixed(1)}KB</div></div>`).join('');
-
-    // FIX: build messagesHistory correctly (all roles preserved) with auth email
     c.querySelectorAll('.history-item').forEach(el=>{
       el.onclick=async(ev)=>{
         if(ev.target.classList.contains('delete-chat'))return;
@@ -822,16 +719,15 @@ async function loadChatHistoryList(){
   }catch(_){}
 }
 
-// FIX: Serialized save to prevent duplicate chats from races
-let _saveChain = Promise.resolve();
+let _saveChain=Promise.resolve();
 async function saveCurrentChat(){
-  if(isGuest)return;
   if(!currentUser||!messagesHistory.length)return;
   const snapshot=messagesHistory.map(m=>({role:m.role,content:m.content}));
   const titleSnapshot=snapshot[0]?.content?.slice(0,50)||'Untitled chat';
+  const emailSnapshot=currentUser.email;
   _saveChain=_saveChain.then(async ()=>{
     try{
-      const res=await apiPost('/api/chat-history',{email:currentUser.email,id:currentChatId,title:titleSnapshot,messages:snapshot});
+      const res=await apiPost('/api/chat-history',{email:emailSnapshot,id:currentChatId,title:titleSnapshot,messages:snapshot});
       if(res.success&&res.id)currentChatId=res.id;
       await loadChatHistoryList();
     }catch(e){console.warn('save chat failed',e)}
@@ -839,12 +735,11 @@ async function saveCurrentChat(){
   return _saveChain;
 }
 
-// ========== USER SETTINGS ==========
+/* USER SETTINGS */
 async function openUserSettings(){
-  if(isGuest){promptLogin('account settings');return}
   let userKeys=await loadUserApiKeys(currentUser.email);
   const modal=document.createElement('div');modal.className='modal-overlay';
-  modal.innerHTML=`<div class="modal-content" style="max-width:720px"><div class="modal-header"><h3>Account Center</h3><span class="close" id="settingsClose">&times;</span></div><div class="grid-2"><div class="card-sm"><h4>Profile</h4><label>Profile Picture URL</label><input type="text" id="profilePicUrl" placeholder="https://…" value="${escapeHtml(currentUser.profilePic||'')}" /><div class="profile-preview" id="profilePreview" style="background-image:url('${escapeHtml(currentUser.profilePic||'')}');"></div><label>Change Username</label><input type="text" id="newUsername" placeholder="New username" /><button class="btn-sm primary" id="updateUsernameBtn">Update Username</button><button class="btn-sm danger" id="deleteAccountBtn">Delete Account</button></div><div class="card-sm"><h4>Your Stats</h4><div style="font-size:.8rem;line-height:1.8;color:var(--text-secondary);"><div>Extra chat credits: ${currentUser.extraChatCredits||0}</div><div>Extra image credits: ${currentUser.extraImageCredits||0}</div><div>Hours live: ${(currentUser.totalHoursLive||0).toFixed(1)}</div></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>API Keys (max 2)</h4><div class="key-list" id="apiKeysList"></div><button class="btn-sm primary" id="generateApiKeyBtn">+ Generate Key</button><div style="font-size:.62rem;color:var(--text-muted);margin-top:.3rem;">Bearer token · 20 req/day</div></div><div class="card-sm"><h4>Free API Key (100/day)</h4><div id="freeKeyInfo" style="font-size:.75rem;color:var(--text-secondary);"></div><button class="btn-sm success" id="generateFreeKeyBtn">Generate / Regenerate</button><button class="btn-sm danger" id="revokeFreeKeyBtn" style="display:none;">Revoke</button><div class="free-key-box" id="freeKeyDisplay" style="display:none;"><strong>Key:</strong> <code id="freeKeyValue"></code><br><strong>Endpoint:</strong> <code>https://vrythos-server.onrender.com/api/external/chat</code></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>Report Bug / Request Credits</h4><textarea id="bugReportText" placeholder="Describe issue or request…" rows="2"></textarea><button class="btn-sm" id="submitBugBtn">Submit Report</button></div><div class="card-sm"><h4>Legal</h4><div style="font-size:.72rem;color:var(--text-secondary);line-height:1.6;">By using Vrythos AI, you agree to our <a href="#" style="color:var(--accent);">Terms</a> and <a href="#" style="color:var(--accent);">Privacy Policy</a>. All data is securely stored.</div><button class="btn-sm" id="logoutBtn" style="margin-top:.6rem;background:#374151;border:none;color:#fff;">Logout</button></div></div></div>`;
+  modal.innerHTML=`<div class="modal-content"><div class="modal-header"><h3>Account Center</h3><span class="close" id="settingsClose">&times;</span></div><div class="grid-2"><div class="card-sm"><h4>Profile</h4><label>Profile Picture URL</label><input type="text" id="profilePicUrl" placeholder="https://…" value="${escapeHtml(currentUser.profilePic||'')}" /><div class="profile-preview" id="profilePreview" style="background-image:url('${escapeHtml(currentUser.profilePic||'')}');"></div><label>Change Username</label><input type="text" id="newUsername" placeholder="New username" /><button class="btn-sm primary" id="updateUsernameBtn">Update Username</button><button class="btn-sm danger" id="deleteAccountBtn">Delete Account</button></div><div class="card-sm"><h4>Your Stats</h4><div style="font-size:.8rem;line-height:1.8;color:var(--text-secondary);"><div>Extra chat credits: ${currentUser.extraChatCredits||0}</div><div>Extra image credits: ${currentUser.extraImageCredits||0}</div><div>Hours live: ${(currentUser.totalHoursLive||0).toFixed(1)}</div></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>API Keys (max 2)</h4><div class="key-list" id="apiKeysList"></div><button class="btn-sm primary" id="generateApiKeyBtn">+ Generate Key</button><div style="font-size:.62rem;color:var(--text-muted);margin-top:.3rem;">Bearer token · 20 req/day</div></div><div class="card-sm"><h4>Free API Key (100/day)</h4><div id="freeKeyInfo" style="font-size:.75rem;color:var(--text-secondary);"></div><button class="btn-sm success" id="generateFreeKeyBtn">Generate / Regenerate</button><button class="btn-sm danger" id="revokeFreeKeyBtn" style="display:none;">Revoke</button><div class="free-key-box" id="freeKeyDisplay" style="display:none;"><strong>Key:</strong> <code id="freeKeyValue"></code><br><strong>Endpoint:</strong> <code>https://vrythos-server.onrender.com/api/external/chat</code></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>Report Bug / Request Credits</h4><textarea id="bugReportText" placeholder="Describe issue or request…" rows="2"></textarea><button class="btn-sm" id="submitBugBtn">Submit Report</button></div><div class="card-sm"><h4>Legal</h4><div style="font-size:.72rem;color:var(--text-secondary);line-height:1.6;">By using Vrythos AI, you agree to our <a href="#" style="color:var(--accent);">Terms</a> and <a href="#" style="color:var(--accent);">Privacy Policy</a>. All data is securely stored.</div><button class="btn-sm" id="logoutBtn" style="margin-top:.6rem;background:#374151;border:none;color:#fff;">Logout</button></div></div></div>`;
   document.body.appendChild(modal);
   const close=()=>modal.remove();
   modal.querySelector('#settingsClose').onclick=close;
@@ -869,11 +764,7 @@ async function openUserSettings(){
     await addBugReport({email:currentUser.email,username:currentUser.username,description:desc,timestamp:Date.now(),status:'pending'});
     showToast('Bug report submitted','info');document.getElementById('bugReportText').value='';
   };
-  document.getElementById('logoutBtn').onclick=()=>{
-    localStorage.removeItem('vrythos_current_session');
-    localStorage.setItem('vrythos_guest_chats','0');
-    location.reload();
-  };
+  document.getElementById('logoutBtn').onclick=()=>{localStorage.removeItem('vrythos_current_session');location.reload()};
   async function refreshApiKeys(){
     userKeys=await loadUserApiKeys(currentUser.email);
     const c=document.getElementById('apiKeysList');if(!c)return;
@@ -921,43 +812,30 @@ async function openUserSettings(){
   };
 }
 
-// ========== WELCOME ==========
+/* WELCOME */
 function renderWelcomeScreen(){
   const c=document.getElementById('messagesContainer');
-  const subtitle = isGuest ? 'Chat freely as guest · Login to unlock images, videos & more.' : 'Your neural co-pilot for code, images, video & ideas.';
+  if(!c){console.error('renderWelcomeScreen: #messagesContainer missing from DOM');return}
   c.innerHTML=`
     <div class="welcome-screen" id="welcomeScreen">
-      <div><div class="welcome-logo">Vrythos</div><p>${subtitle}</p></div>
+      <div><div class="welcome-logo">Vrythos</div><p>Your neural co-pilot for code, images, video &amp; ideas.</p></div>
       <div class="suggestion-grid">
         <div class="suggestion-card" data-prompt="Build a responsive landing page in HTML/CSS with a gradient hero and CTA buttons"><strong>Build a landing page</strong>Responsive HTML/CSS with hero + CTA</div>
-        <div class="suggestion-card" data-prompt="Explain transformers in AI like I'm 12, with a simple example"><strong>Explain a concept</strong>Transformers made simple</div>
+        <div class="suggestion-card" data-prompt="Explain transformers in AI like I'm 12, with a simple example"><strong>Explain an concept</strong>Transformers made simple</div>
         <div class="suggestion-card" data-prompt="Write a Python script that renames all files in a folder by date prefix"><strong>Write a Python script</strong>Batch-rename files by date</div>
-        <div class="suggestion-card" data-prompt="Generate a cinematic cyberpunk city at night, rain, neon reflections"><strong>Generate an image</strong>${isGuest ? '🔐 Login to generate images' : 'Cyberpunk city at night'}</div>
+        <div class="suggestion-card" data-prompt="Generate a cinematic cyberpunk city at night, rain, neon reflections"><strong>Generate an image</strong>Cyberpunk city at night</div>
       </div>
     </div>`;
   c.querySelectorAll('.suggestion-card').forEach(card=>{
     card.onclick=()=>{
-      if(isGuest && card.dataset.prompt.includes('Generate a cinematic')){promptLogin('image generation');return}
       const t=document.getElementById('userInput');if(!t)return;
       t.value=card.dataset.prompt;t.dispatchEvent(new Event('input'));t.focus();
     };
   });
 }
 
-// ========== BUILD UI ==========
+/* BUILD UI — every template element guaranteed present */
 async function buildUI(){
-  const userBtnLabel = isGuest ? '🔐 Login / Sign up' : '👤 My Account';
-  const userBtnClass = isGuest ? 'user-menu-btn login-highlight' : 'user-menu-btn';
-  const guestHeaderBadge = isGuest ? `<span class="model-badge guest-badge" id="guestHeaderBadge">Guest · <span id="guestHeaderCounter">${Math.max(0, GUEST_CHAT_LIMIT - guestChatCount)}</span> left</span>` : `<span class="model-badge" id="modelBadge"><span class="dot"></span> Auto</span>`;
-
-  const chatHistorySection = isGuest ? `
-        <div class="guest-banner">
-          <div class="gb-label">🎁 Guest Mode</div>
-          <div class="gb-text">You can chat freely. Login to unlock tools, images, videos, history & API keys.</div>
-          <div class="gb-counter">Free chats left: <strong id="guestCounter">${Math.max(0, GUEST_CHAT_LIMIT - guestChatCount)}</strong></div>
-        </div>` : `
-        <div class="section"><span class="section-label">Chat History (max 5)</span><div id="chatHistoryList"><i style="color:var(--text-muted);font-size:.78rem;">Loading…</i></div></div>`;
-
   document.getElementById('app-root').innerHTML=`
     <div class="app">
       <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -965,20 +843,20 @@ async function buildUI(){
         <div class="logo">Vrythos</div>
         <button class="new-chat-btn" id="newChatBtn">+ New Conversation</button>
         <div class="section"><span class="section-label">Active Engine</span><div class="module-status" id="moduleStatus">Auto-select</div></div>
-        ${chatHistorySection}
+        <div class="section"><span class="section-label">Chat History (max 5)</span><div id="chatHistoryList"><i style="color:var(--text-muted);font-size:.78rem;">No saved chats.</i></div></div>
         <div class="section"><span class="section-label">Reasoning Depth</span><label class="toggle-row"><input type="checkbox" id="deepThinkToggle" /> Step-by-step analysis</label></div>
         <div class="section"><span class="section-label">Live Image Mode</span><label class="toggle-row"><input type="checkbox" id="liveImageToggle" /> Auto-generate images</label></div>
         <div class="section"><span class="section-label">Live Video Mode</span><label class="toggle-row"><input type="checkbox" id="liveVideoToggle" /> Auto-generate videos</label></div>
         <div class="section"><span class="section-label">Best Coding Mode</span><label class="toggle-row"><input type="checkbox" id="bestCodingToggle" /> Multi-pass refinement</label></div>
         <div class="section" style="margin-top:.25rem;"><span class="section-label">Tournaments</span><div id="tournamentsContainer"></div></div>
-        <div class="footer-stats"><span id="sidebarUsername">${isGuest ? 'guest' : currentUser.username}</span><span style="color:var(--text-muted);">${isGuest ? 'Guest' : 'Unlimited'}</span></div>
+        <div class="footer-stats"><span id="sidebarUsername">user</span><span style="color:var(--text-muted);">Unlimited</span></div>
       </div>
       <div class="main-chat">
         <div class="chat-header">
           <div style="display:flex;align-items:center;gap:.6rem;"><button class="mobile-hamburger" id="hamburgerBtn">☰</button><div class="ai-status">Vrythos</div></div>
-          <div style="display:flex;align-items:center;gap:.6rem;">${guestHeaderBadge}<div class="${userBtnClass}" id="userSettingsBtn">${userBtnLabel}</div></div>
+          <div style="display:flex;align-items:center;gap:.6rem;"><span class="model-badge" id="modelBadge"><span class="dot"></span> Auto</span><div class="user-menu-btn" id="userSettingsBtn">My Account</div></div>
         </div>
-        <div class="messages id="messagesContainer"></div>
+        <div class="messages" id="messagesContainer"></div>
         <div class="input-area">
           <div class="file-badge" id="filePreviewArea"></div>
           <div class="active-tools" id="activeTools"></div>
@@ -997,7 +875,7 @@ async function buildUI(){
           </div>
           <div class="input-wrapper">
             <button class="plus-btn" id="plusBtn" title="Tools">＋</button>
-            <textarea id="userInput" placeholder="${isGuest ? 'Message Vrythos (guest)…' : 'Message Vrythos…'}" rows="1"></textarea>
+            <textarea id="userInput" placeholder="Message Vrythos…" rows="1"></textarea>
             <button class="send-btn" id="sendBtn" title="Send">➤</button>
           </div>
           <div class="char-counter" id="charCounter">0 characters</div>
@@ -1006,474 +884,281 @@ async function buildUI(){
       </div>
     </div>`;
 
-  // ========== Wire up UI events ==========
-  const ta = document.getElementById('userInput');
-  const cc = document.getElementById('charCounter');
-  if (ta) {
-    ta.addEventListener('input', () => {
-      ta.style.height = 'auto';
-      ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
-      cc.textContent = ta.value.length + ' characters';
-    });
-    ta.dispatchEvent(new Event('input'));
-  }
+  const ta=document.getElementById('userInput');
+  const cc=document.getElementById('charCounter');
+  ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,200)+'px';cc.textContent=ta.value.length+' characters'});
+  ta.dispatchEvent(new Event('input'));
 
-  // New chat button
-  const newChatBtn = document.getElementById('newChatBtn');
-  if (newChatBtn) {
-    newChatBtn.onclick = async () => {
-      if (isProcessing) { showToast('Please wait for the current reply to finish', 'warning'); return; }
-      if (!isGuest) await saveCurrentChat();
-      messagesHistory = [];
-      currentChatId = null;
-      renderWelcomeScreen();
-      document.getElementById('sidebar').classList.remove('open');
-      document.getElementById('sidebarOverlay').classList.remove('active');
+  document.getElementById('newChatBtn').onclick=async()=>{
+    if(isProcessing){showToast('Please wait for the current reply to finish','warning');return}
+    await saveCurrentChat();
+    messagesHistory=[];currentChatId=null;renderWelcomeScreen();
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('active');
+  };
+
+  document.getElementById('sendBtn').onclick=()=>{
+    if(isProcessing)return;
+    const v=ta.value.trim();if(v)sendMessage(v);
+    ta.value='';ta.style.height='auto';cc.textContent='0 characters';
+  };
+
+  ta.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){
+      if(isProcessing){e.preventDefault();return}
+      e.preventDefault();
+      const v=ta.value.trim();if(v)sendMessage(v);
+      ta.value='';ta.style.height='auto';cc.textContent='0 characters';
+    }
+  });
+
+  document.getElementById('deepThinkToggle').onchange=e=>{deepThink=e.target.checked;syncToolMenu();renderActiveTools()};
+  document.getElementById('liveImageToggle').onchange=e=>{liveImageMode=e.target.checked;syncToolMenu();renderActiveTools()};
+  document.getElementById('liveVideoToggle').onchange=e=>{liveVideoMode=e.target.checked;syncToolMenu();renderActiveTools()};
+  document.getElementById('bestCodingToggle').onchange=e=>{bestCodingMode=e.target.checked;syncToolMenu();renderActiveTools()};
+
+  document.getElementById('fileInput').onchange=e=>{
+    if(e.target.files){
+      Array.from(e.target.files).forEach(f=>{
+        const reader=new FileReader();
+        reader.onload=ev=>{
+          attachedFiles.push({name:f.name,content:ev.target.result,isText:f.type.startsWith('text/')||f.name.match(/\.(txt|json|md)$/i)});
+          renderFileBadges();
+        };
+        if(f.type.startsWith('text/')||f.name.match(/\.(txt|json|md)$/i))reader.readAsText(f);else reader.readAsDataURL(f);
+      });
+    }
+  };
+
+  document.getElementById('userSettingsBtn').onclick=openUserSettings;
+
+  const sidebar=document.getElementById('sidebar');
+  const overlay=document.getElementById('sidebarOverlay');
+  document.getElementById('hamburgerBtn').onclick=()=>{sidebar.classList.toggle('open');overlay.classList.toggle('active')};
+  overlay.onclick=()=>{sidebar.classList.remove('open');overlay.classList.remove('active')};
+
+  const plusBtn=document.getElementById('plusBtn');
+  const toolMenu=document.getElementById('toolMenu');
+  plusBtn.onclick=e=>{e.stopPropagation();toolMenu.classList.toggle('open');plusBtn.classList.toggle('open')};
+
+  toolMenu.querySelectorAll('.tool-toggle').forEach(row=>{
+    row.onclick=()=>{
+      const tool=row.dataset.tool;
+      if(tool==='deep'){deepThink=!deepThink;document.getElementById('deepThinkToggle').checked=deepThink}
+      else if(tool==='coding'){bestCodingMode=!bestCodingMode;document.getElementById('bestCodingToggle').checked=bestCodingMode}
+      else if(tool==='liveimage'){liveImageMode=!liveImageMode;document.getElementById('liveImageToggle').checked=liveImageMode}
+      else if(tool==='livevideo'){liveVideoMode=!liveVideoMode;document.getElementById('liveVideoToggle').checked=liveVideoMode}
+      syncToolMenu();renderActiveTools();
     };
-  }
+  });
 
-  // Send button + Enter key
-  const sendBtn = document.getElementById('sendBtn');
-  if (sendBtn) {
-    sendBtn.onclick = () => {
-      if (isProcessing) return;
-      const v = ta.value.trim();
-      if (v) sendMessage(v);
-      ta.value = ''; ta.style.height = 'auto'; cc.textContent = '0 characters';
-    };
-  }
-  if (ta) {
-    ta.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        if (isProcessing) { e.preventDefault(); return; }
-        e.preventDefault();
-        const v = ta.value.trim();
-        if (v) sendMessage(v);
-        ta.value = ''; ta.style.height = 'auto'; cc.textContent = '0 characters';
-      }
-    });
-  }
-
-  // Guest: intercept sidebar toggle clicks
-  if (isGuest) {
-    document.querySelectorAll('.sidebar .toggle-row').forEach(row => {
-      row.addEventListener('click', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        promptLogin('this tool');
-      }, true);
-    });
-  } else {
-    // Sidebar toggles — bind change handlers
-    const dt = document.getElementById('deepThinkToggle');
-    const li = document.getElementById('liveImageToggle');
-    const lv = document.getElementById('liveVideoToggle');
-    const bc = document.getElementById('bestCodingToggle');
-    if (dt) dt.onchange = e => { deepThink = e.target.checked; syncToolMenu(); renderActiveTools(); };
-    if (li) li.onchange = e => { liveImageMode = e.target.checked; syncToolMenu(); renderActiveTools(); };
-    if (lv) lv.onchange = e => { liveVideoMode = e.target.checked; syncToolMenu(); renderActiveTools(); };
-    if (bc) bc.onchange = e => { bestCodingMode = e.target.checked; syncToolMenu(); renderActiveTools(); };
-  }
-
-  // File input (only for logged-in)
-  const fileInput = document.getElementById('fileInput');
-  if (fileInput && !isGuest) {
-    fileInput.onchange = e => {
-      if (e.target.files) {
-        Array.from(e.target.files).forEach(f => {
-          const reader = new FileReader();
-          reader.onload = ev => {
-            attachedFiles.push({ name: f.name, content: ev.target.result, isText: f.type.startsWith('text/') || f.name.match(/\.(txt|json|md)$/i) });
-            renderFileBadges();
-          };
-          if (f.type.startsWith('text/') || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
-          else reader.readAsDataURL(f);
-        });
+  toolMenu.querySelectorAll('.tool-action').forEach(btn=>{
+    btn.onclick=()=>{
+      if(isProcessing&&btn.dataset.action!=='clear'){showToast('Please wait for the current reply to finish','warning');return}
+      toolMenu.classList.remove('open');plusBtn.classList.remove('open');
+      const action=btn.dataset.action;const txt=ta.value.trim();
+      if(action==='image'){sendMessage(txt||'cyberpunk city at night, neon',true);ta.value='';cc.textContent='0 characters'}
+      else if(action==='video'){sendMessage(txt||'cinematic drone shot over mountains at sunset',false,true);ta.value='';cc.textContent='0 characters'}
+      else if(action==='attach'){document.getElementById('fileInput').click()}
+      else if(action==='clear'){
+        messagesHistory=[];currentChatId=null;renderWelcomeScreen();showToast('Conversation cleared','info');
       }
     };
+  });
+
+  function syncToolMenu(){
+    toolMenu.querySelector('[data-tool="deep"]').classList.toggle('active',deepThink);
+    toolMenu.querySelector('[data-tool="coding"]').classList.toggle('active',bestCodingMode);
+    toolMenu.querySelector('[data-tool="liveimage"]').classList.toggle('active',liveImageMode);
+    toolMenu.querySelector('[data-tool="livevideo"]').classList.toggle('active',liveVideoMode);
   }
-
-  // User settings / Login button
-  const userSettingsBtn = document.getElementById('userSettingsBtn');
-  if (userSettingsBtn) {
-    userSettingsBtn.onclick = () => {
-      if (isGuest) showAuthModal('login');
-      else openUserSettings();
-    };
-  }
-
-  // Hamburger + overlay
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebarOverlay');
-  const hamburgerBtn = document.getElementById('hamburgerBtn');
-  if (hamburgerBtn) hamburgerBtn.onclick = () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); };
-  if (overlay) overlay.onclick = () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); };
-
-  // Plus button opens tool menu
-  const plusBtn = document.getElementById('plusBtn');
-  const toolMenu = document.getElementById('toolMenu');
-  if (plusBtn && toolMenu) {
-    plusBtn.onclick = e => {
-      e.stopPropagation();
-      toolMenu.classList.toggle('open');
-      plusBtn.classList.toggle('open');
-    };
-
-    // Tool toggles — locked for guest
-    toolMenu.querySelectorAll('.tool-toggle').forEach(row => {
-      if (isGuest) {
-        row.classList.add('locked');
-        row.onclick = e => {
-          e.stopPropagation();
-          toolMenu.classList.remove('open');
-          plusBtn.classList.remove('open');
-          promptLogin(row.querySelector('.tool-name').textContent);
-        };
-      } else {
-        row.onclick = () => {
-          const tool = row.dataset.tool;
-          if (tool === 'deep') { deepThink = !deepThink; document.getElementById('deepThinkToggle').checked = deepThink; }
-          else if (tool === 'coding') { bestCodingMode = !bestCodingMode; document.getElementById('bestCodingToggle').checked = bestCodingMode; }
-          else if (tool === 'liveimage') { liveImageMode = !liveImageMode; document.getElementById('liveImageToggle').checked = liveImageMode; }
-          else if (tool === 'livevideo') { liveVideoMode = !liveVideoMode; document.getElementById('liveVideoToggle').checked = liveVideoMode; }
-          syncToolMenu();
-          renderActiveTools();
-        };
-      }
-    });
-
-    // Tool actions — locked for guest (except clear)
-    toolMenu.querySelectorAll('.tool-action').forEach(btn => {
-      if (isGuest && btn.dataset.action !== 'clear') {
-        btn.classList.add('locked');
-        btn.onclick = e => {
-          e.stopPropagation();
-          toolMenu.classList.remove('open');
-          plusBtn.classList.remove('open');
-          promptLogin(btn.textContent.trim());
-        };
-      } else {
-        btn.onclick = () => {
-          if (isProcessing && btn.dataset.action !== 'clear') { showToast('Please wait for the current reply to finish', 'warning'); return; }
-          toolMenu.classList.remove('open');
-          plusBtn.classList.remove('open');
-          const action = btn.dataset.action;
-          const txt = ta.value.trim();
-          if (action === 'image') { sendMessage(txt || 'cyberpunk city at night, neon', true); ta.value = ''; cc.textContent = '0 characters'; }
-          else if (action === 'video') { sendMessage(txt || 'cinematic drone shot over mountains at sunset', false, true); ta.value = ''; cc.textContent = '0 characters'; }
-          else if (action === 'attach') { if (isGuest) { promptLogin('file attachments'); return; } document.getElementById('fileInput').click(); }
-          else if (action === 'clear') { messagesHistory = []; currentChatId = null; renderWelcomeScreen(); showToast('Conversation cleared', 'info'); }
-        };
-      }
-    });
-  }
-
-  // syncToolMenu helper (per instance)
-  function syncToolMenu() {
-    if (!toolMenu) return;
-    const dEl = toolMenu.querySelector('[data-tool="deep"]');
-    const cEl = toolMenu.querySelector('[data-tool="coding"]');
-    const liEl = toolMenu.querySelector('[data-tool="liveimage"]');
-    const lvEl = toolMenu.querySelector('[data-tool="livevideo"]');
-    if (dEl) dEl.classList.toggle('active', deepThink);
-    if (cEl) cEl.classList.toggle('active', bestCodingMode);
-    if (liEl) liEl.classList.toggle('active', liveImageMode);
-    if (lvEl) lvEl.classList.toggle('active', liveVideoMode);
-  }
-  window.syncToolMenu = syncToolMenu;
+  window.syncToolMenu=syncToolMenu;
   syncToolMenu();
   renderActiveTools();
 
-  // Populate sidebar
-  const sidebarUsername = document.getElementById('sidebarUsername');
-  if (sidebarUsername) sidebarUsername.textContent = isGuest ? 'guest' : currentUser.username;
-
+  document.getElementById('sidebarUsername').textContent=currentUser.username;
   await renderTournaments();
-  if (!isGuest) await loadChatHistoryList();
+  await loadChatHistoryList();
   renderWelcomeScreen();
   startActivityTracking();
-  updateGuestCounter();
 
-  window.addEventListener('resize', () => {
-    if (window.innerWidth > 820 && sidebar && overlay) {
-      sidebar.classList.remove('open');
-      overlay.classList.remove('active');
-    }
-  });
+  window.addEventListener('resize',()=>{if(window.innerWidth>820){sidebar.classList.remove('open');overlay.classList.remove('active')}});
 }
 
-// ========== GOOGLE OAUTH ==========
-window.handleGoogleLogin = async (response) => {
-  try {
-    const res = await apiPost('/api/auth/google', { token: response.credential });
-    if (res.success) {
-      currentUser = {
-        email: res.email, username: res.username, name: res.name, profilePic: res.profilePic,
-        extraChatCredits: res.extraChatCredits || 0, extraImageCredits: res.extraImageCredits || 0,
-        banned: res.banned || false, totalHoursLive: res.totalHoursLive || 0,
-        authProvider: 'google'
-      };
-      isGuest = false;
-      localStorage.setItem('vrythos_current_session', res.email);
-      const modal = document.getElementById('authModal');
-      if (modal) modal.remove();
-      showToast('Welcome back!', 'info');
-      await loadAllData();
-      await buildUI();
-    } else {
-      const el = document.getElementById('modalAuthMessage');
-      if (el) el.textContent = res.error || 'Google login failed';
-    }
-  } catch (e) {
-    const el = document.getElementById('modalAuthMessage');
-    if (el) el.textContent = 'Google login error: ' + e.message;
+/* Global tool menu close handler — attached ONCE, never leaks */
+document.addEventListener('click',e=>{
+  const tm=document.getElementById('toolMenu');
+  const pb=document.getElementById('plusBtn');
+  if(tm&&pb&&!tm.contains(e.target)&&e.target!==pb){
+    tm.classList.remove('open');
+    pb.classList.remove('open');
   }
+});
+
+/* GOOGLE OAUTH */
+window.handleGoogleLogin=async(response)=>{
+  try{
+    const res=await apiPost('/api/auth/google',{token:response.credential});
+    if(res.success){
+      currentUser={email:res.email,username:res.username,name:res.name,profilePic:res.profilePic,extraChatCredits:res.extraChatCredits||0,extraImageCredits:res.extraImageCredits||0,banned:res.banned||false,totalHoursLive:res.totalHoursLive||0};
+      localStorage.setItem('vrythos_current_session',res.email);
+      await buildUI();
+    }else{
+      const el=document.getElementById('authMessage');if(el)el.textContent=res.error||'Google login failed';
+    }
+  }catch(e){const el=document.getElementById('authMessage');if(el)el.textContent='Google login error: '+e.message}
 };
 
-// ========== AUTH MODAL (used in guest mode and via Login button) ==========
-function showAuthModal(mode = 'login') {
-  // Remove any existing modal
-  const existing = document.getElementById('authModal');
-  if (existing) existing.remove();
-
-  const modal = document.createElement('div');
-  modal.id = 'authModal';
-  modal.className = 'modal-overlay';
-  modal.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 id="modalAuthHeading">${mode === 'login' ? 'Welcome back' : 'Create your account'}</h3>
-        <span class="close" id="authModalClose">&times;</span>
-      </div>
-      <p class="auth-subheading" id="modalAuthSubheading" style="margin-bottom:1rem;">${mode === 'login' ? 'Sign in to unlock all features' : 'Start using Vrythos AI in seconds'}</p>
-
-      <div id="modalLoginForm" class="${mode === 'login' ? '' : 'hidden'}">
-        <div id="modalGoogleBtn" class="g_id_signin" data-type="standard" data-size="large" data-theme="filled_black" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="center"></div>
-        <div class="auth-divider">or continue with email</div>
-        <div class="auth-form-group">
-          <input type="email" class="auth-input" id="modalLoginEmail" placeholder="Email address" autocomplete="off" />
+/* AUTH INIT */
+async function initAuth(){
+  const saved=localStorage.getItem('vrythos_current_session');
+  if(saved){
+    try{
+      const users=await loadUsers();
+      const dbUser=users.find(u=>u.email===saved&&!u.banned);
+      if(dbUser){
+        currentUser={email:dbUser.email,username:dbUser.username,name:dbUser.name||'',profilePic:dbUser.profilePic||'',passwordHash:dbUser.passwordHash||null,extraChatCredits:dbUser.extraChatCredits||0,extraImageCredits:dbUser.extraImageCredits||0,banned:dbUser.banned||false,totalHoursLive:dbUser.totalHoursLive||0,authProvider:dbUser.authProvider||'email'};
+        await loadAllData();await buildUI();return;
+      }
+    }catch(_){localStorage.removeItem('vrythos_current_session')}
+  }
+  document.getElementById('app-root').innerHTML=`
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-logo">Vrythos</div>
+        <h2 class="auth-heading" id="authHeading">Welcome back</h2>
+        <p class="auth-subheading" id="authSubheading">Sign in to continue to your AI assistant</p>
+        <div id="loginForm">
+          <div id="g_id_onload" data-client_id="527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com" data-callback="handleGoogleLogin" data-auto_prompt="false"></div>
+          <div class="g_id_signin" data-type="standard" data-size="large" data-theme="filled_black" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="center"></div>
+          <div class="auth-divider">or continue with email</div>
+          <div class="auth-form-group"><input type="email" class="auth-input" id="loginEmail" placeholder="Email address" autocomplete="off" /></div>
+          <div class="auth-form-group"><input type="password" class="auth-input" id="loginPassword" placeholder="Password" /></div>
+          <div class="recaptcha-wrap"><div class="g-recaptcha" id="recaptchaLogin" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" data-theme="dark"></div></div>
+          <div class="auth-forgot" id="forgotPasswordBtn">Forgot password?</div>
+          <button class="auth-btn" id="doLoginBtn">Sign in</button>
+          <div class="auth-switch" id="showRegisterBtn">Don't have an account?<strong>Sign up</strong></div>
         </div>
-        <div class="auth-form-group">
-          <input type="password" class="auth-input" id="modalLoginPassword" placeholder="Password" />
+        <div id="registerForm" class="hidden">
+          <div class="auth-form-group"><input type="text" class="auth-input" id="regUsername" placeholder="Username" /></div>
+          <div class="auth-form-group"><input type="text" class="auth-input" id="regName" placeholder="Full name" /></div>
+          <div class="auth-form-group"><input type="email" class="auth-input" id="regEmail" placeholder="Email address" /></div>
+          <div class="auth-form-group"><input type="password" class="auth-input" id="regPassword" placeholder="Password (min 4 characters)" /></div>
+          <div class="auth-form-group"><input type="password" class="auth-input" id="regPasswordConfirm" placeholder="Confirm password" /></div>
+          <div class="recaptcha-wrap"><div class="g-recaptcha" id="recaptchaRegister" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" data-theme="dark"></div></div>
+          <button class="auth-btn" id="doRegisterBtn">Create account</button>
+          <div class="auth-switch" id="showLoginBtn">← Back to sign in</div>
         </div>
-        <div class="recaptcha-wrap"><div id="modalRecaptchaLogin"></div></div>
-        <button class="auth-btn" id="modalDoLoginBtn">Sign in</button>
-        <div class="auth-switch" id="modalShowRegisterBtn">Don't have an account?<strong>Sign up</strong></div>
+        <div id="authMessage"></div>
       </div>
-
-      <div id="modalRegisterForm" class="${mode === 'register' ? '' : 'hidden'}">
-        <div class="auth-form-group"><input type="text" class="auth-input" id="modalRegUsername" placeholder="Username" /></div>
-        <div class="auth-form-group"><input type="text" class="auth-input" id="modalRegName" placeholder="Full name" /></div>
-        <div class="auth-form-group"><input type="email" class="auth-input" id="modalRegEmail" placeholder="Email address" /></div>
-        <div class="auth-form-group"><input type="password" class="auth-input" id="modalRegPassword" placeholder="Password (min 4 characters)" /></div>
-        <div class="auth-form-group"><input type="password" class="auth-input" id="modalRegPasswordConfirm" placeholder="Confirm password" /></div>
-        <div class="recaptcha-wrap"><div id="modalRecaptchaRegister"></div></div>
-        <button class="auth-btn" id="modalDoRegisterBtn">Create account</button>
-        <div class="auth-switch" id="modalShowLoginBtn">← Back to sign in</div>
-      </div>
-
-      <div id="modalAuthMessage" style="margin-top:.75rem;font-size:.82rem;text-align:center;color:var(--danger);min-height:1.25rem;"></div>
+      <div class="auth-footer"><a href="#">Terms</a>·<a href="#">Privacy</a>·<a href="#">Help</a><div style="margin-top:.5rem;">© Vrythos AI</div></div>
     </div>`;
-  document.body.appendChild(modal);
 
-  // Close handlers
-  const closeModal = () => modal.remove();
-  modal.querySelector('#authModalClose').onclick = closeModal;
-  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-  document.addEventListener('keydown', function escHandler(e) {
-    if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escHandler); }
-  });
-
-  // Toggle login/register
-  modal.querySelector('#modalShowRegisterBtn').onclick = () => {
-    document.getElementById('modalLoginForm').classList.add('hidden');
-    document.getElementById('modalRegisterForm').classList.remove('hidden');
-    document.getElementById('modalAuthHeading').textContent = 'Create your account';
-    document.getElementById('modalAuthSubheading').textContent = 'Start using Vrythos AI in seconds';
-    document.getElementById('modalAuthMessage').textContent = '';
-  };
-  modal.querySelector('#modalShowLoginBtn').onclick = () => {
-    document.getElementById('modalRegisterForm').classList.add('hidden');
-    document.getElementById('modalLoginForm').classList.remove('hidden');
-    document.getElementById('modalAuthHeading').textContent = 'Welcome back';
-    document.getElementById('modalAuthSubheading').textContent = 'Sign in to unlock all features';
-    document.getElementById('modalAuthMessage').textContent = '';
-  };
-
-  // Render Google button inside modal (if loaded)
-  setTimeout(() => {
-    if (window.google && window.google.accounts) {
-      try {
-        window.google.accounts.id.initialize({
-          client_id: '527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com',
-          callback: window.handleGoogleLogin
-        });
-        const googleBtn = document.getElementById('modalGoogleBtn');
-        if (googleBtn) {
-          window.google.accounts.id.renderButton(googleBtn, {
-            theme: 'filled_black', size: 'large', shape: 'rectangular',
-            text: 'sign_in_with', logo_alignment: 'center'
-          });
-        }
-      } catch (_) {}
-    }
-  }, 200);
-
-  // Render reCAPTCHA widgets
-  let recaptchaTries = 0;
-  function tryRenderRecaptcha() {
+  let recaptchaTries=0;
+  function initRecaptchas(){
     recaptchaTries++;
-    if (window.grecaptcha && grecaptcha.render) {
-      try {
-        const loginEl = document.getElementById('modalRecaptchaLogin');
-        const regEl = document.getElementById('modalRecaptchaRegister');
-        if (loginEl && !loginEl.hasChildNodes()) {
-          grecaptcha.render('modalRecaptchaLogin', { sitekey: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI', theme: 'dark' });
-        }
-        if (regEl && !regEl.hasChildNodes()) {
-          grecaptcha.render('modalRecaptchaRegister', { sitekey: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI', theme: 'dark' });
-        }
-      } catch (_) {}
-    } else if (recaptchaTries < 20) {
-      setTimeout(tryRenderRecaptcha, 300);
+    if(window.grecaptcha && grecaptcha.render){
+      try{
+        grecaptcha.render('recaptchaLogin',{sitekey:'6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI',theme:'dark'});
+        grecaptcha.render('recaptchaRegister',{sitekey:'6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI',theme:'dark'});
+      }catch(_){}
+    } else if(recaptchaTries < 20){
+      setTimeout(initRecaptchas,300);
     } else {
-      const msgEl = document.getElementById('modalAuthMessage');
-      if (msgEl && !msgEl.textContent) {
-        msgEl.style.color = 'var(--danger)';
-        msgEl.textContent = 'reCAPTCHA failed to load. Refresh the page or disable adblockers.';
+      const msg=document.getElementById('authMessage');
+      if(msg && !msg.textContent){
+        msg.style.color='var(--danger)';
+        msg.textContent='reCAPTCHA failed to load. Please refresh or disable adblockers.';
       }
     }
   }
-  setTimeout(tryRenderRecaptcha, 300);
+  setTimeout(initRecaptchas,300);
 
-  // LOGIN submit
-  const loginBtn = modal.querySelector('#modalDoLoginBtn');
-  if (loginBtn) {
-    loginBtn.onclick = async () => {
-      const email = document.getElementById('modalLoginEmail').value.trim();
-      const pwd = document.getElementById('modalLoginPassword').value;
-      const msgEl = document.getElementById('modalAuthMessage');
-      msgEl.style.color = 'var(--danger)';
-      msgEl.textContent = '';
-      const recaptchaToken = (window.grecaptcha && grecaptcha.getResponse) ? grecaptcha.getResponse(0) : '';
-      if (!recaptchaToken) { msgEl.textContent = 'Please complete the reCAPTCHA'; return; }
-      loginBtn.disabled = true;
-      loginBtn.textContent = 'Signing in…';
-      try {
-        const res = await apiPost('/api/login', { email, password: pwd, recaptchaToken });
-        if (res.success) {
-          currentUser = {
-            email: res.email, username: res.username, name: res.name || '', profilePic: res.profilePic || '',
-            passwordHash: null, extraChatCredits: res.extraChatCredits || 0, extraImageCredits: res.extraImageCredits || 0,
-            banned: res.banned || false, totalHoursLive: res.totalHoursLive || 0,
-            authProvider: res.authProvider || 'email'
-          };
-          isGuest = false;
-          localStorage.setItem('vrythos_current_session', res.email);
-          localStorage.removeItem('vrythos_guest_chats');
-          guestChatCount = 0;
-          closeModal();
-          showToast('Welcome back!', 'info');
-          await loadAllData();
-          await buildUI();
-        }
-      } catch (e) {
-        msgEl.textContent = e.message || 'Login failed';
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Sign in';
-        if (window.grecaptcha && grecaptcha.reset) { try { grecaptcha.reset(0); } catch (_) {} }
-      }
-    };
+  if(window.google&&window.google.accounts){
+    window.google.accounts.id.initialize({
+      client_id:'527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com',
+      callback:window.handleGoogleLogin
+    });
+    window.google.accounts.id.renderButton(document.querySelector('.g_id_signin'),{theme:'filled_black',size:'large',shape:'rectangular',text:'sign_in_with',logo_alignment:'center'});
   }
 
-  // REGISTER submit
-  const regBtn = modal.querySelector('#modalDoRegisterBtn');
-  if (regBtn) {
-    regBtn.onclick = async () => {
-      const username = document.getElementById('modalRegUsername').value.trim();
-      const name = document.getElementById('modalRegName').value.trim();
-      const email = document.getElementById('modalRegEmail').value.trim();
-      const password = document.getElementById('modalRegPassword').value;
-      const confirm = document.getElementById('modalRegPasswordConfirm').value;
-      const msgEl = document.getElementById('modalAuthMessage');
-      msgEl.style.color = 'var(--danger)';
-      if (!username || !name || !email || password.length < 4 || password !== confirm) {
-        msgEl.textContent = 'Fill all fields (password min 4 chars, must match)';
-        return;
-      }
-      const recaptchaToken = (window.grecaptcha && grecaptcha.getResponse) ? grecaptcha.getResponse(1) : '';
-      if (!recaptchaToken) { msgEl.textContent = 'Please complete the reCAPTCHA'; return; }
-      regBtn.disabled = true;
-      regBtn.textContent = 'Creating…';
-      try {
-        const users = await loadUsers();
-        if (users.find(u => u.email === email)) { msgEl.textContent = 'Email already registered'; regBtn.disabled = false; regBtn.textContent = 'Create account'; return; }
-        if (users.find(u => u.username === username)) { msgEl.textContent = 'Username taken'; regBtn.disabled = false; regBtn.textContent = 'Create account'; return; }
-        const passwordHash = await hashPassword(password);
-        await apiPost('/api/users', {
-          recaptchaToken, email, username, name, passwordHash, profilePic: '',
-          dailyCallsRecord: { date: '', count: 0 }, extraChatCredits: 0, extraImageCredits: 0,
-          banned: false, createdAt: Date.now(), totalHoursLive: 0, lastActive: Date.now(),
-          authProvider: 'email'
-        });
-        msgEl.style.color = 'var(--success)';
-        msgEl.textContent = '✅ Account created! Please sign in.';
-        document.getElementById('modalRegisterForm').classList.add('hidden');
-        document.getElementById('modalLoginForm').classList.remove('hidden');
-        document.getElementById('modalAuthHeading').textContent = 'Welcome back';
-        document.getElementById('modalAuthSubheading').textContent = 'Sign in to unlock all features';
-        document.getElementById('modalLoginEmail').value = email;
-        if (window.grecaptcha && grecaptcha.reset) { try { grecaptcha.reset(0); grecaptcha.reset(1); } catch (_) {} }
-      } catch (e) {
-        msgEl.textContent = e.message || 'Registration failed';
-        regBtn.disabled = false;
-        regBtn.textContent = 'Create account';
-        if (window.grecaptcha && grecaptcha.reset) { try { grecaptcha.reset(1); } catch (_) {} }
-      }
-    };
-  }
-}
+  document.getElementById('loginPassword').addEventListener('keypress',e=>{if(e.key==='Enter')document.getElementById('doLoginBtn').click()});
 
-// ========== INIT AUTH ==========
-async function initAuth() {
-  const saved = localStorage.getItem('vrythos_current_session');
-  if (saved) {
-    try {
-      const users = await loadUsers();
-      const dbUser = users.find(u => u.email === saved && !u.banned);
-      if (dbUser) {
-        currentUser = {
-          email: dbUser.email, username: dbUser.username, name: dbUser.name || '',
-          profilePic: dbUser.profilePic || '', passwordHash: dbUser.passwordHash || null,
-          extraChatCredits: dbUser.extraChatCredits || 0, extraImageCredits: dbUser.extraImageCredits || 0,
-          banned: dbUser.banned || false, totalHoursLive: dbUser.totalHoursLive || 0,
-          authProvider: dbUser.authProvider || 'email'
-        };
-        isGuest = false;
-        await loadAllData();
-        await buildUI();
-        return;
+  document.getElementById('doLoginBtn').onclick=async()=>{
+    const email=document.getElementById('loginEmail').value.trim();
+    const pwd=document.getElementById('loginPassword').value;
+    const msgEl=document.getElementById('authMessage');msgEl.textContent='';
+    const recaptchaToken = (window.grecaptcha && grecaptcha.getResponse) ? grecaptcha.getResponse() : '';
+    if(!recaptchaToken){msgEl.textContent='Please complete the reCAPTCHA';return}
+    try{
+      const res=await apiPost('/api/login',{email,password:pwd,recaptchaToken});
+      if(res.success){
+        currentUser={email:res.email,username:res.username,name:res.name||'',profilePic:res.profilePic||'',passwordHash:null,extraChatCredits:res.extraChatCredits||0,extraImageCredits:res.extraImageCredits||0,banned:res.banned||false,totalHoursLive:res.totalHoursLive||0,authProvider:res.authProvider||'email'};
+        localStorage.setItem('vrythos_current_session',res.email);
+        await loadAllData();await buildUI();
       }
-    } catch (_) {
-      localStorage.removeItem('vrythos_current_session');
+    }catch(e){
+      msgEl.textContent=e.message||'Login failed';
+      if(window.grecaptcha && grecaptcha.reset){grecaptcha.reset()}
     }
-  }
-  // Guest mode
-  isGuest = true;
-  currentUser = null;
-  await buildUI();
+  };
+
+  document.getElementById('showRegisterBtn').onclick=()=>{
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('registerForm').classList.remove('hidden');
+    document.getElementById('authHeading').textContent='Create your account';
+    document.getElementById('authSubheading').textContent='Start using Vrythos AI in seconds';
+    document.getElementById('authMessage').textContent='';
+    if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
+  };
+  document.getElementById('showLoginBtn').onclick=()=>{
+    document.getElementById('registerForm').classList.add('hidden');
+    document.getElementById('loginForm').classList.remove('hidden');
+    document.getElementById('authHeading').textContent='Welcome back';
+    document.getElementById('authSubheading').textContent='Sign in to continue to your AI assistant';
+    document.getElementById('authMessage').textContent='';
+    if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
+  };
+  document.getElementById('forgotPasswordBtn').onclick=()=>{showToast('Password reset not available. Use Google login or contact admin.','warning')};
+
+  document.getElementById('doRegisterBtn').onclick=async()=>{
+    const username=document.getElementById('regUsername').value.trim();
+    const name=document.getElementById('regName').value.trim();
+    const email=document.getElementById('regEmail').value.trim();
+    const password=document.getElementById('regPassword').value;
+    const confirm=document.getElementById('regPasswordConfirm').value;
+    const msgEl=document.getElementById('authMessage');
+    if(!username||!name||!email||password.length<4||password!==confirm){msgEl.textContent='Please fill all fields correctly (password min 4 characters, must match)';return}
+    const recaptchaToken = (window.grecaptcha && grecaptcha.getResponse) ? grecaptcha.getResponse() : '';
+    if(!recaptchaToken){msgEl.textContent='Please complete the reCAPTCHA';return}
+    try{
+      const users=await loadUsers();
+      if(users.find(u=>u.email===email)){msgEl.textContent='Email already registered';return}
+      if(users.find(u=>u.username===username)){msgEl.textContent='Username already taken';return}
+      const passwordHash=await hashPassword(password);
+      await apiPost('/api/users',{recaptchaToken,email,username,name,passwordHash,profilePic:'',dailyCallsRecord:{date:'',count:0},extraChatCredits:0,extraImageCredits:0,banned:false,createdAt:Date.now(),totalHoursLive:0,lastActive:Date.now(),authProvider:'email'});
+      msgEl.style.color='var(--success)';msgEl.innerHTML='Account created. Please sign in.';
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('loginForm').classList.remove('hidden');
+      document.getElementById('authHeading').textContent='Welcome back';
+      document.getElementById('authSubheading').textContent='Sign in to continue to your AI assistant';
+      if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
+    }catch(e){
+      msgEl.style.color='var(--danger)';msgEl.textContent=e.message||'Registration error';
+      if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
+    }
+  };
 }
 
-// ========== BOOT ==========
-(async function boot() {
-  try {
-    await loadAllData();
-    await initAuth();
-  } catch (err) {
-    console.error('Boot error:', err);
-    const root = document.getElementById('app-root');
-    root.className = 'error';
-    root.innerHTML = `<h2>Connection Error</h2><p>Could not connect to the Vrythos server. Make sure the backend is running and reachable.</p><p style="font-size:.85rem;color:var(--text-muted);">${escapeHtml(err.message)}</p><button onclick="location.reload()">Retry</button>`;
+/* BOOT — improved error message */
+(async function boot(){
+  try{await loadAllData();await initAuth()}
+  catch(err){
+    console.error('Boot error:',err);
+    const root=document.getElementById('app-root');
+    if(!root){document.body.innerHTML='<h2 style="color:red;padding:2rem;font-family:monospace;">Fatal: #app-root missing from page</h2>';return}
+    root.className='error';
+    root.innerHTML=`<h2>Startup Error</h2><p>The app failed to start. This is a bug, not a connection issue.</p><p style="font-size:.8rem;color:#888;font-family:monospace;background:#111;padding:.5rem;border-radius:6px;overflow-x:auto;max-width:600px;">${escapeHtml(err.message)}<br>${escapeHtml((err.stack||'').split('\n').slice(1,3).join('\n'))}</p><button onclick="location.reload()">Retry</button>`;
   }
 })();
 </script>
