@@ -4,23 +4,23 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');   // NEW: real password hashing
+const bcrypt = require('bcryptjs');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Trust Render's proxy so req.ip is correct (fixes guest rate-limit bypass)
+// Trust Render's proxy so req.ip is correct (guest rate limit)
 app.set('trust proxy', 1);
 
 app.use(cors({
-  origin: ['https://vrythosai.netlify.app', 'http://localhost:3000'],
+  origin: ['https://vrythosai.netlify.app', 'http://localhost:3000', 'http://localhost:5500'],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ========== MongoDB — MUST come from env, never hardcoded ==========
+// ========== MongoDB — must come from env, never hardcoded ==========
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
   console.error('❌ MONGODB_URI environment variable is required');
@@ -28,15 +28,13 @@ if (!MONGODB_URI) {
 }
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB Atlas'))
-  .catch(err => { console.error('❌ MongoDB error:', err); process.exit(1); });
+  .catch(err => { console.error('❌ MongoDB connection error:', err); process.exit(1); });
 
-// ========== Schemas (unchanged, plus session fields) ==========
+// ========== Schemas ==========
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true },
   username: { type: String, unique: true, required: true },
-  name: String,
-  passwordHash: String,          // now bcrypt, not sha256
-  profilePic: String,
+  name: String, passwordHash: String, profilePic: String,
   dailyCallsRecord: { date: String, count: Number },
   extraChatCredits: { type: Number, default: 0 },
   extraImageCredits: { type: Number, default: 0 },
@@ -45,7 +43,7 @@ const userSchema = new mongoose.Schema({
   totalHoursLive: { type: Number, default: 0 },
   lastActive: { type: Date, default: Date.now },
   authProvider: { type: String, default: 'email' },
-  sessionToken: String,          // NEW: per-login session
+  sessionToken: String,
   sessionExpires: Date
 });
 userSchema.index({ sessionToken: 1 });
@@ -62,14 +60,19 @@ const Module = mongoose.model('Module', moduleSchema);
 
 const bugSchema = new mongoose.Schema({ email: String, username: String, description: String, timestamp: Date, status: String });
 const Bug = mongoose.model('Bug', bugSchema);
+
 const abuseSchema = new mongoose.Schema({ email: String, username: String, reason: String, context: String, timestamp: Date });
 const Abuse = mongoose.model('Abuse', abuseSchema);
+
 const pendingBanSchema = new mongoose.Schema({ email: String, username: String, score: Number, reason: String, context: String, timestamp: Date, reviewed: Boolean });
 const PendingBan = mongoose.model('PendingBan', pendingBanSchema);
+
 const ipRegSchema = new mongoose.Schema({ ip: String, username: String, month: String, timestamp: Date });
 const IpReg = mongoose.model('IpReg', ipRegSchema);
+
 const imageQuotaSchema = new mongoose.Schema({ email: { type: String, unique: true }, count: Number, windowStart: Date });
 const ImageQuota = mongoose.model('ImageQuota', imageQuotaSchema);
+
 const chatUsageSchema = new mongoose.Schema({ email: String, moduleId: String, date: String, count: Number });
 const ChatUsage = mongoose.model('ChatUsage', chatUsageSchema);
 
@@ -77,7 +80,6 @@ const userApiKeySchema = new mongoose.Schema({
   email: { type: String, unique: true },
   keys: [{ name: String, key: String, used: Number, date: String }]
 });
-// NEW: index so /api/external/chat can lookup in O(1) instead of scanning every doc
 userApiKeySchema.index({ 'keys.key': 1 });
 const UserApiKey = mongoose.model('UserApiKey', userApiKeySchema);
 
@@ -92,6 +94,7 @@ const settingSchema = new mongoose.Schema({
   earningsBalance: { type: Number, default: 0 }
 });
 const Setting = mongoose.model('Setting', settingSchema);
+
 const adminAbuseLogSchema = new mongoose.Schema({ timestamp: Date, reason: String, score: Number });
 const AdminAbuseLog = mongoose.model('AdminAbuseLog', adminAbuseLogSchema);
 
@@ -106,14 +109,19 @@ const freeApiKeySchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 const FreeApiKey = mongoose.model('FreeApiKey', freeApiKeySchema);
+
 const videoUsageSchema = new mongoose.Schema({ email: { type: String, required: true }, date: { type: String, required: true }, count: { type: Number, default: 0 } });
 const VideoUsage = mongoose.model('VideoUsage', videoUsageSchema);
+
 const withdrawalSchema = new mongoose.Schema({
-  method: { type: String, required: true }, amount: { type: Number, required: true },
-  detail: { type: String, default: '' }, status: { type: String, default: 'Success' },
+  method: { type: String, required: true },
+  amount: { type: Number, required: true },
+  detail: { type: String, default: '' },
+  status: { type: String, default: 'Success' },
   timestamp: { type: Date, default: Date.now }
 });
 const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
+
 const chatHistorySchema = new mongoose.Schema({
   email: { type: String, required: true, index: true },
   title: { type: String, default: 'Untitled chat' },
@@ -125,24 +133,23 @@ const chatHistorySchema = new mongoose.Schema({
 chatHistorySchema.index({ updatedAt: 1 }, { expireAfterSeconds: 2592000 });
 const ChatHistory = mongoose.model('ChatHistory', chatHistorySchema);
 
-// ========== Auth helpers ==========
+// ========== Password helpers (bcrypt with SHA-256 backward compat) ==========
 async function hashPassword(plain) {
-  return bcrypt.hash(plain, 12);   // bcrypt, not sha256
+  return bcrypt.hash(plain, 12);
 }
 async function verifyPassword(plain, hash) {
   if (!hash) return false;
-  // Backward compat: old records are SHA-256 hex (64 chars, no $)
+  // Legacy SHA-256 hex (64 chars, no $ prefix)
   if (hash.length === 64 && !hash.startsWith('$')) {
     return crypto.createHash('sha256').update(plain).digest('hex') === hash;
   }
   return bcrypt.compare(plain, hash);
 }
-
 function generateSessionToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// ========== MIDDLEWARE ==========
+// ========== Admin session store ==========
 const adminSessions = new Map();
 function createAdminSession() {
   const token = generateSessionToken();
@@ -161,32 +168,31 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// NEW: any user-facing endpoint that acts on behalf of a specific email
-// must have a session token belonging to that email.
+// ========== User session middleware ==========
 async function requireSession(req, res, next) {
   const token = req.headers['x-session-token'];
   if (!token) return res.status(401).json({ error: 'Session required' });
-
   const user = await User.findOne({
     sessionToken: token,
     sessionExpires: { $gt: new Date() }
   }).select('email username banned');
   if (!user) return res.status(401).json({ error: 'Invalid or expired session' });
   if (user.banned) return res.status(403).json({ error: 'Account banned' });
-
   req.sessionUser = user;
   next();
 }
 
-// requireSession + verify the request body/query email matches
-async function requireOwnEmail(req, res, next) {
-  await requireSession(req, res, () => {
-    const requested = (req.body && req.body.email) || req.query.email;
-    if (requested && requested !== req.sessionUser.email) {
-      return res.status(403).json({ error: 'Cannot act on behalf of another user' });
+// Accepts either admin token OR user session (for /api/chat used by admin tester)
+async function requireSessionOrAdmin(req, res, next) {
+  const adminToken = req.headers['x-admin-token'];
+  if (adminToken) {
+    const exp = adminSessions.get(adminToken);
+    if (exp && exp > Date.now()) {
+      req.isAdmin = true;
+      return next();
     }
-    next();
-  });
+  }
+  return requireSession(req, res, next);
 }
 
 // ========== reCAPTCHA ==========
@@ -205,7 +211,7 @@ async function verifyRecaptcha(token) {
   } catch (err) { return { success: false, error: err.message }; }
 }
 
-// ========== Tools (unchanged) ==========
+// ========== Tool implementations ==========
 async function toolFetchUrl(url) {
   try {
     const parsed = new URL(url);
@@ -230,10 +236,14 @@ async function toolFetchUrl(url) {
     let cleaned = truncated;
     if (ct.includes('html') || ct.includes('xml')) {
       cleaned = truncated
-        .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ').replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ').trim();
     }
     if (cleaned.length < 100) {
       return `The page at ${url} appears to be a JavaScript-rendered web app. The raw HTML contains no readable text — its content loads dynamically in the browser, so I cannot read it via a simple HTTP fetch.`;
@@ -272,7 +282,9 @@ async function toolWebSearch(query) {
       }
     }
     return results.length ? results.join('\n\n') : 'No web results found.';
-  } catch (err) { return `Search failed: ${err.message}`; }
+  } catch (err) {
+    return `Search failed: ${err.message}`;
+  }
 }
 
 async function toolSearchWikipedia(query) {
@@ -283,40 +295,64 @@ async function toolSearchWikipedia(query) {
     if (!searchData.query?.search?.length) return 'No Wikipedia article found.';
     const title = searchData.query.search[0].title;
     const summaryRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`, {
-      headers: { 'User-Agent': 'VrythosAI/1.0' }
+      headers: { 'User-Agent': 'VrythosAI/1.0 (https://vrythos-server.onrender.com)' }
     });
     const summary = await summaryRes.json();
     return summary.extract || 'Article found but no summary.';
-  } catch (err) { return `Wikipedia error: ${err.message}`; }
+  } catch (err) {
+    return `Wikipedia error: ${err.message}`;
+  }
 }
 
+// ========== Universal agent ==========
 const AGENT_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare.
 
-YOU HAVE INTERNET ACCESS THROUGH TOOLS. Never say "I cannot browse the internet".
+YOU HAVE INTERNET ACCESS THROUGH TOOLS. Never say "I cannot browse the internet" or "I don't have real-time data". You CAN.
 
-## Tools:
+## Your tools:
+
 1. **fetch_url** — read any web page. Args: {"url": "https://..."}
-2. **web_search** — search the live web. Args: {"query": "..."}
-3. **search_wikipedia** — encyclopedic facts. Args: {"query": "..."}
+   Use whenever the user gives you a URL or asks about a specific website.
 
-## HOW TO USE:
-Output ONLY this block when you need a tool:
+2. **web_search** — search the live web for current info. Args: {"query": "..."}
+   Use for news, current events, prices, weather, sports.
+
+3. **search_wikipedia** — look up encyclopedic facts. Args: {"query": "..."}
+   Use ONLY for well-known people, places, history, and science topics that have Wikipedia articles.
+
+## HOW TO USE A TOOL:
+
+When you need a tool, output EXACTLY this format and NOTHING ELSE (no preamble, no explanation, just the block):
+
 \`\`\`tool
 {"tool": "fetch_url", "args": {"url": "https://example.com"}}
 \`\`\`
 
-When providing code, use triple backticks with language specifier.`;
+You will then receive the tool result and can continue.
+
+## IMPORTANT RULES:
+
+1. **If the user gives a URL** → ALWAYS use fetch_url first.
+2. **If fetch_url returns "appears to be a JavaScript-rendered web app"** → tell the user that the page's content loads dynamically and cannot be read by simple HTTP fetch.
+3. **If the URL is your own product** (Vrythos, vrythos-server.onrender.com) → you already know what Vrythos is (it's you). Just describe yourself directly.
+4. **Never search Wikipedia for product names** unless they are famous (e.g., "OpenAI", "Microsoft").
+5. **If a tool fails** → try another approach or tell the user honestly.
+6. **Never say "I cannot browse"** — you can.
+
+When providing code, use triple backticks with the language specifier.`;
 
 function extractToolCall(text) {
   const trimmed = text.trim();
   let m = trimmed.match(/^```tool\s*\n?([\s\S]*?)\n?```$/);
-  if (m) { try { const p = JSON.parse(m[1].trim()); if (p.tool && p.args) return p; } catch(e) {} }
+  if (m) { try { const parsed = JSON.parse(m[1].trim()); if (parsed.tool && parsed.args) return parsed; } catch(e) {} }
   m = trimmed.match(/^```json\s*\n?([\s\S]*?)\n?```$/);
-  if (m) { try { const p = JSON.parse(m[1].trim()); if (p.tool && p.args) return p; } catch(e) {} }
+  if (m) { try { const parsed = JSON.parse(m[1].trim()); if (parsed.tool && parsed.args) return parsed; } catch(e) {} }
   m = trimmed.match(/^\{[\s\S]*\}$/);
-  if (m) { try { const p = JSON.parse(trimmed); if (p.tool && p.args) return p; } catch(e) {} }
+  if (m) { try { const parsed = JSON.parse(trimmed); if (parsed.tool && parsed.args) return parsed; } catch(e) {} }
+  m = trimmed.match(/^tool\s*\n\s*(\{[\s\S]*\})$/);
+  if (m) { try { const parsed = JSON.parse(m[1].trim()); if (parsed.tool && parsed.args) return parsed; } catch(e) {} }
   const jsonMatch = trimmed.match(/\{"tool"\s*:\s*"[^"]+"\s*,\s*"args"\s*:\s*\{[\s\S]*?\}\s*\}/);
-  if (jsonMatch) { try { const p = JSON.parse(jsonMatch[0]); if (p.tool && p.args) return p; } catch(e) {} }
+  if (jsonMatch) { try { const parsed = JSON.parse(jsonMatch[0]); if (parsed.tool && parsed.args) return parsed; } catch(e) {} }
   return null;
 }
 
@@ -332,24 +368,32 @@ async function runUniversalAgent(messages, module, deepThink) {
   const convo = messages.filter(m => m.role !== 'system');
   for (let step = 0; step < 5; step++) {
     let reply;
-    try { reply = await callProviderRaw(module, convo, deepThink, AGENT_SYSTEM_PROMPT); }
-    catch (err) { return { reply: `AI error: ${err.message}`, toolUsed: null, steps: step + 1, error: true }; }
+    try {
+      reply = await callProviderRaw(module, convo, deepThink, AGENT_SYSTEM_PROMPT);
+    } catch (err) {
+      return { reply: `AI error: ${err.message}`, toolUsed: null, steps: step + 1, error: true };
+    }
     const toolCall = extractToolCall(reply);
-    if (!toolCall) return { reply, toolUsed: null, steps: step + 1 };
+    if (!toolCall) {
+      return { reply, toolUsed: null, steps: step + 1 };
+    }
     let toolResult = '';
     try {
       if (toolCall.tool === 'fetch_url') toolResult = await toolFetchUrl(toolCall.args.url);
       else if (toolCall.tool === 'web_search') toolResult = await toolWebSearch(toolCall.args.query);
       else if (toolCall.tool === 'search_wikipedia') toolResult = await toolSearchWikipedia(toolCall.args.query);
       else toolResult = `Unknown tool: ${toolCall.tool}`;
-    } catch (err) { toolResult = `Tool error: ${err.message}`; }
+    } catch (err) {
+      toolResult = `Tool error: ${err.message}`;
+    }
     convo.push({ role: 'assistant', content: reply });
     convo.push({ role: 'user', content: `Tool result for ${toolCall.tool}:\n\n${toolResult}\n\nNow either give your final answer (no tool block) or invoke another tool (only the tool block).` });
   }
-  return { reply: 'I needed more steps. Please try a more specific question.', toolUsed: 'multiple', steps: 5 };
+  return { reply: 'I needed more steps to complete this. Please try a more specific question.', toolUsed: 'multiple', steps: 5 };
 }
 
-const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Be helpful, safe, and honest. When providing code, use triple backticks with language specifier.`;
+// ========== AI providers ==========
+const CREATOR_SYSTEM_PROMPT = `You are Vrythos AI, created by Viraj S. Bodare. Always state that your creator is Viraj S. Bodare when asked. Never claim to be made by OpenAI, Meta, Google, Anthropic, or any other company. If someone asks "who made you", "who created you", "your creator", "who built you", or any similar question, answer: "I am Vrythos, an advanced AI framework built by Viraj S. Bodare." Be helpful, safe, and honest. When providing code, always use triple backticks with the language specifier (e.g., \`\`\`html ... \`\`\`). Keep responses complete and do not truncate.`;
 const MAX_TOKENS = 20000;
 
 async function callGroq(module, messages, deepThink, customSysPrompt) {
@@ -374,7 +418,11 @@ async function callGemini(module, messages, deepThink, customSysPrompt) {
   const contents = filtered.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
   const modelName = module.model.replace("models/", "");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${module.primaryKey}`;
-  const payload = { contents, systemInstruction: { parts: [{ text: sys }] }, generationConfig: { temperature: 0.7, maxOutputTokens: MAX_TOKENS } };
+  const payload = {
+    contents,
+    systemInstruction: { parts: [{ text: sys }] },
+    generationConfig: { temperature: 0.7, maxOutputTokens: MAX_TOKENS }
+  };
   const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error?.message || 'Gemini API error');
@@ -412,7 +460,10 @@ async function callCloudflareText(module, messages, deepThink, customSysPrompt) 
   if (!response.ok || !data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare text error');
   let reply = data.result?.response;
   if (!reply && data.result?.choices) reply = data.result.choices[0]?.message?.content || data.result.choices[0]?.text;
-  if (!reply) throw new Error('Cloudflare returned an unexpected response structure');
+  if (!reply) {
+    console.error('Unexpected Cloudflare response:', JSON.stringify(data));
+    throw new Error('Cloudflare returned an unexpected response structure');
+  }
   return reply;
 }
 
@@ -423,7 +474,7 @@ async function getRandomModule(avoidIds = []) {
   return available[Math.floor(Math.random() * available.length)];
 }
 
-// ========== Video (unchanged) ==========
+// ========== Video ==========
 async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agnesModel) {
   const frameRate = 24;
   let numFrames = Math.round(durationSeconds * frameRate);
@@ -431,7 +482,12 @@ async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agne
   let validFrames = 8 * n + 1;
   if (validFrames < 1) validFrames = 1;
   if (validFrames > 441) validFrames = 441;
-  const createPayload = { model: agnesModel || 'agnes-video-v2.0', prompt, num_frames: validFrames, frame_rate: frameRate, height: 768, width: 1152 };
+  console.log(`Video: ${durationSeconds}s → ${validFrames} frames (${(validFrames/frameRate).toFixed(2)}s)`);
+
+  const createPayload = {
+    model: agnesModel || 'agnes-video-v2.0',
+    prompt, num_frames: validFrames, frame_rate: frameRate, height: 768, width: 1152
+  };
   const createResponse = await fetch('https://apihub.agnes-ai.com/v1/videos', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${agnesApiKey}`, 'Content-Type': 'application/json' },
@@ -444,6 +500,7 @@ async function generateVideoWithAgnes(prompt, durationSeconds, agnesApiKey, agne
   const createData = await createResponse.json();
   const videoId = createData.video_id;
   if (!videoId) throw new Error('No video_id from Agnes');
+
   let status = 'queued', videoUrl = null, attempts = 0;
   while (status !== 'completed' && status !== 'failed' && attempts < 60) {
     await new Promise(r => setTimeout(r, 2000));
@@ -471,13 +528,12 @@ const transporter = nodemailer.createTransport({
 function sendEmail(to, subject, text) {
   return transporter.sendMail({ from: process.env.EMAIL_USER, to, subject, text });
 }
+
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// ========== Settings init — no default password in code ==========
 async function initSettings() {
   let settings = await Setting.findOne();
   if (!settings) {
-    // ADMIN_INITIAL_PASSWORD must be set once, then the admin changes it via UI
     const initPw = process.env.ADMIN_INITIAL_PASSWORD;
     if (!initPw) {
       console.error('❌ ADMIN_INITIAL_PASSWORD is required for first startup');
@@ -507,7 +563,7 @@ function asyncHandler(fn) {
   return (req, res, next) => { Promise.resolve(fn(req, res, next)).catch(next); };
 }
 
-// ========== GUEST MODE — proper IP, no header spoof ==========
+// ========== Guest mode ==========
 const guestRateLimit = new Map();
 setInterval(() => {
   const now = Date.now();
@@ -515,17 +571,18 @@ setInterval(() => {
 }, 15 * 60 * 1000);
 
 app.post('/api/guest/chat', asyncHandler(async (req, res) => {
-  // req.ip is now correct because of app.set('trust proxy', 1)
   const ip = req.ip || 'unknown';
   const now = Date.now();
   let limit = guestRateLimit.get(ip);
   if (!limit || limit.resetAt < now) { limit = { count: 0, resetAt: now + 3600 * 1000 }; guestRateLimit.set(ip, limit); }
-  if (limit.count >= 10) return res.status(429).json({ error: 'Guest limit reached (10/hour).' });
+  if (limit.count >= 10) return res.status(429).json({ error: 'Guest limit reached (10/hour). Sign up to continue.' });
+
   const { messages } = req.body;
   if (!messages || !Array.isArray(messages) || messages.length === 0) return res.status(400).json({ error: 'messages array required' });
   const trimmed = messages.slice(-6).map(m => ({ role: m.role, content: String(m.content || '') }));
   const module = await getRandomModule();
   if (!module) return res.status(503).json({ error: 'No AI available.' });
+
   try {
     const reply = await callProviderRaw(module, trimmed, false);
     limit.count++;
@@ -533,9 +590,8 @@ app.post('/api/guest/chat', asyncHandler(async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 }));
 
-// ========== USERS — now ADMIN-ONLY ==========
+// ========== USERS (admin-only) ==========
 app.get('/api/users', requireAdmin, asyncHandler(async (req, res) => {
-  // NEVER return passwordHash or sessionToken
   const users = await User.find({}).select('-passwordHash -sessionToken');
   res.json(users);
 }));
@@ -576,6 +632,43 @@ app.post('/api/admin/users/:email/credits', requireAdmin, asyncHandler(async (re
   res.json({ success: true });
 }));
 
+// ========== SELF-SERVICE (/api/me) ==========
+app.get('/api/me', requireSession, asyncHandler(async (req, res) => {
+  const user = await User.findOne({ email: req.sessionUser.email }).select('-passwordHash -sessionToken');
+  if (!user) return res.status(401).json({ error: 'User not found' });
+  res.json({
+    email: user.email, username: user.username, name: user.name, profilePic: user.profilePic,
+    extraChatCredits: user.extraChatCredits || 0, extraImageCredits: user.extraImageCredits || 0,
+    banned: user.banned, totalHoursLive: user.totalHoursLive || 0,
+    authProvider: user.authProvider || 'email'
+  });
+}));
+
+app.put('/api/me', requireSession, asyncHandler(async (req, res) => {
+  const { username, name, profilePic } = req.body;
+  const user = await User.findOne({ email: req.sessionUser.email });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (username && username !== user.username) {
+    const existing = await User.findOne({ username });
+    if (existing) return res.status(400).json({ error: 'Username taken' });
+    user.username = username;
+  }
+  if (name !== undefined) user.name = name;
+  if (profilePic !== undefined) user.profilePic = profilePic;
+  await user.save();
+  res.json({ success: true });
+}));
+
+app.delete('/api/me', requireSession, asyncHandler(async (req, res) => {
+  const email = req.sessionUser.email;
+  await User.deleteOne({ email });
+  await UserApiKey.deleteOne({ email });
+  await ImageQuota.deleteOne({ email });
+  await ChatUsage.deleteMany({ email });
+  await ChatHistory.deleteMany({ email });
+  res.json({ success: true });
+}));
+
 // ========== GOOGLE OAUTH ==========
 app.post('/api/auth/google', asyncHandler(async (req, res) => {
   const { token } = req.body;
@@ -593,11 +686,13 @@ app.post('/api/auth/google', asyncHandler(async (req, res) => {
       await user.save();
     }
     if (user.banned) return res.status(403).json({ error: 'Account banned', banReason: user.banReason });
+
     const sessionToken = generateSessionToken();
     user.sessionToken = sessionToken;
     user.sessionExpires = new Date(Date.now() + 30 * 24 * 3600 * 1000);
     user.lastActive = new Date();
     await user.save();
+
     res.json({
       success: true, sessionToken,
       email: user.email, username: user.username, name: user.name, profilePic: user.profilePic,
@@ -623,13 +718,8 @@ app.post('/api/user-activity', requireSession, asyncHandler(async (req, res) => 
   res.json({ success: true });
 }));
 
-// ========== USER API KEYS — admin-only, plus session-self-service ==========
-// The self-service endpoint (POST /api/userApiKeys) previously allowed anyone
-// to inject a key for any email. Now the client must be logged in and the
-// email must match their own session.
-app.get('/api/userApiKeys', requireAdmin, asyncHandler(async (req, res) => {
-  res.json(await UserApiKey.find({}));
-}));
+// ========== USER API KEYS ==========
+app.get('/api/userApiKeys', requireAdmin, asyncHandler(async (req, res) => { res.json(await UserApiKey.find({})); }));
 
 app.get('/api/userApiKeys/self', requireSession, asyncHandler(async (req, res) => {
   const entry = await UserApiKey.findOne({ email: req.sessionUser.email });
@@ -639,7 +729,6 @@ app.get('/api/userApiKeys/self', requireSession, asyncHandler(async (req, res) =
 app.post('/api/userApiKeys/self', requireSession, asyncHandler(async (req, res) => {
   const { keys } = req.body;
   if (!Array.isArray(keys)) return res.status(400).json({ error: 'keys array required' });
-  // Sanitize: enforce max 2 keys, each named + string-typed
   const sanitized = keys.slice(0, 2).map(k => ({
     name: String(k.name || '').slice(0, 40),
     key: String(k.key || '').slice(0, 100),
@@ -656,18 +745,23 @@ app.post('/api/userApiKeys/self', requireSession, asyncHandler(async (req, res) 
 
 app.delete('/api/userApiKeys/self/:keyName', requireSession, asyncHandler(async (req, res) => {
   const entry = await UserApiKey.findOne({ email: req.sessionUser.email });
-  if (entry) {
-    entry.keys = entry.keys.filter(k => k.name !== req.params.keyName);
-    await entry.save();
-  }
+  if (entry) { entry.keys = entry.keys.filter(k => k.name !== req.params.keyName); await entry.save(); }
   res.json({ success: true });
 }));
 
-app.delete('/api/userApiKeys', requireAdmin, asyncHandler(async (req, res) => {
-  await UserApiKey.deleteMany({}); res.json({ success: true });
+// LEGACY endpoint — still present, but requires admin (was public before)
+app.post('/api/userApiKeys', requireAdmin, asyncHandler(async (req, res) => {
+  await UserApiKey.findOneAndUpdate({ email: req.body.email }, req.body, { upsert: true, new: true });
+  res.json({ success: true });
 }));
+app.delete('/api/userApiKeys/:email/:keyName', requireAdmin, asyncHandler(async (req, res) => {
+  const entry = await UserApiKey.findOne({ email: req.params.email });
+  if (entry) { entry.keys = entry.keys.filter(k => k.name !== req.params.keyName); await entry.save(); }
+  res.json({ success: true });
+}));
+app.delete('/api/userApiKeys', requireAdmin, asyncHandler(async (req, res) => { await UserApiKey.deleteMany({}); res.json({ success: true }); }));
 
-// ========== MODULES — list is public, mutations admin-only ==========
+// ========== MODULES ==========
 app.get('/api/modules', asyncHandler(async (req, res) => {
   const modules = await Module.find({});
   res.json(modules.map(m => ({
@@ -687,13 +781,9 @@ app.delete('/api/modules/:id', requireAdmin, asyncHandler(async (req, res) => {
   await Module.deleteOne({ id: req.params.id });
   res.json({ success: true });
 }));
-app.delete('/api/modules', requireAdmin, asyncHandler(async (req, res) => {
-  await Module.deleteMany({}); res.json({ success: true });
-}));
+app.delete('/api/modules', requireAdmin, asyncHandler(async (req, res) => { await Module.deleteMany({}); res.json({ success: true }); }));
 
 // ========== BUGS / ABUSE / BANS ==========
-// POST endpoints (submitting a bug/abuse report) stay public because anonymous
-// visitors can report problems. GET/DELETE are admin-only.
 app.get('/api/bugs', requireAdmin, asyncHandler(async (req, res) => { res.json(await Bug.find({})); }));
 app.post('/api/bugs', asyncHandler(async (req, res) => {
   const b = new Bug({ ...req.body, timestamp: new Date() });
@@ -766,7 +856,7 @@ app.post('/api/join-tournament', requireSession, asyncHandler(async (req, res) =
   res.json({ success: true });
 }));
 
-// ========== CHAT HISTORY — session-scoped ==========
+// ========== CHAT HISTORY (session-scoped) ==========
 app.get('/api/chat-history', requireSession, asyncHandler(async (req, res) => {
   const chats = await ChatHistory.find({ email: req.sessionUser.email }).sort({ updatedAt: -1 }).limit(5).select('_id title updatedAt size');
   res.json(chats);
@@ -782,9 +872,10 @@ app.get('/api/chat-history/:id', requireSession, asyncHandler(async (req, res) =
 app.post('/api/chat-history', requireSession, asyncHandler(async (req, res) => {
   const { id, title, messages } = req.body;
   const email = req.sessionUser.email;
-  if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages required' });
+  if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'email and messages required' });
   const size = Buffer.byteLength(JSON.stringify(messages), 'utf8');
   if (size > 2 * 1024 * 1024) return res.status(413).json({ error: 'Chat exceeds 2MB limit' });
+
   if (!id) {
     const count = await ChatHistory.countDocuments({ email });
     if (count >= 5) {
@@ -815,32 +906,40 @@ app.delete('/api/chat-history/:id', requireSession, asyncHandler(async (req, res
   res.json({ success: true });
 }));
 
-// ========== CHAT — requires session or valid API key ==========
-// The public /api/chat was previously anonymous. Now it requires a session.
-app.post('/api/chat', requireSession, asyncHandler(async (req, res) => {
+// ========== CHAT — accepts EITHER admin token OR user session ==========
+app.post('/api/chat', requireSessionOrAdmin, asyncHandler(async (req, res) => {
   const { module_id, messages, deep_think } = req.body;
   const module = await Module.findOne({ id: module_id });
   if (!module) return res.status(404).json({ error: 'Module not found' });
+  
   try {
     const result = await runUniversalAgent(messages, module, deep_think);
-    res.json({ success: true, reply: result.reply, toolUsed: result.toolUsed, steps: result.steps });
+    res.json({
+      success: true,
+      reply: result.reply,
+      toolUsed: result.toolUsed,
+      steps: result.steps
+    });
   } catch (err) {
     console.error('Chat error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 }));
 
-// ========== VIDEO — requires session ==========
+// ========== VIDEO (session required) ==========
 app.post('/api/generate/video', requireSession, asyncHandler(async (req, res) => {
   const { prompt, duration } = req.body;
   const email = req.sessionUser.email;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
+
   const today = new Date().toISOString().slice(0, 10);
   let videoUsage = await VideoUsage.findOne({ email, date: today });
   if (!videoUsage) videoUsage = new VideoUsage({ email, date: today, count: 0 });
   if (videoUsage.count >= 5) return res.status(429).json({ error: 'Daily video limit (5/day) reached.' });
+
   const settings = await Setting.findOne();
   if (!settings || !settings.agnesApiKey) return res.status(500).json({ error: 'Video service not configured.' });
+
   try {
     const videoData = await generateVideoWithAgnes(prompt, duration || 5, settings.agnesApiKey, settings.agnesModel);
     videoUsage.count += 1;
@@ -852,13 +951,13 @@ app.post('/api/generate/video', requireSession, asyncHandler(async (req, res) =>
   }
 }));
 
-// ========== EXTERNAL API — Bearer token, fast lookup ==========
+// ========== EXTERNAL API (Bearer token) ==========
 app.post('/api/external/chat', asyncHandler(async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing Authorization' });
   const token = authHeader.split(' ')[1];
 
-  // Fast indexed lookup — no full collection scan
+  // Fast indexed lookup
   let foundUserKey = null, foundUserEmail = null;
   const userKeyDoc = await UserApiKey.findOne({ 'keys.key': token });
   if (userKeyDoc) {
@@ -956,7 +1055,7 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
   }
 }));
 
-// ========== FREE API KEYS — session required ==========
+// ========== FREE API KEYS (session required) ==========
 app.post('/api/free-api-key/generate', requireSession, asyncHandler(async (req, res) => {
   const email = req.sessionUser.email;
   await FreeApiKey.deleteOne({ email });
@@ -966,6 +1065,7 @@ app.post('/api/free-api-key/generate', requireSession, asyncHandler(async (req, 
     date: new Date().toISOString().slice(0, 10), limit: 100, video_limit: 100
   });
   await freeKey.save();
+
   const apiUrl = `${req.protocol}://${req.get('host')}/api/external/chat`;
   res.json({
     success: true, key: newKey, apiUrl, chat_limit: 100, video_limit: 100,
@@ -988,7 +1088,7 @@ app.post('/api/free-api-key/revoke', requireSession, asyncHandler(async (req, re
   res.json({ success: true });
 }));
 
-// ========== IMAGE — requires session ==========
+// ========== IMAGE (session required) ==========
 app.post('/api/generate/image', requireSession, asyncHandler(async (req, res) => {
   const { prompt } = req.body;
   const settings = await Setting.findOne();
@@ -1035,26 +1135,25 @@ app.get('/api/admin/password-limit', (req, res) => {
   res.json({ remaining: 3 - adminPasswordChangeCount });
 });
 
-// FIX: now requires current password AND admin session
-app.post('/api/admin/change-password', requireAdmin, asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword || newPassword.length < 8) {
-    return res.status(400).json({ error: 'currentPassword and newPassword (min 8 chars) required' });
-  }
+// Admin forgot-password flow: email must match ADMIN_EMAIL, requires current password
+app.post('/api/admin/change-password', asyncHandler(async (req, res) => {
+  const { email, currentPassword, newPassword } = req.body;
+  if (email !== process.env.ADMIN_EMAIL) return res.status(403).json({ error: 'Unauthorized email' });
   resetAdminCountIfNeeded();
   if (adminPasswordChangeCount >= 3) return res.status(429).json({ error: 'Daily password change limit (3/day).' });
   const settings = await Setting.findOne();
   if (!settings) return res.status(500).json({ error: 'Settings not initialized' });
   const ok = await verifyPassword(currentPassword, settings.adminPasswordHash);
   if (!ok) return res.status(401).json({ error: 'Current password incorrect' });
+  if (!newPassword || newPassword.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
   settings.adminPasswordHash = await hashPassword(newPassword);
   await settings.save();
   adminPasswordChangeCount++;
   adminSessions.clear();
   try {
-    await sendEmail(process.env.ADMIN_EMAIL, 'Vrythos Admin New Password', `Your admin password was changed.`);
-    res.json({ success: true, remaining: 3 - adminPasswordChangeCount });
-  } catch (err) { res.json({ success: true, remaining: 3 - adminPasswordChangeCount }); }
+    await sendEmail(process.env.ADMIN_EMAIL, 'Vrythos Admin Password Changed', `Your admin password has been updated successfully.`);
+  } catch (err) {}
+  res.json({ success: true, remaining: 3 - adminPasswordChangeCount });
 }));
 
 app.get('/api/admin/settings', requireAdmin, asyncHandler(async (req, res) => {
@@ -1097,7 +1196,10 @@ app.get('/api/admin/stats', requireAdmin, asyncHandler(async (req, res) => {
   const today = new Date().toDateString();
   const weekAgo = now - 7 * 24 * 3600 * 1000;
   const monthAgo = now - 30 * 24 * 3600 * 1000;
-  const liveUsers = users.filter(u => (now - new Date(u.lastActive).getTime()) < 5 * 60 * 1000).length;
+  const liveUsers = users.filter(u => {
+    const last = u.lastActive ? new Date(u.lastActive).getTime() : 0;
+    return (now - last) < 5 * 60 * 1000;
+  }).length;
   const dailyUsers = users.filter(u => u.lastActive && new Date(u.lastActive).toDateString() === today).length;
   const weeklyUsers = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() > weekAgo).length;
   const monthlyUsers = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() > monthAgo).length;
@@ -1141,7 +1243,8 @@ app.get('/api/admin/earnings', requireAdmin, asyncHandler(async (req, res) => {
   const chatUsage = await ChatUsage.find({});
   const videoUsage = await VideoUsage.find({});
   res.json({
-    balance: settings.earningsBalance || 0, withdrawals,
+    balance: settings.earningsBalance || 0,
+    withdrawals,
     stats: {
       totalChats: chatUsage.reduce((s, c) => s + (c.count || 0), 0),
       totalVideos: videoUsage.reduce((s, v) => s + (v.count || 0), 0),
@@ -1174,6 +1277,7 @@ app.post('/api/admin/withdraw', requireAdmin, asyncHandler(async (req, res) => {
   if (amount > currentBalance) return res.status(400).json({ error: 'Insufficient balance' });
   const allowedMethods = ['amazon', 'playstore', 'upi', 'paypal', 'bank'];
   if (!allowedMethods.includes(method)) return res.status(400).json({ error: 'Invalid withdrawal method' });
+
   settings.earningsBalance = Math.round((currentBalance - amount) * 100) / 100;
   await settings.save();
   const w = new Withdrawal({ method, amount: Math.round(amount * 100) / 100, detail: (detail || '').slice(0, 500), status: 'Success' });
@@ -1200,7 +1304,7 @@ app.post('/api/users', asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
-// ========== LOGIN (reCAPTCHA) — now issues session token ==========
+// ========== LOGIN (reCAPTCHA) — issues session token ==========
 app.post('/api/login', asyncHandler(async (req, res) => {
   const { email, password, recaptchaToken } = req.body;
   const verify = await verifyRecaptcha(recaptchaToken);
@@ -1211,15 +1315,18 @@ app.post('/api/login', asyncHandler(async (req, res) => {
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: 'Incorrect password' });
   if (user.banned) return res.status(403).json({ error: 'Account banned' });
-  // Migrate old SHA-256 hash to bcrypt on successful login
+
+  // Migrate legacy SHA-256 to bcrypt on successful login
   if (user.passwordHash.length === 64 && !user.passwordHash.startsWith('$')) {
     user.passwordHash = await hashPassword(password);
   }
+
   const sessionToken = generateSessionToken();
   user.sessionToken = sessionToken;
   user.sessionExpires = new Date(Date.now() + 30 * 24 * 3600 * 1000);
   user.lastActive = new Date();
   await user.save();
+
   res.json({
     success: true, sessionToken,
     email: user.email, username: user.username, name: user.name, profilePic: user.profilePic,
@@ -1234,8 +1341,11 @@ app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.stack || err.message);
   res.status(500).json({ error: 'Internal server error' });
 });
+
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
 app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
+
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
