@@ -122,7 +122,7 @@ const ChatHistory = mongoose.model('ChatHistory', chatHistorySchema);
 // ========== Helpers ==========
 function hashPassword(pw) { return crypto.createHash('sha256').update(pw).digest('hex'); }
 
-const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET || '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe';
+const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET || '6LfA_w0uAAAAADu_4R9Zo_1uBkSRTIY2bGAStkVq';
 async function verifyRecaptcha(token) {
     if (!token) return { success: false, error: 'Missing reCAPTCHA token' };
     try {
