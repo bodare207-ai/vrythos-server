@@ -201,674 +201,761 @@ html,body{height:100%;font-family:var(--font-sans);background:var(--bg-primary);
 <div id="app-root" class="loading">Loading Vrythos…</div>
 
 <script>
-async function apiGet(endpoint){const res=await fetch(endpoint);if(!res.ok)throw new Error(await res.text());return res.json()}
-async function apiPost(endpoint,data){const res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error||'Request failed')}return res.json()}
-async function apiPut(endpoint,data){const res=await fetch(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!res.ok)throw new Error(await res.text());return res.json()}
-async function apiDelete(endpoint){const res=await fetch(endpoint,{method:'DELETE'});if(!res.ok)throw new Error(await res.text());return res.json()}
+// ============================================================
+// SESSION STATE
+// ============================================================
+let sessionToken = localStorage.getItem('vrythos_session_token') || null;
 
-let currentUser=null;
-let modules=[];
-let tournaments=[];
-let deepThink=false;
-let liveImageMode=false;
-let liveVideoMode=false;
-let bestCodingMode=false;
-let messagesHistory=[];
-let attachedFiles=[];
-let isProcessing=false;
-const DEFAULT_VIDEO_DURATION=5;
-const imgStore={};
-let imgStoreCounter=0;
-const videoStore={};
-let videoStoreCounter=0;
-let abuseScore=0;
-let abuseWarningShown=false;
-let messageIdCounter=0;
-const messageContentStore={};
-let currentChatId=null;
-let isGuestMode=false;
-
-function escapeHtml(str){const map={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};return String(str).replace(/[&<>"']/g,m=>map[m])}
-function smartScroll(el){if(!el)return;const threshold=120;if(el.scrollHeight-el.scrollTop-el.clientHeight<threshold)el.scrollTop=el.scrollHeight}
-async function hashPassword(pw){const enc=new TextEncoder().encode(pw);const h=await crypto.subtle.digest('SHA-256',enc);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('')}
-function showToast(msg,type='info'){const t=document.createElement('div');const bg=type==='error'?'#7f1a1a':type==='warning'?'#78350f':'#2a2926';t.style.cssText=`position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:${bg};color:#f5f4ef;padding:.65rem 1.25rem;border-radius:9999px;font-size:.82rem;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:90%;text-align:center;border:1px solid #3a3833;min-height:44px;display:flex;align-items:center;justify-content:center;font-family:'Inter',system-ui,sans-serif`;t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s'},2800);setTimeout(()=>t.remove(),3200)}
-
-/* ABUSE */
-async function addAbuseScore(points,reason,context){
-  if(!currentUser||isGuestMode)return;
-  abuseScore=Math.min(100,abuseScore+points);
-  try{
-    await apiPost('/api/pendingBans',{email:currentUser.email,username:currentUser.username,score:abuseScore,reason,context:(context||'').slice(0,200),timestamp:Date.now(),reviewed:false});
-    await apiPost('/api/abuse',{email:currentUser.email,username:currentUser.username,reason,context:(context||'').slice(0,100),timestamp:Date.now()});
-  }catch(_){}
-  if((abuseScore>=10&&!abuseWarningShown)||points>=5){
-    abuseWarningShown=true;
-    addAIMessage(`Warning: suspicious activity detected (score ${abuseScore}%). Repeated violations may lead to a ban.`,false,false,true);
-  }
+// ============================================================
+// API HELPERS (all send X-Session-Token when available)
+// ============================================================
+function handleAuthError() {
+  sessionToken = null;
+  localStorage.removeItem('vrythos_session_token');
+  currentUser = null;
+  isGuestMode = false;
+  showToast('Session expired. Please log in again.', 'error');
+  setTimeout(() => location.reload(), 1500);
 }
-document.addEventListener('contextmenu',e=>{e.preventDefault();addAbuseScore(5,'Right-click attempt','User right-clicked');showToast('Right-click is prohibited','warning');return false});
-function detectDevTools(){const t=160;if(window.outerWidth-window.innerWidth>t||window.outerHeight-window.innerHeight>t){addAbuseScore(10,'Developer tools detected','DevTools opened');showToast('Developer tools detected','error')}}
-setInterval(detectDevTools,2000);
-document.addEventListener('keydown',e=>{if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&e.key==='I')||(e.ctrlKey&&e.key==='U')){e.preventDefault();addAbuseScore(10,'View source attempt','Tried to view page source');showToast('Viewing source is forbidden','error');return false}});
 
-/* DOWNLOAD/COPY */
-window.downloadImage=function(id){const u=imgStore[id];if(!u)return;const a=document.createElement('a');a.download='vrythos_image.png';a.href=u;a.click()};
-window.copyImageToClipboard=async function(id){const u=imgStore[id];if(!u)return;try{const b=await(await fetch(u)).blob();await navigator.clipboard.write([new ClipboardItem({[b.type]:b})]);showToast('Image copied','info')}catch(_){showToast('Copy failed','error')}};
-window.downloadVideo=function(id){const u=videoStore[id];if(!u)return;const a=document.createElement('a');a.download='vrythos_video.mp4';a.href=u;a.click()};
-window.copyVideoToClipboard=async function(id){const u=videoStore[id];if(!u)return;try{const b=await(await fetch(u)).blob();await navigator.clipboard.write([new ClipboardItem({[b.type]:b})]);showToast('Video copied','info')}catch(_){showToast('Copy failed','error')}};
+async function apiGet(endpoint) {
+  const headers = {};
+  if (sessionToken) headers['X-Session-Token'] = sessionToken;
+  const res = await fetch(endpoint, { headers });
+  if (res.status === 401 && sessionToken) { handleAuthError(); throw new Error('Session expired'); }
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 
-/* LOADERS */
-async function loadAllData(){modules=await apiGet('/api/modules');tournaments=await apiGet('/api/tournaments')}
-async function loadUsers(){return await apiGet('/api/users')}
-async function updateUser(email,updates){return await apiPut(`/api/users/${email}`,updates)}
-async function deleteUser(email){return await apiDelete(`/api/users/${email}`)}
-async function loadUserApiKeys(email){const all=await apiGet('/api/userApiKeys');const entry=all.find(e=>e.email===email);return entry?entry.keys:[]}
-async function saveUserApiKeys(email,keys){await apiPost('/api/userApiKeys',{email,keys})}
-async function addBugReport(bug){return await apiPost('/api/bugs',bug)}
-async function joinTournament(id){return await apiPost('/api/join-tournament',{email:currentUser.email,tournamentId:id})}
+async function apiPost(endpoint, data) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (sessionToken) headers['X-Session-Token'] = sessionToken;
+  const res = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(data || {}) });
+  if (res.status === 401 && sessionToken) { handleAuthError(); throw new Error('Session expired'); }
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Request failed'); }
+  return res.json();
+}
 
-/* IMAGE */
-async function generateImageWithCloudflare(prompt){try{const r=await fetch('/api/generate/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(d.success)return d.image}catch(_){}return null}
-async function generateImageWithPollinations(prompt){try{const r=await fetch('/api/fallback/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});const d=await r.json();if(d.success)return d.image}catch(_){}return null}
-async function generateImageAndShow(prompt,live=false){
-  addAIMessage(live?'🎨 Painting image… bringing your vision to life':'Generating image…',false,false,true);
-  let imgData=await generateImageWithCloudflare(prompt);
-  if(!imgData)imgData=await generateImageWithPollinations(prompt);
-  if(imgData&&imgData.startsWith('data:image')){
-    const id='img_'+(++imgStoreCounter);
-    imgStore[id]=imgData;
-    if(live){
-      addAIMessage(`<div class="live-image-container"><div class="live-image-frame"><img src="${imgData}" class="live-image" alt="Generated image" /><div class="live-scanline"></div><div class="live-glow"></div></div></div><div class="btn-row"><button onclick="downloadImage('${id}')">⬇️ Download</button><button onclick="copyImageToClipboard('${id}')">📋 Copy</button></div>`,true,false);
-    }else{
-      addAIMessage(`<img src="${imgData}" style="max-width:100%;border-radius:12px;" /><div class="btn-row"><button onclick="downloadImage('${id}')">Download</button><button onclick="copyImageToClipboard('${id}')">Copy</button></div>`,true,false);
+async function apiPut(endpoint, data) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (sessionToken) headers['X-Session-Token'] = sessionToken;
+  const res = await fetch(endpoint, { method: 'PUT', headers, body: JSON.stringify(data || {}) });
+  if (res.status === 401 && sessionToken) { handleAuthError(); throw new Error('Session expired'); }
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiDelete(endpoint) {
+  const headers = {};
+  if (sessionToken) headers['X-Session-Token'] = sessionToken;
+  const res = await fetch(endpoint, { method: 'DELETE', headers });
+  if (res.status === 401 && sessionToken) { handleAuthError(); throw new Error('Session expired'); }
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+let currentUser = null;
+let modules = [];
+let tournaments = [];
+let deepThink = false;
+let liveImageMode = false;
+let liveVideoMode = false;
+let bestCodingMode = false;
+let messagesHistory = [];
+let attachedFiles = [];
+let isProcessing = false;
+const DEFAULT_VIDEO_DURATION = 5;
+const imgStore = {};
+let imgStoreCounter = 0;
+const videoStore = {};
+let videoStoreCounter = 0;
+let abuseScore = 0;
+let abuseWarningShown = false;
+let messageIdCounter = 0;
+const messageContentStore = {};
+let currentChatId = null;
+let isGuestMode = false;
+
+function escapeHtml(str) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(str).replace(/[&<>"']/g, m => map[m]);
+}
+function smartScroll(el) { if (!el) return; const threshold = 120; if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) el.scrollTop = el.scrollHeight; }
+
+function showToast(msg, type = 'info') {
+  const t = document.createElement('div');
+  const bg = type === 'error' ? '#7f1a1a' : type === 'warning' ? '#78350f' : '#2a2926';
+  t.style.cssText = `position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:${bg};color:#f5f4ef;padding:.65rem 1.25rem;border-radius:9999px;font-size:.82rem;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:90%;text-align:center;border:1px solid #3a3833;min-height:44px;display:flex;align-items:center;justify-content:center;font-family:'Inter',system-ui,sans-serif`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; }, 2800);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// Abuse scoring (kept but not triggered — no anti-debug blocks)
+async function addAbuseScore(points, reason, context) {
+  if (!currentUser || isGuestMode) return;
+  abuseScore = Math.min(100, abuseScore + points);
+  try {
+    await apiPost('/api/pendingBans', { email: currentUser.email, username: currentUser.username, score: abuseScore, reason, context: (context || '').slice(0, 200), timestamp: Date.now(), reviewed: false });
+    await apiPost('/api/abuse', { email: currentUser.email, username: currentUser.username, reason, context: (context || '').slice(0, 100), timestamp: Date.now() });
+  } catch (_) {}
+}
+
+// Download / copy helpers (unchanged)
+window.downloadImage = function(id) { const u = imgStore[id]; if (!u) return; const a = document.createElement('a'); a.download = 'vrythos_image.png'; a.href = u; a.click(); };
+window.copyImageToClipboard = async function(id) { const u = imgStore[id]; if (!u) return; try { const b = await (await fetch(u)).blob(); await navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]); showToast('Image copied', 'info'); } catch (_) { showToast('Copy failed', 'error'); } };
+window.downloadVideo = function(id) { const u = videoStore[id]; if (!u) return; const a = document.createElement('a'); a.download = 'vrythos_video.mp4'; a.href = u; a.click(); };
+window.copyVideoToClipboard = async function(id) { const u = videoStore[id]; if (!u) return; try { const b = await (await fetch(u)).blob(); await navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]); showToast('Video copied', 'info'); } catch (_) { showToast('Copy failed', 'error'); } };
+
+// ============================================================
+// DATA LOADERS (patched to use /api/me and self-service)
+// ============================================================
+async function loadAllData() {
+  modules = await apiGet('/api/modules');
+  tournaments = await apiGet('/api/tournaments');
+}
+async function updateUser(email, updates) { return await apiPut('/api/me', updates); }
+async function deleteUser(email) { return await apiDelete('/api/me'); }
+async function loadUserApiKeys(email) { return await apiGet('/api/userApiKeys/self'); }
+async function saveUserApiKeys(email, keys) { await apiPost('/api/userApiKeys/self', { keys }); }
+async function addBugReport(bug) { return await apiPost('/api/bugs', bug); }
+async function joinTournament(id) { return await apiPost('/api/join-tournament', { tournamentId: id }); }
+
+// ============================================================
+// IMAGE GENERATION (patched with X-Session-Token)
+// ============================================================
+async function generateImageWithCloudflare(prompt) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (sessionToken) headers['X-Session-Token'] = sessionToken;
+    const r = await fetch('/api/generate/image', { method: 'POST', headers, body: JSON.stringify({ prompt }) });
+    const d = await r.json();
+    if (d.success) return d.image;
+  } catch (_) {}
+  return null;
+}
+async function generateImageWithPollinations(prompt) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (sessionToken) headers['X-Session-Token'] = sessionToken;
+    const r = await fetch('/api/fallback/image', { method: 'POST', headers, body: JSON.stringify({ prompt }) });
+    const d = await r.json();
+    if (d.success) return d.image;
+  } catch (_) {}
+  return null;
+}
+async function generateImageAndShow(prompt, live = false) {
+  addAIMessage(live ? '🎨 Painting image… bringing your vision to life' : 'Generating image…', false, false, true);
+  let imgData = await generateImageWithCloudflare(prompt);
+  if (!imgData) imgData = await generateImageWithPollinations(prompt);
+  if (imgData && imgData.startsWith('data:image')) {
+    const id = 'img_' + (++imgStoreCounter);
+    imgStore[id] = imgData;
+    if (live) {
+      addAIMessage(`<div class="live-image-container"><div class="live-image-frame"><img src="${imgData}" class="live-image" alt="Generated image" /><div class="live-scanline"></div><div class="live-glow"></div></div></div><div class="btn-row"><button onclick="downloadImage('${id}')">⬇️ Download</button><button onclick="copyImageToClipboard('${id}')">📋 Copy</button></div>`, true, false);
+    } else {
+      addAIMessage(`<img src="${imgData}" style="max-width:100%;border-radius:12px;" /><div class="btn-row"><button onclick="downloadImage('${id}')">Download</button><button onclick="copyImageToClipboard('${id}')">Copy</button></div>`, true, false);
     }
-  }else{
-    addAIMessage('Image generation failed. Please try again.',false,false,true);
+  } else {
+    addAIMessage('Image generation failed. Please try again.', false, false, true);
   }
 }
 
-/* VIDEO */
-async function generateVideo(prompt,duration){
-  addAIMessage('Generating video… (may take 30–60s)',false,false,true);
-  try{
-    const r=await apiPost('/api/generate/video',{email:currentUser.email,prompt,duration:duration||DEFAULT_VIDEO_DURATION});
-    if(r.success){
-      const id='vid_'+(++videoStoreCounter);
-      videoStore[id]=r.video;
-      addAIMessage(`<video controls autoplay loop style="max-width:100%;border-radius:12px;max-height:400px;"><source src="${r.video}" type="video/mp4">Your browser does not support video.</video><div class="btn-row"><button onclick="downloadVideo('${id}')">Download</button><button onclick="copyVideoToClipboard('${id}')">Copy</button></div>`,true,false);
-    }else{
-      addAIMessage('Video failed: '+(r.error||'Unknown error'),false,false,true);
+// ============================================================
+// VIDEO (patched — no email param)
+// ============================================================
+async function generateVideo(prompt, duration) {
+  addAIMessage('Generating video… (may take 30–60s)', false, false, true);
+  try {
+    const r = await apiPost('/api/generate/video', { prompt, duration: duration || DEFAULT_VIDEO_DURATION });
+    if (r.success) {
+      const id = 'vid_' + (++videoStoreCounter);
+      videoStore[id] = r.video;
+      addAIMessage(`<video controls autoplay loop style="max-width:100%;border-radius:12px;max-height:400px;"><source src="${r.video}" type="video/mp4">Your browser does not support video.</video><div class="btn-row"><button onclick="downloadVideo('${id}')">Download</button><button onclick="copyVideoToClipboard('${id}')">Copy</button></div>`, true, false);
+    } else {
+      addAIMessage('Video failed: ' + (r.error || 'Unknown error'), false, false, true);
     }
-  }catch(e){addAIMessage('Video error: '+e.message,false,false,true)}
+  } catch (e) { addAIMessage('Video error: ' + e.message, false, false, true); }
 }
-function isVideoRequest(t){return /(video|animate|animation|make a video|create a video|generate a video|render|cinematic|short film|motion|sequence|clip|movie)/i.test(t)}
-function isImageRequest(t){return /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i.test(t)}
+function isVideoRequest(t) { return /(video|animate|animation|make a video|create a video|generate a video|render|cinematic|short film|motion|sequence|clip|movie)/i.test(t); }
+function isImageRequest(t) { return /(make|create|generate|draw|paint|render).*(image|picture|photo|art|illustration).*of\s+(.+)|(image|picture|photo|art|illustration)\s+(of|with)\s+(.+)/i.test(t); }
 
-/* AI CALL */
-async function callChatWithFallback(messages,deep){
-  let attempts=0;let lastError=null;
-  const maxAttempts=Math.min(modules.length,3);
-  const shuffled=[...modules].sort(()=>Math.random()-0.5);
-  for(const mod of shuffled){
-    if(attempts>=maxAttempts)break;attempts++;
-    try{const r=await callChatAPI(mod.id,messages,deep);updateModuleStatus(mod.displayName);return r}
-    catch(err){lastError=err;console.warn(`Module ${mod.displayName} failed: ${err.message}`)}
+// ============================================================
+// CHAT (patched — sends X-Session-Token)
+// ============================================================
+async function callChatWithFallback(messages, deep) {
+  let attempts = 0; let lastError = null;
+  const maxAttempts = Math.min(modules.length, 3);
+  const shuffled = [...modules].sort(() => Math.random() - 0.5);
+  for (const mod of shuffled) {
+    if (attempts >= maxAttempts) break;
+    attempts++;
+    try { const r = await callChatAPI(mod.id, messages, deep); updateModuleStatus(mod.displayName); return r; }
+    catch (err) { lastError = err; console.warn(`Module ${mod.displayName} failed: ${err.message}`); }
   }
-  throw new Error(lastError?lastError.message:'All AI engines unavailable');
+  throw new Error(lastError ? lastError.message : 'All AI engines unavailable');
 }
-async function callChatAPI(module_id,messages,deep){
-  const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({module_id,messages,deep_think:deep})});
-  const data=await res.json();
-  if(!data.success)throw new Error(data.error||'Chat API error');
+async function callChatAPI(module_id, messages, deep) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (sessionToken) headers['X-Session-Token'] = sessionToken;
+  const res = await fetch('/api/chat', { method: 'POST', headers, body: JSON.stringify({ module_id, messages, deep_think: deep }) });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Chat API error');
   return data.reply;
 }
-function updateModuleStatus(name){
-  const el=document.getElementById('moduleStatus');if(el)el.textContent=name;
-  const b=document.getElementById('modelBadge');if(b)b.innerHTML=`<span class="dot"></span> ${escapeHtml(name)}`;
+function updateModuleStatus(name) {
+  const el = document.getElementById('moduleStatus'); if (el) el.textContent = name;
+  const b = document.getElementById('modelBadge'); if (b) b.innerHTML = `<span class="dot"></span> ${escapeHtml(name)}`;
 }
 
-/* CODE */
-function processCodeInText(text){
-  const re=/```(\w+)?\n([\s\S]*?)```/g;
-  let m,last=0,parts=[],has=false;
-  while((m=re.exec(text))!==null){
-    if(m.index>last)parts.push({type:'text',content:text.substring(last,m.index)});
-    parts.push({type:'code',language:m[1]||'txt',code:m[2]});
-    has=true;last=m.index+m[0].length;
+// ============================================================
+// CODE PROCESSING (unchanged)
+// ============================================================
+function processCodeInText(text) {
+  const re = /```(\w+)?\n([\s\S]*?)```/g;
+  let m, last = 0, parts = [], has = false;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ type: 'text', content: text.substring(last, m.index) });
+    parts.push({ type: 'code', language: m[1] || 'txt', code: m[2] });
+    has = true; last = m.index + m[0].length;
   }
-  if(last<text.length)parts.push({type:'text',content:text.substring(last)});
-  return has?parts:null;
+  if (last < text.length) parts.push({ type: 'text', content: text.substring(last) });
+  return has ? parts : null;
 }
-let codeStore={};
-function buildCodeHtml(parts){
-  let html='';
-  for(const p of parts){
-    if(p.type==='text')html+=escapeHtml(p.content).replace(/\n/g,'<br>');
-    else{
-      const id='code_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
-      codeStore[id]={language:p.language||'txt',code:p.code};
-      html+=`<div class="code-block-wrapper" data-codeid="${id}"><span class="code-lang">${escapeHtml(p.language||'txt')}</span><pre><code>${escapeHtml(p.code)}</code></pre><div class="code-actions"><button onclick="previewCode('${id}')">👁️ Preview</button><button onclick="downloadCode('${id}')">Download</button><button onclick="copyCode('${id}')">Copy</button><button onclick="debugCode('${id}')">Debug</button></div></div>`;
+let codeStore = {};
+function buildCodeHtml(parts) {
+  let html = '';
+  for (const p of parts) {
+    if (p.type === 'text') html += escapeHtml(p.content).replace(/\n/g, '<br>');
+    else {
+      const id = 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      codeStore[id] = { language: p.language || 'txt', code: p.code };
+      html += `<div class="code-block-wrapper" data-codeid="${id}"><span class="code-lang">${escapeHtml(p.language || 'txt')}</span><pre><code>${escapeHtml(p.code)}</code></pre><div class="code-actions"><button onclick="previewCode('${id}')">👁️ Preview</button><button onclick="downloadCode('${id}')">Download</button><button onclick="copyCode('${id}')">Copy</button><button onclick="debugCode('${id}')">Debug</button></div></div>`;
     }
   }
   return html;
 }
-window.previewCode=function(id){
-  const d=codeStore[id];if(!d)return;
-  const modal=document.createElement('div');modal.className='modal-overlay';
-  modal.innerHTML=`<div class="modal-content" style="max-width:900px;"><div class="modal-header"><h3>Code Preview (${escapeHtml(d.language)})</h3><span class="close" id="previewClose">&times;</span></div><div class="modal-body" style="max-height:70dvh;">${escapeHtml(d.code)}</div><div class="modal-actions"><button class="primary" id="previewCopy">Copy Code</button><button id="previewCloseBtn">Close</button></div></div>`;
+window.previewCode = function(id) {
+  const d = codeStore[id]; if (!d) return;
+  const modal = document.createElement('div'); modal.className = 'modal-overlay';
+  modal.innerHTML = `<div class="modal-content" style="max-width:900px;"><div class="modal-header"><h3>Code Preview (${escapeHtml(d.language)})</h3><span class="close" id="previewClose">&times;</span></div><div class="modal-body" style="max-height:70dvh;">${escapeHtml(d.code)}</div><div class="modal-actions"><button class="primary" id="previewCopy">Copy Code</button><button id="previewCloseBtn">Close</button></div></div>`;
   document.body.appendChild(modal);
-  const close=()=>modal.remove();
-  modal.querySelector('#previewClose').onclick=close;
-  modal.querySelector('#previewCloseBtn').onclick=close;
-  modal.querySelector('#previewCopy').onclick=async()=>{try{await navigator.clipboard.writeText(d.code);showToast('Copied','info')}catch(_){showToast('Copy failed','error')}};
-  modal.addEventListener('click',e=>{if(e.target===modal)close()});
+  const close = () => modal.remove();
+  modal.querySelector('#previewClose').onclick = close;
+  modal.querySelector('#previewCloseBtn').onclick = close;
+  modal.querySelector('#previewCopy').onclick = async () => { try { await navigator.clipboard.writeText(d.code); showToast('Copied', 'info'); } catch (_) { showToast('Copy failed', 'error'); } };
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
 };
-window.downloadCode=function(id){
-  const d=codeStore[id];if(!d)return;
-  const blob=new Blob([d.code],{type:'text/plain'});const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  const ext={html:'html',css:'css',js:'js',javascript:'js',python:'py',py:'py',java:'java',c:'c',cpp:'cpp','c++':'cpp',go:'go',rust:'rs',php:'php',ruby:'rb',rb:'rb',swift:'swift',ts:'ts',typescript:'ts',json:'json',xml:'xml',sh:'sh',bash:'sh',txt:'txt'};
-  a.download=`code.${ext[d.language]||'txt'}`;a.click();URL.revokeObjectURL(url);
+window.downloadCode = function(id) {
+  const d = codeStore[id]; if (!d) return;
+  const blob = new Blob([d.code], { type: 'text/plain' }); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  const ext = { html: 'html', css: 'css', js: 'js', javascript: 'js', python: 'py', py: 'py', java: 'java', c: 'c', cpp: 'cpp', 'c++': 'cpp', go: 'go', rust: 'rs', php: 'php', ruby: 'rb', rb: 'rb', swift: 'swift', ts: 'ts', typescript: 'ts', json: 'json', xml: 'xml', sh: 'sh', bash: 'sh', txt: 'txt' };
+  a.download = `code.${ext[d.language] || 'txt'}`; a.click(); URL.revokeObjectURL(url);
 };
-window.copyCode=async function(id){const d=codeStore[id];if(!d)return;try{await navigator.clipboard.writeText(d.code);showToast('Code copied','info')}catch(_){showToast('Copy failed','error')}};
-window.debugCode=async function(id){
-  const d=codeStore[id];if(!d)return;
-  if(isProcessing){showToast('Please wait for current reply to finish','warning');return}
-  if(isGuestMode){showToast('Sign up to use Debug','warning');return}
-  const btn=document.querySelector(`.code-block-wrapper[data-codeid="${id}"] .code-actions button:last-child`);
-  if(btn)btn.disabled=true;const orig=btn?btn.textContent:'Debug';if(btn)btn.textContent='Debugging…';
+window.copyCode = async function(id) { const d = codeStore[id]; if (!d) return; try { await navigator.clipboard.writeText(d.code); showToast('Code copied', 'info'); } catch (_) { showToast('Copy failed', 'error'); } };
+window.debugCode = async function(id) {
+  const d = codeStore[id]; if (!d) return;
+  if (isProcessing) { showToast('Please wait for current reply to finish', 'warning'); return; }
+  if (isGuestMode) { showToast('Sign up to use Debug', 'warning'); return; }
+  const btn = document.querySelector(`.code-block-wrapper[data-codeid="${id}"] .code-actions button:last-child`);
+  if (btn) btn.disabled = true; const orig = btn ? btn.textContent : 'Debug'; if (btn) btn.textContent = 'Debugging…';
   setProcessing(true);
-  try{
-    messagesHistory.push({role:'user',content:`Please review the following ${d.language} code for errors, bugs, or improvements. Provide the fixed version with explanations. Code:\n\`\`\`${d.language}\n${d.code}\n\`\`\``});
-    const r=await callChatWithFallback(messagesHistory.slice(-12),deepThink);
-    await addAIMessage(r,false,true);
-    if(btn){btn.disabled=false;btn.textContent=orig}
-  }catch(err){showToast('Debug failed: '+err.message,'error');if(btn){btn.disabled=false;btn.textContent=orig}}
-  finally{setProcessing(false);await saveCurrentChat()}
+  try {
+    messagesHistory.push({ role: 'user', content: `Please review the following ${d.language} code for errors, bugs, or improvements. Provide the fixed version with explanations. Code:\n\`\`\`${d.language}\n${d.code}\n\`\`\`` });
+    const r = await callChatWithFallback(messagesHistory.slice(-12), deepThink);
+    await addAIMessage(r, false, true);
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  } catch (err) { showToast('Debug failed: ' + err.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = orig; } }
+  finally { setProcessing(false); await saveCurrentChat(); }
 };
 
-/* FULL OUTPUT */
-function showFullOutput(content){
-  const m=document.createElement('div');m.className='modal-overlay';
-  m.innerHTML=`<div class="modal-content" style="max-width:800px;"><div class="modal-header"><h3>Full Output</h3><span class="close" id="foClose">&times;</span></div><div class="modal-body">${escapeHtml(content)}</div><div class="modal-actions"><button class="primary" id="foCopy">Copy Full Text</button><button id="foCloseBtn">Close</button></div></div>`;
+// ============================================================
+// OUTPUT / REGENERATE / TYPING / STREAMING (unchanged)
+// ============================================================
+function showFullOutput(content) {
+  const m = document.createElement('div'); m.className = 'modal-overlay';
+  m.innerHTML = `<div class="modal-content" style="max-width:800px;"><div class="modal-header"><h3>Full Output</h3><span class="close" id="foClose">&times;</span></div><div class="modal-body">${escapeHtml(content)}</div><div class="modal-actions"><button class="primary" id="foCopy">Copy Full Text</button><button id="foCloseBtn">Close</button></div></div>`;
   document.body.appendChild(m);
-  const close=()=>m.remove();
-  m.querySelector('#foClose').onclick=close;m.querySelector('#foCloseBtn').onclick=close;
-  m.querySelector('#foCopy').onclick=async()=>{try{await navigator.clipboard.writeText(content);showToast('Full output copied','info')}catch(_){showToast('Copy failed','error')}};
-  m.addEventListener('click',e=>{if(e.target===m)close()});
+  const close = () => m.remove();
+  m.querySelector('#foClose').onclick = close; m.querySelector('#foCloseBtn').onclick = close;
+  m.querySelector('#foCopy').onclick = async () => { try { await navigator.clipboard.writeText(content); showToast('Full output copied', 'info'); } catch (_) { showToast('Copy failed', 'error'); } };
+  m.addEventListener('click', e => { if (e.target === m) close(); });
 }
-
-/* REGENERATE */
-async function regenerateReply(){
-  if(isProcessing||!currentUser)return;
-  if(isGuestMode){showToast('Sign up to regenerate replies','warning');return}
-  while(messagesHistory.length>0&&messagesHistory[messagesHistory.length-1].role==='assistant')messagesHistory.pop();
-  if(!messagesHistory.length){showToast('Nothing to regenerate','warning');return}
-  const container=document.getElementById('messagesContainer');
-  const allAI=container.querySelectorAll('.ai-message');
-  if(allAI.length>0)allAI[allAI.length-1].remove();
-  showToast('Regenerating…','info');setProcessing(true);
-  try{const r=await callChatWithFallback(messagesHistory.slice(-12),deepThink);await addAIMessage(r,false,true)}
-  catch(e){addAIMessage('Regenerate failed: '+e.message,false,false,true)}
-  finally{setProcessing(false);await saveCurrentChat()}
+async function regenerateReply() {
+  if (isProcessing || !currentUser) return;
+  if (isGuestMode) { showToast('Sign up to regenerate replies', 'warning'); return; }
+  while (messagesHistory.length > 0 && messagesHistory[messagesHistory.length - 1].role === 'assistant') messagesHistory.pop();
+  if (!messagesHistory.length) { showToast('Nothing to regenerate', 'warning'); return; }
+  const container = document.getElementById('messagesContainer');
+  const allAI = container.querySelectorAll('.ai-message');
+  if (allAI.length > 0) allAI[allAI.length - 1].remove();
+  showToast('Regenerating…', 'info'); setProcessing(true);
+  try { const r = await callChatWithFallback(messagesHistory.slice(-12), deepThink); await addAIMessage(r, false, true); }
+  catch (e) { addAIMessage('Regenerate failed: ' + e.message, false, false, true); }
+  finally { setProcessing(false); await saveCurrentChat(); }
 }
-
-/* INSTANT AI MESSAGE */
-function _addAIMessageInstant(content,isHtml=false,skipHistory=false){
-  const container=document.getElementById('messagesContainer');
-  if(!container){console.error('_addAIMessageInstant: #messagesContainer missing');return}
-  const div=document.createElement('div');div.className='message ai-message';
-  if(isHtml){
-    div.innerHTML=`<div class="avatar">◆</div><div class="bubble">${content}</div>`;
-    container.appendChild(div);smartScroll(container);
+function _addAIMessageInstant(content, isHtml = false, skipHistory = false) {
+  const container = document.getElementById('messagesContainer');
+  if (!container) { console.error('_addAIMessageInstant: #messagesContainer missing'); return; }
+  const div = document.createElement('div'); div.className = 'message ai-message';
+  if (isHtml) {
+    div.innerHTML = `<div class="avatar">◆</div><div class="bubble">${content}</div>`;
+    container.appendChild(div); smartScroll(container);
     return;
   }
-  let bubbleContent='';
-  const parts=processCodeInText(content);
-  bubbleContent=parts?buildCodeHtml(parts):escapeHtml(content).replace(/\n/g,'<br>');
-  const msgId='msg_'+(++messageIdCounter);
-  messageContentStore[msgId]=content;
-  div.innerHTML=`<div class="avatar">◆</div><div class="bubble">${bubbleContent}<div class="msg-actions-bar"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
-  container.appendChild(div);container.scrollTop=container.scrollHeight;
-  div.querySelector(`[data-copy="${msgId}"]`).onclick=async()=>{try{await navigator.clipboard.writeText(messageContentStore[msgId]||'');showToast('Copied','info')}catch(_){showToast('Copy failed','error')}};
-  div.querySelector(`[data-regen="${msgId}"]`).onclick=regenerateReply;
-  div.querySelector(`[data-full="${msgId}"]`).onclick=()=>showFullOutput(messageContentStore[msgId]||'');
-  if(!skipHistory)messagesHistory.push({role:'assistant',content});
+  let bubbleContent = '';
+  const parts = processCodeInText(content);
+  bubbleContent = parts ? buildCodeHtml(parts) : escapeHtml(content).replace(/\n/g, '<br>');
+  const msgId = 'msg_' + (++messageIdCounter);
+  messageContentStore[msgId] = content;
+  div.innerHTML = `<div class="avatar">◆</div><div class="bubble">${bubbleContent}<div class="msg-actions-bar"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
+  container.appendChild(div); container.scrollTop = container.scrollHeight;
+  div.querySelector(`[data-copy="${msgId}"]`).onclick = async () => { try { await navigator.clipboard.writeText(messageContentStore[msgId] || ''); showToast('Copied', 'info'); } catch (_) { showToast('Copy failed', 'error'); } };
+  div.querySelector(`[data-regen="${msgId}"]`).onclick = regenerateReply;
+  div.querySelector(`[data-full="${msgId}"]`).onclick = () => showFullOutput(messageContentStore[msgId] || '');
+  if (!skipHistory) messagesHistory.push({ role: 'assistant', content });
 }
-
-/* TYPING */
-function getTypingDelay(wordIndex){
-  if(wordIndex<21)return 1000/7;
-  if(wordIndex<61)return 1000/10;
-  if(wordIndex<161)return 1000/10;
-  return 1000/20;
+function getTypingDelay(wordIndex) {
+  if (wordIndex < 21) return 1000 / 7;
+  if (wordIndex < 61) return 1000 / 10;
+  if (wordIndex < 161) return 1000 / 10;
+  return 1000 / 20;
 }
-async function typeInto(text,targetEl,isAborted){
-  const tokens=text.split(/(\s+)/);
-  let buffer='';let wordCount=0;
-  for(let i=0;i<tokens.length;i++){
-    if(isAborted&&isAborted()){
-      for(let j=i;j<tokens.length;j++)buffer+=tokens[j];
-      targetEl.innerHTML=escapeHtml(buffer).replace(/\n/g,'<br>');
+async function typeInto(text, targetEl, isAborted) {
+  const tokens = text.split(/(\s+)/);
+  let buffer = ''; let wordCount = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    if (isAborted && isAborted()) {
+      for (let j = i; j < tokens.length; j++) buffer += tokens[j];
+      targetEl.innerHTML = escapeHtml(buffer).replace(/\n/g, '<br>');
       smartScroll(document.getElementById('messagesContainer'));
       return;
     }
-    buffer+=tokens[i];
-    targetEl.innerHTML=escapeHtml(buffer).replace(/\n/g,'<br>');
+    buffer += tokens[i];
+    targetEl.innerHTML = escapeHtml(buffer).replace(/\n/g, '<br>');
     smartScroll(document.getElementById('messagesContainer'));
-    if(tokens[i].trim()){
-      const delay=getTypingDelay(wordCount);wordCount++;
-      await new Promise(r=>setTimeout(r,delay));
-    }else if(tokens[i].includes('\n')){
-      await new Promise(r=>setTimeout(r,25));
+    if (tokens[i].trim()) {
+      const delay = getTypingDelay(wordCount); wordCount++;
+      await new Promise(r => setTimeout(r, delay));
+    } else if (tokens[i].includes('\n')) {
+      await new Promise(r => setTimeout(r, 25));
     }
   }
 }
-
-/* STREAMING */
-let currentTypingAbort=null;
-async function streamAIMessage(content){
-  if(currentTypingAbort){currentTypingAbort();currentTypingAbort=null}
-  const container=document.getElementById('messagesContainer');
-  if(!container){console.error('streamAIMessage: #messagesContainer missing');return}
-  const div=document.createElement('div');div.className='message ai-message';
-  const msgId='msg_'+(++messageIdCounter);
-  messageContentStore[msgId]=content;
-  const parts=processCodeInText(content);
-  div.innerHTML=`<div class="avatar">◆</div><div class="bubble"><span class="typing-content"></span><span class="typing-cursor"></span><div class="msg-actions-bar" style="display:none;"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
-  container.appendChild(div);container.scrollTop=container.scrollHeight;
-  messagesHistory.push({role:'assistant',content});
-  div.querySelector(`[data-copy="${msgId}"]`).onclick=async()=>{try{await navigator.clipboard.writeText(messageContentStore[msgId]||'');showToast('Copied','info')}catch(_){showToast('Copy failed','error')}};
-  div.querySelector(`[data-regen="${msgId}"]`).onclick=regenerateReply;
-  div.querySelector(`[data-full="${msgId}"]`).onclick=()=>showFullOutput(messageContentStore[msgId]||'');
-  const typingContent=div.querySelector('.typing-content');
-  const cursorEl=div.querySelector('.typing-cursor');
-  let aborted=false;currentTypingAbort=()=>{aborted=true};
-  const isAborted=()=>aborted;
-  try{
-    if(parts){
-      for(let i=0;i<parts.length;i++){
-        const p=parts[i];
-        if(p.type==='text'){
-          const textSpan=document.createElement('span');
+let currentTypingAbort = null;
+async function streamAIMessage(content) {
+  if (currentTypingAbort) { currentTypingAbort(); currentTypingAbort = null; }
+  const container = document.getElementById('messagesContainer');
+  if (!container) { console.error('streamAIMessage: #messagesContainer missing'); return; }
+  const div = document.createElement('div'); div.className = 'message ai-message';
+  const msgId = 'msg_' + (++messageIdCounter);
+  messageContentStore[msgId] = content;
+  const parts = processCodeInText(content);
+  div.innerHTML = `<div class="avatar">◆</div><div class="bubble"><span class="typing-content"></span><span class="typing-cursor"></span><div class="msg-actions-bar" style="display:none;"><button data-copy="${msgId}">Copy</button><button data-regen="${msgId}">Regenerate</button><button data-full="${msgId}">Full</button></div></div>`;
+  container.appendChild(div); container.scrollTop = container.scrollHeight;
+  messagesHistory.push({ role: 'assistant', content });
+  div.querySelector(`[data-copy="${msgId}"]`).onclick = async () => { try { await navigator.clipboard.writeText(messageContentStore[msgId] || ''); showToast('Copied', 'info'); } catch (_) { showToast('Copy failed', 'error'); } };
+  div.querySelector(`[data-regen="${msgId}"]`).onclick = regenerateReply;
+  div.querySelector(`[data-full="${msgId}"]`).onclick = () => showFullOutput(messageContentStore[msgId] || '');
+  const typingContent = div.querySelector('.typing-content');
+  const cursorEl = div.querySelector('.typing-cursor');
+  let aborted = false; currentTypingAbort = () => { aborted = true; };
+  const isAborted = () => aborted;
+  try {
+    if (parts) {
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        if (p.type === 'text') {
+          const textSpan = document.createElement('span');
           typingContent.appendChild(textSpan);
-          await typeInto(p.content,textSpan,isAborted);
-        }else{
-          const codeWrapper=document.createElement('div');
-          codeWrapper.innerHTML=buildCodeHtml([p]);
-          while(codeWrapper.firstChild)typingContent.appendChild(codeWrapper.firstChild);
+          await typeInto(p.content, textSpan, isAborted);
+        } else {
+          const codeWrapper = document.createElement('div');
+          codeWrapper.innerHTML = buildCodeHtml([p]);
+          while (codeWrapper.firstChild) typingContent.appendChild(codeWrapper.firstChild);
           smartScroll(container);
-          await new Promise(r=>setTimeout(r,60));
+          await new Promise(r => setTimeout(r, 60));
         }
-        if(aborted){
-          for(let j=i+1;j<parts.length;j++){
-            const q=parts[j];
-            if(q.type==='text'){
-              const s=document.createElement('span');
-              s.innerHTML=escapeHtml(q.content).replace(/\n/g,'<br>');
+        if (aborted) {
+          for (let j = i + 1; j < parts.length; j++) {
+            const q = parts[j];
+            if (q.type === 'text') {
+              const s = document.createElement('span');
+              s.innerHTML = escapeHtml(q.content).replace(/\n/g, '<br>');
               typingContent.appendChild(s);
-            }else{
-              const w=document.createElement('div');
-              w.innerHTML=buildCodeHtml([q]);
-              while(w.firstChild)typingContent.appendChild(w.firstChild);
+            } else {
+              const w = document.createElement('div');
+              w.innerHTML = buildCodeHtml([q]);
+              while (w.firstChild) typingContent.appendChild(w.firstChild);
             }
           }
-          smartScroll(container);break;
+          smartScroll(container); break;
         }
       }
-    }else{
-      await typeInto(content,typingContent,isAborted);
+    } else {
+      await typeInto(content, typingContent, isAborted);
     }
-  }finally{
-    if(cursorEl.parentNode)cursorEl.remove();
-    div.querySelector('.msg-actions-bar').style.display='flex';
+  } finally {
+    if (cursorEl.parentNode) cursorEl.remove();
+    div.querySelector('.msg-actions-bar').style.display = 'flex';
     smartScroll(container);
-    if(!aborted)currentTypingAbort=null;
+    if (!aborted) currentTypingAbort = null;
   }
 }
-function addAIMessage(content,isHtml=false,stream=false,skipHistory=false){
-  if(stream&&!isHtml)return streamAIMessage(content);
-  _addAIMessageInstant(content,isHtml,skipHistory);
+function addAIMessage(content, isHtml = false, stream = false, skipHistory = false) {
+  if (stream && !isHtml) return streamAIMessage(content);
+  _addAIMessageInstant(content, isHtml, skipHistory);
   return Promise.resolve();
 }
 
-/* USER MESSAGE */
-function addUserMessage(text){
-  const container=document.getElementById('messagesContainer');
-  if(!container){console.error('addUserMessage: #messagesContainer missing');return}
-  const div=document.createElement('div');div.className='message user-message';
-  const initial=(currentUser?.username?.charAt(0)||'U').toUpperCase();
-  div.innerHTML=`<div class="avatar">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(text).replace(/\n/g,'<br>')}<div class="msg-actions-bar" style="justify-content:flex-end;"><button data-edit="1">Edit</button></div></div>`;
-  container.appendChild(div);container.scrollTop=container.scrollHeight;
-  div.querySelector('[data-edit="1"]').onclick=()=>{
-    if(isProcessing){showToast('Please wait for current reply to finish','warning');return}
-    const t=document.getElementById('userInput');if(!t)return;
-    t.value=text;t.dispatchEvent(new Event('input'));t.focus();
+function addUserMessage(text) {
+  const container = document.getElementById('messagesContainer');
+  if (!container) { console.error('addUserMessage: #messagesContainer missing'); return; }
+  const div = document.createElement('div'); div.className = 'message user-message';
+  const initial = (currentUser?.username?.charAt(0) || 'U').toUpperCase();
+  div.innerHTML = `<div class="avatar">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(text).replace(/\n/g, '<br>')}<div class="msg-actions-bar" style="justify-content:flex-end;"><button data-edit="1">Edit</button></div></div>`;
+  container.appendChild(div); container.scrollTop = container.scrollHeight;
+  div.querySelector('[data-edit="1"]').onclick = () => {
+    if (isProcessing) { showToast('Please wait for current reply to finish', 'warning'); return; }
+    const t = document.getElementById('userInput'); if (!t) return;
+    t.value = text; t.dispatchEvent(new Event('input')); t.focus();
   };
-  messagesHistory.push({role:'user',content:text});
+  messagesHistory.push({ role: 'user', content: text });
 }
 
-function showTyping(){
-  const container=document.getElementById('messagesContainer');
-  if(!container)return null;
-  const div=document.createElement('div');div.id='typingMsg';div.className='message ai-message';
-  div.innerHTML=`<div class="avatar">◆</div><div class="bubble" style="color:var(--text-muted);">Thinking…</div>`;
-  container.appendChild(div);container.scrollTop=container.scrollHeight;
+function showTyping() {
+  const container = document.getElementById('messagesContainer');
+  if (!container) return null;
+  const div = document.createElement('div'); div.id = 'typingMsg'; div.className = 'message ai-message';
+  div.innerHTML = `<div class="avatar">◆</div><div class="bubble" style="color:var(--text-muted);">Thinking…</div>`;
+  container.appendChild(div); container.scrollTop = container.scrollHeight;
   return div;
 }
 
-/* ACTIVITY */
-let activityInterval=null;
-function startActivityTracking(){if(activityInterval)clearInterval(activityInterval);activityInterval=setInterval(async()=>{if(currentUser&&!isGuestMode)await apiPost('/api/user-activity',{email:currentUser.email})},5*60*1000)}
-
-function setProcessing(p){
-  isProcessing=p;
-  const ta=document.getElementById('userInput');const btn=document.getElementById('sendBtn');
-  if(ta)ta.disabled=p;if(btn)btn.disabled=p;
-  if(ta)ta.placeholder=p?'Please wait for reply to finish…':'Message Vrythos…';
-  if(!p&&ta)ta.focus();
-}
-
-/* ACTIVE TOOLS */
-function renderActiveTools(){
-  const c=document.getElementById('activeTools');if(!c)return;
-  const tools=[];
-  if(deepThink)tools.push({icon:'🔬',name:'Deep Think'});
-  if(bestCodingMode)tools.push({icon:'⚙️',name:'Best Coding'});
-  if(liveImageMode)tools.push({icon:'🖼️',name:'Live Image'});
-  if(liveVideoMode)tools.push({icon:'🎥',name:'Live Video'});
-  if(tools.length){c.style.display='flex';c.innerHTML=tools.map(t=>`<span class="active-tool-pill">${t.icon} ${t.name}</span>`).join('')}
-  else{c.style.display='none';c.innerHTML=''}
-}
-
-/* BEST CODING */
-async function handleBestCoding(userText,attachedFilesText){
-  const avail=[...modules];
-  if(!avail.length){addAIMessage('No AI engines available. Please add at least one engine in the admin panel.',false,false,true);return}
-  let initial=userText;if(attachedFilesText)initial+='\n\n'+attachedFilesText;
-  let reply=null;let used=[];let step=0;const maxSteps=Math.min(4,avail.length);let attempts=0;const maxA=avail.length*2;
-  const typing=showTyping();const bubble=typing?typing.querySelector('.bubble'):null;
-  while(step<maxSteps&&attempts<maxA){
-    attempts++;let found=false;
-    for(const mod of avail){
-      if(used.includes(mod.id))continue;
-      if(bubble)bubble.textContent=`Step ${step+1}/${maxSteps} with ${mod.displayName}…`;
-      try{
-        const r=step===0?await callChatAPI(mod.id,[{role:'user',content:initial}],deepThink):await callChatAPI(mod.id,[{role:'user',content:`Original request: "${userText}"\n\nPrevious output:\n${reply}\n\nPlease review, fix bugs, improve the code, add more features, and make it more professional. Provide the final improved version.`}],deepThink);
-        reply=r;used.push(mod.id);step++;found=true;updateModuleStatus(mod.displayName);break;
-      }catch(err){used.push(mod.id)}
+let activityInterval = null;
+function startActivityTracking() {
+  if (activityInterval) clearInterval(activityInterval);
+  activityInterval = setInterval(async () => {
+    if (currentUser && !isGuestMode) {
+      try { await apiPost('/api/user-activity', {}); } catch (_) {}
     }
-    if(!found)break;
+  }, 5 * 60 * 1000);
+}
+
+function setProcessing(p) {
+  isProcessing = p;
+  const ta = document.getElementById('userInput'); const btn = document.getElementById('sendBtn');
+  if (ta) ta.disabled = p; if (btn) btn.disabled = p;
+  if (ta) ta.placeholder = p ? 'Please wait for reply to finish…' : 'Message Vrythos…';
+  if (!p && ta) ta.focus();
+}
+
+function renderActiveTools() {
+  const c = document.getElementById('activeTools'); if (!c) return;
+  const tools = [];
+  if (deepThink) tools.push({ icon: '🔬', name: 'Deep Think' });
+  if (bestCodingMode) tools.push({ icon: '⚙️', name: 'Best Coding' });
+  if (liveImageMode) tools.push({ icon: '🖼️', name: 'Live Image' });
+  if (liveVideoMode) tools.push({ icon: '🎥', name: 'Live Video' });
+  if (tools.length) { c.style.display = 'flex'; c.innerHTML = tools.map(t => `<span class="active-tool-pill">${t.icon} ${t.name}</span>`).join(''); }
+  else { c.style.display = 'none'; c.innerHTML = ''; }
+}
+
+async function handleBestCoding(userText, attachedFilesText) {
+  const avail = [...modules];
+  if (!avail.length) { addAIMessage('No AI engines available. Please add at least one engine in the admin panel.', false, false, true); return; }
+  let initial = userText; if (attachedFilesText) initial += '\n\n' + attachedFilesText;
+  let reply = null; let used = []; let step = 0; const maxSteps = Math.min(4, avail.length); let attempts = 0; const maxA = avail.length * 2;
+  const typing = showTyping(); const bubble = typing ? typing.querySelector('.bubble') : null;
+  while (step < maxSteps && attempts < maxA) {
+    attempts++; let found = false;
+    for (const mod of avail) {
+      if (used.includes(mod.id)) continue;
+      if (bubble) bubble.textContent = `Step ${step + 1}/${maxSteps} with ${mod.displayName}…`;
+      try {
+        const r = step === 0
+          ? await callChatAPI(mod.id, [{ role: 'user', content: initial }], deepThink)
+          : await callChatAPI(mod.id, [{ role: 'user', content: `Original request: "${userText}"\n\nPrevious output:\n${reply}\n\nPlease review, fix bugs, improve the code, add more features, and make it more professional. Provide the final improved version.` }], deepThink);
+        reply = r; used.push(mod.id); step++; found = true; updateModuleStatus(mod.displayName); break;
+      } catch (err) { used.push(mod.id); }
+    }
+    if (!found) break;
   }
-  if(typing)typing.remove();
-  if(reply)await addAIMessage(reply,false,true);
-  else addAIMessage('Best coding chain failed to produce any output.',false,false,true);
+  if (typing) typing.remove();
+  if (reply) await addAIMessage(reply, false, true);
+  else addAIMessage('Best coding chain failed to produce any output.', false, false, true);
 }
 
-/* SEND MESSAGE */
-async function sendMessage(userText,forceImage=false,forceVideo=false){
-  if(!currentUser||currentUser.banned){addAIMessage('Account banned.',false,false,true);return}
-  if(isProcessing){addAIMessage('Please wait for the current reply to finish.',false,false,true);return}
+async function sendMessage(userText, forceImage = false, forceVideo = false) {
+  if (!currentUser || currentUser.banned) { addAIMessage('Account banned.', false, false, true); return; }
+  if (isProcessing) { addAIMessage('Please wait for the current reply to finish.', false, false, true); return; }
   setProcessing(true);
-  const welcome=document.getElementById('welcomeScreen');if(welcome)welcome.remove();
-  try{
-    if(isGuestMode){
+  const welcome = document.getElementById('welcomeScreen'); if (welcome) welcome.remove();
+  try {
+    if (isGuestMode) {
       addUserMessage(userText);
-      const typing=showTyping();
-      let reply='';let isErr=false;
-      try{
-        const res=await fetch('/api/guest/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:messagesHistory.slice(-6)})});
-        const data=await res.json();
-        if(!data.success)throw new Error(data.error||'Guest chat error');
-        reply=data.reply;
-      }catch(e){reply=e.message;isErr=true}
-      finally{if(typing)typing.remove()}
-      if(isErr)addAIMessage(reply,false,false,true);
-      else await addAIMessage(reply,false,true);
+      const typing = showTyping();
+      let reply = ''; let isErr = false;
+      try {
+        const res = await fetch('/api/guest/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: messagesHistory.slice(-6) }) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Guest chat error');
+        reply = data.reply;
+      } catch (e) { reply = e.message; isErr = true; }
+      finally { if (typing) typing.remove(); }
+      if (isErr) addAIMessage(reply, false, false, true);
+      else await addAIMessage(reply, false, true);
       return;
     }
 
-    const willVideo=forceVideo||(!forceImage&&liveVideoMode&&isVideoRequest(userText));
-    const willImage=(forceImage||(liveImageMode&&isImageRequest(userText)))&&!willVideo;
-    if(willVideo){
-      let prompt=userText;
-      const m=userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
-      if(m&&m[2])prompt=m[2];
+    const willVideo = forceVideo || (!forceImage && liveVideoMode && isVideoRequest(userText));
+    const willImage = (forceImage || (liveImageMode && isImageRequest(userText))) && !willVideo;
+    if (willVideo) {
+      let prompt = userText;
+      const m = userText.match(/.*(?:make|create|generate|render|animate)\s+(?:a\s+)?(video|animation|clip|short film|cinematic)\s+(?:of|with)\s+(.+)/i);
+      if (m && m[2]) prompt = m[2];
       addUserMessage(userText);
-      await generateVideo(prompt,DEFAULT_VIDEO_DURATION);
+      await generateVideo(prompt, DEFAULT_VIDEO_DURATION);
       return;
     }
-    if(willImage){
+    if (willImage) {
       addUserMessage(userText);
-      let prompt=userText;
-      const m=userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
-      if(m&&m[2])prompt=m[2];
-      await generateImageAndShow(prompt,liveImageMode||forceImage);
+      let prompt = userText;
+      const m = userText.match(/.*(?:make|create|generate|draw|paint|render)\s+(?:an?\s+)?(image|picture|photo|art|illustration)\s+(?:of|with)\s+(.+)/i);
+      if (m && m[2]) prompt = m[2];
+      await generateImageAndShow(prompt, liveImageMode || forceImage);
       return;
     }
-    if(bestCodingMode&&modules.length>0){
-      let filesText='';
-      if(attachedFiles.length){
-        filesText=attachedFiles.map(f=>f.isText?`${f.name}:\n${f.content}`:`${f.name} (binary)`).join('\n');
-        attachedFiles=[];renderFileBadges();
+    if (bestCodingMode && modules.length > 0) {
+      let filesText = '';
+      if (attachedFiles.length) {
+        filesText = attachedFiles.map(f => f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`).join('\n');
+        attachedFiles = []; renderFileBadges();
       }
       addUserMessage(userText);
-      await handleBestCoding(userText,filesText);
+      await handleBestCoding(userText, filesText);
       return;
     }
-    let modifiedText=userText;
-    const codeKeywords=['code','html','css','javascript','python','java','c++','c#','php','ruby','go','rust','swift','typescript','js','py','cpp'];
-    if(codeKeywords.some(kw=>userText.toLowerCase().includes(kw)))modifiedText+="\n\n(Please format any code you provide with triple backticks and language specifier, e.g., ```html ... ```)";
+    let modifiedText = userText;
+    const codeKeywords = ['code', 'html', 'css', 'javascript', 'python', 'java', 'c++', 'c#', 'php', 'ruby', 'go', 'rust', 'swift', 'typescript', 'js', 'py', 'cpp'];
+    if (codeKeywords.some(kw => userText.toLowerCase().includes(kw))) modifiedText += "\n\n(Please format any code you provide with triple backticks and language specifier, e.g., ```html ... ```)";
     addUserMessage(userText);
-    let fullMsg=modifiedText;
-    if(attachedFiles.length){
-      fullMsg+='\n\n[Attached files]\n'+attachedFiles.map(f=>f.isText?`${f.name}:\n${f.content}`:`${f.name} (binary)`).join('\n');
-      attachedFiles=[];renderFileBadges();
+    let fullMsg = modifiedText;
+    if (attachedFiles.length) {
+      fullMsg += '\n\n[Attached files]\n' + attachedFiles.map(f => f.isText ? `${f.name}:\n${f.content}` : `${f.name} (binary)`).join('\n');
+      attachedFiles = []; renderFileBadges();
     }
-    const typing=showTyping();
-    let reply='';let isErr=false;
-    try{reply=await callChatWithFallback(messagesHistory.slice(-12),deepThink)}
-    catch(e){reply=`All AI engines are currently unavailable. Please try again later. Error: ${e.message}`;isErr=true}
-    finally{if(typing)typing.remove()}
-    if(isErr)addAIMessage(reply,false,false,true);
-    else await addAIMessage(reply,false,true);
-  }finally{
+    const typing = showTyping();
+    let reply = ''; let isErr = false;
+    try { reply = await callChatWithFallback(messagesHistory.slice(-12), deepThink); }
+    catch (e) { reply = `All AI engines are currently unavailable. Please try again later. Error: ${e.message}`; isErr = true; }
+    finally { if (typing) typing.remove(); }
+    if (isErr) addAIMessage(reply, false, false, true);
+    else await addAIMessage(reply, false, true);
+  } finally {
     setProcessing(false);
     await saveCurrentChat();
   }
 }
 
-/* FILE BADGES */
-function renderFileBadges(){
-  const c=document.getElementById('filePreviewArea');if(!c)return;
-  c.innerHTML=attachedFiles.map((f,idx)=>`<span class="file-tag">${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:var(--danger);cursor:pointer;">×</button></span>`).join('');
-  c.querySelectorAll('.file-tag button').forEach(btn=>{
-    btn.onclick=()=>{const i=parseInt(btn.dataset.idx);attachedFiles.splice(i,1);renderFileBadges()};
+function renderFileBadges() {
+  const c = document.getElementById('filePreviewArea'); if (!c) return;
+  c.innerHTML = attachedFiles.map((f, idx) => `<span class="file-tag">${escapeHtml(f.name)} <button data-idx="${idx}" style="background:none;border:none;color:var(--danger);cursor:pointer;">×</button></span>`).join('');
+  c.querySelectorAll('.file-tag button').forEach(btn => {
+    btn.onclick = () => { const i = parseInt(btn.dataset.idx); attachedFiles.splice(i, 1); renderFileBadges(); };
   });
 }
 
-/* TOURNAMENTS */
-async function renderTournaments(){
-  const c=document.getElementById('tournamentsContainer');if(!c)return;
-  if(!tournaments.length){c.innerHTML='<i style="color:var(--text-muted);font-size:.78rem;">No active tournaments.</i>';return}
-  c.innerHTML=tournaments.map(t=>`<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:.6rem .75rem;margin-bottom:.5rem;border:1px solid var(--border-subtle);"><strong style="font-size:.82rem;">${escapeHtml(t.name)}</strong><div style="font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;">${escapeHtml(t.description||'')}</div><div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">Prize: ${escapeHtml(t.prize||'None')}</div>${t.participants?.includes(currentUser?.email)?'<span style="color:var(--success);font-size:.68rem;">✓ Joined</span>':`<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent);border:none;border-radius:var(--radius-full);padding:.2rem .7rem;color:#1a1917;font-size:.7rem;cursor:pointer;margin-top:.3rem;min-height:28px;font-weight:600;">Join</button>`}</div>`).join('');
-  c.querySelectorAll('.join-tournament-btn').forEach(btn=>{
-    btn.onclick=async()=>{
-      if(isGuestMode){showToast('Sign up to join tournaments','warning');return}
-      await joinTournament(btn.dataset.id);await loadAllData();renderTournaments();
+async function renderTournaments() {
+  const c = document.getElementById('tournamentsContainer'); if (!c) return;
+  if (!tournaments.length) { c.innerHTML = '<i style="color:var(--text-muted);font-size:.78rem;">No active tournaments.</i>'; return; }
+  c.innerHTML = tournaments.map(t => `<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:.6rem .75rem;margin-bottom:.5rem;border:1px solid var(--border-subtle);"><strong style="font-size:.82rem;">${escapeHtml(t.name)}</strong><div style="font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;">${escapeHtml(t.description || '')}</div><div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">Prize: ${escapeHtml(t.prize || 'None')}</div>${t.participants?.includes(currentUser?.email) ? '<span style="color:var(--success);font-size:.68rem;">✓ Joined</span>' : `<button class="join-tournament-btn" data-id="${escapeHtml(t.id)}" style="background:var(--accent);border:none;border-radius:var(--radius-full);padding:.2rem .7rem;color:#1a1917;font-size:.7rem;cursor:pointer;margin-top:.3rem;min-height:28px;font-weight:600;">Join</button>`}</div>`).join('');
+  c.querySelectorAll('.join-tournament-btn').forEach(btn => {
+    btn.onclick = async () => {
+      if (isGuestMode) { showToast('Sign up to join tournaments', 'warning'); return; }
+      await joinTournament(btn.dataset.id); await loadAllData(); renderTournaments();
     };
   });
 }
 
-/* CHAT HISTORY */
-async function loadChatHistoryList(){
-  if(isGuestMode){
-    const c=document.getElementById('chatHistoryList');
-    if(c)c.innerHTML='<i style="color:var(--text-muted);font-size:.75rem;">Sign up to save chats</i>';
+async function loadChatHistoryList() {
+  if (isGuestMode) {
+    const c = document.getElementById('chatHistoryList');
+    if (c) c.innerHTML = '<i style="color:var(--text-muted);font-size:.75rem;">Sign up to save chats</i>';
     return;
   }
-  try{
-    const list=await apiGet(`/api/chat-history?email=${encodeURIComponent(currentUser.email)}`);
-    const c=document.getElementById('chatHistoryList');if(!c)return;
-    if(!list.length){c.innerHTML='<i style="color:var(--text-muted);font-size:.78rem;">No saved chats.</i>';return}
-    c.innerHTML=list.map(ch=>`<div class="history-item" data-id="${ch._id}" style="padding:.5rem .75rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);margin-bottom:.4rem;cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">${escapeHtml(ch.title||'Untitled chat')}</div><button class="delete-chat" data-delid="${ch._id}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.9rem;padding:.1rem .3rem;flex-shrink:0;">×</button></div><div style="font-size:.65rem;color:var(--text-muted);">${new Date(ch.updatedAt).toLocaleDateString()} · ${(ch.size/1024).toFixed(1)}KB</div></div>`).join('');
-    c.querySelectorAll('.history-item').forEach(el=>{
-      el.onclick=async(ev)=>{
-        if(ev.target.classList.contains('delete-chat'))return;
-        const chat=await apiGet(`/api/chat-history/${el.dataset.id}?email=${encodeURIComponent(currentUser.email)}`);
-        currentChatId=chat._id;
-        const container=document.getElementById('messagesContainer');
-        container.innerHTML='';
-        messagesHistory=chat.messages.map(m=>({role:m.role,content:m.content}));
-        messagesHistory.forEach(m=>{
-          if(m.role==='user'){
-            const div=document.createElement('div');div.className='message user-message';
-            const initial=(currentUser?.username?.charAt(0)||'U').toUpperCase();
-            div.innerHTML=`<div class="avatar">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(m.content).replace(/\n/g,'<br>')}</div>`;
+  try {
+    const list = await apiGet('/api/chat-history');
+    const c = document.getElementById('chatHistoryList'); if (!c) return;
+    if (!list.length) { c.innerHTML = '<i style="color:var(--text-muted);font-size:.78rem;">No saved chats.</i>'; return; }
+    c.innerHTML = list.map(ch => `<div class="history-item" data-id="${ch._id}" style="padding:.5rem .75rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);margin-bottom:.4rem;cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">${escapeHtml(ch.title || 'Untitled chat')}</div><button class="delete-chat" data-delid="${ch._id}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.9rem;padding:.1rem .3rem;flex-shrink:0;">×</button></div><div style="font-size:.65rem;color:var(--text-muted);">${new Date(ch.updatedAt).toLocaleDateString()} · ${(ch.size / 1024).toFixed(1)}KB</div></div>`).join('');
+    c.querySelectorAll('.history-item').forEach(el => {
+      el.onclick = async (ev) => {
+        if (ev.target.classList.contains('delete-chat')) return;
+        const chat = await apiGet(`/api/chat-history/${el.dataset.id}`);
+        currentChatId = chat._id;
+        const container = document.getElementById('messagesContainer');
+        container.innerHTML = '';
+        messagesHistory = chat.messages.map(m => ({ role: m.role, content: m.content }));
+        messagesHistory.forEach(m => {
+          if (m.role === 'user') {
+            const div = document.createElement('div'); div.className = 'message user-message';
+            const initial = (currentUser?.username?.charAt(0) || 'U').toUpperCase();
+            div.innerHTML = `<div class="avatar">${escapeHtml(initial)}</div><div class="bubble">${escapeHtml(m.content).replace(/\n/g, '<br>')}</div>`;
             container.appendChild(div);
-          }else{
-            addAIMessage(m.content,false,false,true);
+          } else {
+            addAIMessage(m.content, false, false, true);
           }
         });
-        container.scrollTop=container.scrollHeight;
+        container.scrollTop = container.scrollHeight;
         document.getElementById('sidebar').classList.remove('open');
         document.getElementById('sidebarOverlay').classList.remove('active');
-        showToast('Chat loaded','info');
+        showToast('Chat loaded', 'info');
       };
     });
-    c.querySelectorAll('.delete-chat').forEach(btn=>{
-      btn.onclick=async(ev)=>{
+    c.querySelectorAll('.delete-chat').forEach(btn => {
+      btn.onclick = async (ev) => {
         ev.stopPropagation();
-        if(!confirm('Delete this chat?'))return;
-        await apiDelete(`/api/chat-history/${btn.dataset.delid}?email=${encodeURIComponent(currentUser.email)}`);
-        if(currentChatId===btn.dataset.delid)currentChatId=null;
+        if (!confirm('Delete this chat?')) return;
+        await apiDelete(`/api/chat-history/${btn.dataset.delid}`);
+        if (currentChatId === btn.dataset.delid) currentChatId = null;
         await loadChatHistoryList();
-        showToast('Chat deleted','info');
+        showToast('Chat deleted', 'info');
       };
     });
-  }catch(_){}
+  } catch (_) {}
 }
 
-let _saveChain=Promise.resolve();
-async function saveCurrentChat(){
-  if(!currentUser||!messagesHistory.length)return;
-  if(isGuestMode)return;
-  const snapshot=messagesHistory.map(m=>({role:m.role,content:m.content}));
-  const titleSnapshot=snapshot[0]?.content?.slice(0,50)||'Untitled chat';
-  const emailSnapshot=currentUser.email;
-  _saveChain=_saveChain.then(async ()=>{
-    try{
-      const res=await apiPost('/api/chat-history',{email:emailSnapshot,id:currentChatId,title:titleSnapshot,messages:snapshot});
-      if(res.success&&res.id)currentChatId=res.id;
+let _saveChain = Promise.resolve();
+async function saveCurrentChat() {
+  if (!currentUser || !messagesHistory.length) return;
+  if (isGuestMode) return;
+  const snapshot = messagesHistory.map(m => ({ role: m.role, content: m.content }));
+  const titleSnapshot = snapshot[0]?.content?.slice(0, 50) || 'Untitled chat';
+  _saveChain = _saveChain.then(async () => {
+    try {
+      const res = await apiPost('/api/chat-history', { id: currentChatId, title: titleSnapshot, messages: snapshot });
+      if (res.success && res.id) currentChatId = res.id;
       await loadChatHistoryList();
-    }catch(e){console.warn('save chat failed',e)}
+    } catch (e) { console.warn('save chat failed', e); }
   });
   return _saveChain;
 }
 
-/* USER SETTINGS */
-async function openUserSettings(){
-  if(isGuestMode){showToast('Sign up to access account settings','warning');return}
-  let userKeys=await loadUserApiKeys(currentUser.email);
-  const modal=document.createElement('div');modal.className='modal-overlay';
-  modal.innerHTML=`<div class="modal-content"><div class="modal-header"><h3>Account Center</h3><span class="close" id="settingsClose">&times;</span></div><div class="grid-2"><div class="card-sm"><h4>Profile</h4><label>Profile Picture URL</label><input type="text" id="profilePicUrl" placeholder="https://…" value="${escapeHtml(currentUser.profilePic||'')}" /><div class="profile-preview" id="profilePreview" style="background-image:url('${escapeHtml(currentUser.profilePic||'')}');"></div><label>Change Username</label><input type="text" id="newUsername" placeholder="New username" /><button class="btn-sm primary" id="updateUsernameBtn">Update Username</button><button class="btn-sm danger" id="deleteAccountBtn">Delete Account</button></div><div class="card-sm"><h4>Your Stats</h4><div style="font-size:.8rem;line-height:1.8;color:var(--text-secondary);"><div>Extra chat credits: ${currentUser.extraChatCredits||0}</div><div>Extra image credits: ${currentUser.extraImageCredits||0}</div><div>Hours live: ${(currentUser.totalHoursLive||0).toFixed(1)}</div></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>API Keys (max 2)</h4><div class="key-list" id="apiKeysList"></div><button class="btn-sm primary" id="generateApiKeyBtn">+ Generate Key</button><div style="font-size:.62rem;color:var(--text-muted);margin-top:.3rem;">Bearer token · 20 req/day</div></div><div class="card-sm"><h4>Free API Key (100/day)</h4><div id="freeKeyInfo" style="font-size:.75rem;color:var(--text-secondary);"></div><button class="btn-sm success" id="generateFreeKeyBtn">Generate / Regenerate</button><button class="btn-sm danger" id="revokeFreeKeyBtn" style="display:none;">Revoke</button><div class="free-key-box" id="freeKeyDisplay" style="display:none;"><strong>Key:</strong> <code id="freeKeyValue"></code><br><strong>Endpoint:</strong> <code>https://vrythos-server.onrender.com/api/external/chat</code></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>Report Bug / Request Credits</h4><textarea id="bugReportText" placeholder="Describe issue or request…" rows="2"></textarea><button class="btn-sm" id="submitBugBtn">Submit Report</button></div><div class="card-sm"><h4>Legal</h4><div style="font-size:.72rem;color:var(--text-secondary);line-height:1.6;">By using Vrythos AI, you agree to our <a href="#" style="color:var(--accent);">Terms</a> and <a href="#" style="color:var(--accent);">Privacy Policy</a>. All data is securely stored.</div><button class="btn-sm" id="logoutBtn" style="margin-top:.6rem;background:#374151;border:none;color:#fff;">Logout</button></div></div></div>`;
+async function openUserSettings() {
+  if (isGuestMode) { showToast('Sign up to access account settings', 'warning'); return; }
+  let userKeys = await loadUserApiKeys(currentUser.email);
+  const modal = document.createElement('div'); modal.className = 'modal-overlay';
+  modal.innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Account Center</h3><span class="close" id="settingsClose">&times;</span></div><div class="grid-2"><div class="card-sm"><h4>Profile</h4><label>Profile Picture URL</label><input type="text" id="profilePicUrl" placeholder="https://…" value="${escapeHtml(currentUser.profilePic || '')}" /><div class="profile-preview" id="profilePreview" style="background-image:url('${escapeHtml(currentUser.profilePic || '')}');"></div><label>Change Username</label><input type="text" id="newUsername" placeholder="New username" /><button class="btn-sm primary" id="updateUsernameBtn">Update Username</button><button class="btn-sm danger" id="deleteAccountBtn">Delete Account</button></div><div class="card-sm"><h4>Your Stats</h4><div style="font-size:.8rem;line-height:1.8;color:var(--text-secondary);"><div>Extra chat credits: ${currentUser.extraChatCredits || 0}</div><div>Extra image credits: ${currentUser.extraImageCredits || 0}</div><div>Hours live: ${(currentUser.totalHoursLive || 0).toFixed(1)}</div></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>API Keys (max 2)</h4><div class="key-list" id="apiKeysList"></div><button class="btn-sm primary" id="generateApiKeyBtn">+ Generate Key</button><div style="font-size:.62rem;color:var(--text-muted);margin-top:.3rem;">Bearer token · 20 req/day</div></div><div class="card-sm"><h4>Free API Key (100/day)</h4><div id="freeKeyInfo" style="font-size:.75rem;color:var(--text-secondary);"></div><button class="btn-sm success" id="generateFreeKeyBtn">Generate / Regenerate</button><button class="btn-sm danger" id="revokeFreeKeyBtn" style="display:none;">Revoke</button><div class="free-key-box" id="freeKeyDisplay" style="display:none;"><strong>Key:</strong> <code id="freeKeyValue"></code><br><strong>Endpoint:</strong> <code>https://vrythos-server.onrender.com/api/external/chat</code></div></div></div><div class="grid-2" style="margin-top:1rem;"><div class="card-sm"><h4>Report Bug / Request Credits</h4><textarea id="bugReportText" placeholder="Describe issue or request…" rows="2"></textarea><button class="btn-sm" id="submitBugBtn">Submit Report</button></div><div class="card-sm"><h4>Legal</h4><div style="font-size:.72rem;color:var(--text-secondary);line-height:1.6;">By using Vrythos AI, you agree to our <a href="#" style="color:var(--accent);">Terms</a> and <a href="#" style="color:var(--accent);">Privacy Policy</a>. All data is securely stored.</div><button class="btn-sm" id="logoutBtn" style="margin-top:.6rem;background:#374151;border:none;color:#fff;">Logout</button></div></div></div>`;
   document.body.appendChild(modal);
-  const close=()=>modal.remove();
-  modal.querySelector('#settingsClose').onclick=close;
-  modal.addEventListener('click',e=>{if(e.target===modal)close()});
-  const picInput=document.getElementById('profilePicUrl');
-  const preview=document.getElementById('profilePreview');
-  picInput.addEventListener('input',()=>{preview.style.backgroundImage=`url('${picInput.value}')`});
-  document.getElementById('updateUsernameBtn').onclick=async()=>{
-    const name=document.getElementById('newUsername').value.trim();if(!name)return;
-    const users=await loadUsers();
-    if(users.find(u=>u.username===name)){showToast('Username taken','error');return}
-    await updateUser(currentUser.email,{username:name});
-    currentUser.username=name;showToast('Username updated. Please log in again.','info');
-    close();localStorage.removeItem('vrythos_current_session');location.reload();
+  const close = () => modal.remove();
+  modal.querySelector('#settingsClose').onclick = close;
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  const picInput = document.getElementById('profilePicUrl');
+  const preview = document.getElementById('profilePreview');
+  picInput.addEventListener('input', () => { preview.style.backgroundImage = `url('${picInput.value}')`; });
+  document.getElementById('updateUsernameBtn').onclick = async () => {
+    const name = document.getElementById('newUsername').value.trim(); if (!name) return;
+    try {
+      await updateUser(currentUser.email, { username: name });
+      currentUser.username = name; showToast('Username updated. Please log in again.', 'info');
+      close();
+      sessionToken = null;
+      localStorage.removeItem('vrythos_session_token');
+      setTimeout(() => location.reload(), 1500);
+    } catch (e) { showToast(e.message, 'error'); }
   };
-  document.getElementById('deleteAccountBtn').onclick=async()=>{
-    if(!confirm('Permanently delete your account and all data? This cannot be undone.'))return;
-    await deleteUser(currentUser.email);localStorage.removeItem('vrythos_current_session');location.reload();
+  document.getElementById('deleteAccountBtn').onclick = async () => {
+    if (!confirm('Permanently delete your account and all data? This cannot be undone.')) return;
+    try {
+      await deleteUser(currentUser.email);
+      sessionToken = null;
+      localStorage.removeItem('vrythos_session_token');
+      setTimeout(() => location.reload(), 500);
+    } catch (e) { showToast(e.message, 'error'); }
   };
-  document.getElementById('submitBugBtn').onclick=async()=>{
-    const desc=document.getElementById('bugReportText').value.trim();if(!desc)return;
-    await addBugReport({email:currentUser.email,username:currentUser.username,description:desc,timestamp:Date.now(),status:'pending'});
-    showToast('Bug report submitted','info');document.getElementById('bugReportText').value='';
+  document.getElementById('submitBugBtn').onclick = async () => {
+    const desc = document.getElementById('bugReportText').value.trim(); if (!desc) return;
+    await addBugReport({ email: currentUser.email, username: currentUser.username, description: desc, timestamp: Date.now(), status: 'pending' });
+    showToast('Bug report submitted', 'info'); document.getElementById('bugReportText').value = '';
   };
-  document.getElementById('logoutBtn').onclick=()=>{localStorage.removeItem('vrythos_current_session');location.reload()};
-  async function refreshApiKeys(){
-    userKeys=await loadUserApiKeys(currentUser.email);
-    const c=document.getElementById('apiKeysList');if(!c)return;
-    if(!userKeys.length){c.innerHTML='<i style="color:var(--text-muted);font-size:.75rem;">No keys yet.</i>';return}
-    c.innerHTML=userKeys.map((k,i)=>`<div class="key-item"><span><strong>${escapeHtml(k.name)}</strong> <code>${escapeHtml(k.key)}</code> <span style="color:var(--text-muted);">${k.used||0}/20</span></span><button class="revoke" data-idx="${i}">×</button></div>`).join('');
-    c.querySelectorAll('.revoke').forEach(btn=>{btn.onclick=async()=>{const i=parseInt(btn.dataset.idx);userKeys.splice(i,1);await saveUserApiKeys(currentUser.email,userKeys);await refreshApiKeys()}});
+  document.getElementById('logoutBtn').onclick = () => {
+    sessionToken = null;
+    localStorage.removeItem('vrythos_session_token');
+    location.reload();
+  };
+  async function refreshApiKeys() {
+    userKeys = await loadUserApiKeys(currentUser.email);
+    const c = document.getElementById('apiKeysList'); if (!c) return;
+    if (!userKeys.length) { c.innerHTML = '<i style="color:var(--text-muted);font-size:.75rem;">No keys yet.</i>'; return; }
+    c.innerHTML = userKeys.map((k, i) => `<div class="key-item"><span><strong>${escapeHtml(k.name)}</strong> <code>${escapeHtml(k.key)}</code> <span style="color:var(--text-muted);">${k.used || 0}/20</span></span><button class="revoke" data-idx="${i}">×</button></div>`).join('');
+    c.querySelectorAll('.revoke').forEach(btn => { btn.onclick = async () => { const i = parseInt(btn.dataset.idx); userKeys.splice(i, 1); await saveUserApiKeys(currentUser.email, userKeys); await refreshApiKeys(); }; });
   }
   await refreshApiKeys();
-  document.getElementById('generateApiKeyBtn').onclick=async()=>{
-    if(userKeys.length>=2){showToast('Max 2 keys per user.','error');return}
-    const name=prompt('Label for this key (e.g., MyApp)');if(!name)return;
-    const newKey='vrythos_'+Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,8);
-    userKeys.push({name,key:newKey,used:0,date:new Date().toISOString().slice(0,10)});
-    await saveUserApiKeys(currentUser.email,userKeys);await refreshApiKeys();
-    showToast(`Key generated: ${newKey}`,'info');
+  document.getElementById('generateApiKeyBtn').onclick = async () => {
+    if (userKeys.length >= 2) { showToast('Max 2 keys per user.', 'error'); return; }
+    const name = prompt('Label for this key (e.g., MyApp)'); if (!name) return;
+    const newKey = 'vrythos_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 8);
+    userKeys.push({ name, key: newKey, used: 0, date: new Date().toISOString().slice(0, 10) });
+    await saveUserApiKeys(currentUser.email, userKeys); await refreshApiKeys();
+    showToast(`Key generated: ${newKey}`, 'info');
   };
-  async function refreshFreeKey(){
-    try{
-      const info=await apiGet(`/api/free-api-key/info?email=${encodeURIComponent(currentUser.email)}`);
-      const infoDiv=document.getElementById('freeKeyInfo');
-      const displayDiv=document.getElementById('freeKeyDisplay');
-      const revokeBtn=document.getElementById('revokeFreeKeyBtn');
-      if(info.exists){
-        infoDiv.innerHTML=`Active (${info.used}/${info.limit} used today)`;
-        document.getElementById('freeKeyValue').textContent=info.key;
-        displayDiv.style.display='block';revokeBtn.style.display='block';
-      }else{
-        infoDiv.innerHTML='No free key yet.';
-        displayDiv.style.display='none';revokeBtn.style.display='none';
+  async function refreshFreeKey() {
+    try {
+      const info = await apiGet('/api/free-api-key/info');
+      const infoDiv = document.getElementById('freeKeyInfo');
+      const displayDiv = document.getElementById('freeKeyDisplay');
+      const revokeBtn = document.getElementById('revokeFreeKeyBtn');
+      if (info.exists) {
+        infoDiv.innerHTML = `Active (${info.used}/${info.limit} used today)`;
+        document.getElementById('freeKeyValue').textContent = info.key;
+        displayDiv.style.display = 'block'; revokeBtn.style.display = 'block';
+      } else {
+        infoDiv.innerHTML = 'No free key yet.';
+        displayDiv.style.display = 'none'; revokeBtn.style.display = 'none';
       }
-    }catch(_){}
+    } catch (_) {}
   }
   await refreshFreeKey();
-  document.getElementById('generateFreeKeyBtn').onclick=async()=>{
-    try{
-      const res=await apiPost('/api/free-api-key/generate',{email:currentUser.email});
-      if(res.success){showToast(`Free key generated: ${res.key}`,'info');await refreshFreeKey()}
-      else showToast('Failed: '+(res.error||'Unknown'),'error');
-    }catch(e){showToast('Error: '+e.message,'error')}
+  document.getElementById('generateFreeKeyBtn').onclick = async () => {
+    try {
+      const res = await apiPost('/api/free-api-key/generate', {});
+      if (res.success) { showToast(`Free key generated: ${res.key}`, 'info'); await refreshFreeKey(); }
+      else showToast('Failed: ' + (res.error || 'Unknown'), 'error');
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
   };
-  document.getElementById('revokeFreeKeyBtn').onclick=async()=>{
-    if(!confirm('Revoke your free API key?'))return;
-    try{await apiPost('/api/free-api-key/revoke',{email:currentUser.email});await refreshFreeKey();showToast('Key revoked.','info')}
-    catch(e){showToast('Error: '+e.message,'error')}
+  document.getElementById('revokeFreeKeyBtn').onclick = async () => {
+    if (!confirm('Revoke your free API key?')) return;
+    try { await apiPost('/api/free-api-key/revoke', {}); await refreshFreeKey(); showToast('Key revoked.', 'info'); }
+    catch (e) { showToast('Error: ' + e.message, 'error'); }
   };
 }
 
-/* WELCOME */
-function renderWelcomeScreen(){
-  const c=document.getElementById('messagesContainer');
-  if(!c){console.error('renderWelcomeScreen: #messagesContainer missing from DOM');return}
-  c.innerHTML=`
+function renderWelcomeScreen() {
+  const c = document.getElementById('messagesContainer');
+  if (!c) { console.error('renderWelcomeScreen: #messagesContainer missing from DOM'); return; }
+  c.innerHTML = `
     <div class="welcome-screen" id="welcomeScreen">
       <div><div class="welcome-logo">Vrythos</div><p>Your neural co-pilot for code, images, video &amp; ideas.</p></div>
       <div class="suggestion-grid">
         <div class="suggestion-card" data-prompt="Build a responsive landing page in HTML/CSS with a gradient hero and CTA buttons"><strong>Build a landing page</strong>Responsive HTML/CSS with hero + CTA</div>
-        <div class="suggestion-card" data-prompt="Explain transformers in AI like I'm 12, with a simple example"><strong>Explain an concept</strong>Transformers made simple</div>
+        <div class="suggestion-card" data-prompt="Explain transformers in AI like I'm 12, with a simple example"><strong>Explain a concept</strong>Transformers made simple</div>
         <div class="suggestion-card" data-prompt="Write a Python script that renames all files in a folder by date prefix"><strong>Write a Python script</strong>Batch-rename files by date</div>
         <div class="suggestion-card" data-prompt="Generate a cinematic cyberpunk city at night, rain, neon reflections"><strong>Generate an image</strong>Cyberpunk city at night</div>
       </div>
     </div>`;
-  c.querySelectorAll('.suggestion-card').forEach(card=>{
-    card.onclick=()=>{
-      const t=document.getElementById('userInput');if(!t)return;
-      t.value=card.dataset.prompt;t.dispatchEvent(new Event('input'));t.focus();
+  c.querySelectorAll('.suggestion-card').forEach(card => {
+    card.onclick = () => {
+      const t = document.getElementById('userInput'); if (!t) return;
+      t.value = card.dataset.prompt; t.dispatchEvent(new Event('input')); t.focus();
     };
   });
 }
 
-/* BUILD UI */
-async function buildUI(){
-  document.getElementById('app-root').innerHTML=`
+async function buildUI() {
+  document.getElementById('app-root').innerHTML = `
     <div class="app">
       <div class="sidebar-overlay" id="sidebarOverlay"></div>
       <div class="sidebar" id="sidebar">
@@ -916,161 +1003,164 @@ async function buildUI(){
       </div>
     </div>`;
 
-  const ta=document.getElementById('userInput');
-  const cc=document.getElementById('charCounter');
-  ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,200)+'px';cc.textContent=ta.value.length+' characters'});
+  const ta = document.getElementById('userInput');
+  const cc = document.getElementById('charCounter');
+  ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; cc.textContent = ta.value.length + ' characters'; });
   ta.dispatchEvent(new Event('input'));
 
-  document.getElementById('newChatBtn').onclick=async()=>{
-    if(isProcessing){showToast('Please wait for the current reply to finish','warning');return}
+  document.getElementById('newChatBtn').onclick = async () => {
+    if (isProcessing) { showToast('Please wait for the current reply to finish', 'warning'); return; }
     await saveCurrentChat();
-    messagesHistory=[];currentChatId=null;renderWelcomeScreen();
+    messagesHistory = []; currentChatId = null; renderWelcomeScreen();
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('active');
   };
 
-  document.getElementById('sendBtn').onclick=()=>{
-    if(isProcessing)return;
-    const v=ta.value.trim();if(v)sendMessage(v);
-    ta.value='';ta.style.height='auto';cc.textContent='0 characters';
+  document.getElementById('sendBtn').onclick = () => {
+    if (isProcessing) return;
+    const v = ta.value.trim(); if (v) sendMessage(v);
+    ta.value = ''; ta.style.height = 'auto'; cc.textContent = '0 characters';
   };
 
-  ta.addEventListener('keydown',e=>{
-    if(e.key==='Enter'&&!e.shiftKey){
-      if(isProcessing){e.preventDefault();return}
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (isProcessing) { e.preventDefault(); return; }
       e.preventDefault();
-      const v=ta.value.trim();if(v)sendMessage(v);
-      ta.value='';ta.style.height='auto';cc.textContent='0 characters';
+      const v = ta.value.trim(); if (v) sendMessage(v);
+      ta.value = ''; ta.style.height = 'auto'; cc.textContent = '0 characters';
     }
   });
 
-  document.getElementById('deepThinkToggle').onchange=e=>{
-    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Deep Think','warning');return}
-    deepThink=e.target.checked;syncToolMenu();renderActiveTools()
+  document.getElementById('deepThinkToggle').onchange = e => {
+    if (isGuestMode) { e.target.checked = false; showToast('Sign up to use Deep Think', 'warning'); return; }
+    deepThink = e.target.checked; syncToolMenu(); renderActiveTools();
   };
-  document.getElementById('liveImageToggle').onchange=e=>{
-    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Live Image','warning');return}
-    liveImageMode=e.target.checked;syncToolMenu();renderActiveTools()
+  document.getElementById('liveImageToggle').onchange = e => {
+    if (isGuestMode) { e.target.checked = false; showToast('Sign up to use Live Image', 'warning'); return; }
+    liveImageMode = e.target.checked; syncToolMenu(); renderActiveTools();
   };
-  document.getElementById('liveVideoToggle').onchange=e=>{
-    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Live Video','warning');return}
-    liveVideoMode=e.target.checked;syncToolMenu();renderActiveTools()
+  document.getElementById('liveVideoToggle').onchange = e => {
+    if (isGuestMode) { e.target.checked = false; showToast('Sign up to use Live Video', 'warning'); return; }
+    liveVideoMode = e.target.checked; syncToolMenu(); renderActiveTools();
   };
-  document.getElementById('bestCodingToggle').onchange=e=>{
-    if(isGuestMode){e.target.checked=false;showToast('Sign up to use Best Coding','warning');return}
-    bestCodingMode=e.target.checked;syncToolMenu();renderActiveTools()
+  document.getElementById('bestCodingToggle').onchange = e => {
+    if (isGuestMode) { e.target.checked = false; showToast('Sign up to use Best Coding', 'warning'); return; }
+    bestCodingMode = e.target.checked; syncToolMenu(); renderActiveTools();
   };
 
-  document.getElementById('fileInput').onchange=e=>{
-    if(e.target.files){
-      Array.from(e.target.files).forEach(f=>{
-        const reader=new FileReader();
-        reader.onload=ev=>{
-          attachedFiles.push({name:f.name,content:ev.target.result,isText:f.type.startsWith('text/')||f.name.match(/\.(txt|json|md)$/i)});
+  document.getElementById('fileInput').onchange = e => {
+    if (e.target.files) {
+      Array.from(e.target.files).forEach(f => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          attachedFiles.push({ name: f.name, content: ev.target.result, isText: f.type.startsWith('text/') || f.name.match(/\.(txt|json|md)$/i) });
           renderFileBadges();
         };
-        if(f.type.startsWith('text/')||f.name.match(/\.(txt|json|md)$/i))reader.readAsText(f);else reader.readAsDataURL(f);
+        if (f.type.startsWith('text/') || f.name.match(/\.(txt|json|md)$/i)) reader.readAsText(f);
+        else reader.readAsDataURL(f);
       });
     }
   };
 
-  document.getElementById('userSettingsBtn').onclick=openUserSettings;
+  document.getElementById('userSettingsBtn').onclick = openUserSettings;
 
-  const sidebar=document.getElementById('sidebar');
-  const overlay=document.getElementById('sidebarOverlay');
-  document.getElementById('hamburgerBtn').onclick=()=>{sidebar.classList.toggle('open');overlay.classList.toggle('active')};
-  overlay.onclick=()=>{sidebar.classList.remove('open');overlay.classList.remove('active')};
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  document.getElementById('hamburgerBtn').onclick = () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); };
+  overlay.onclick = () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); };
 
-  const plusBtn=document.getElementById('plusBtn');
-  const toolMenu=document.getElementById('toolMenu');
-  plusBtn.onclick=e=>{e.stopPropagation();toolMenu.classList.toggle('open');plusBtn.classList.toggle('open')};
+  const plusBtn = document.getElementById('plusBtn');
+  const toolMenu = document.getElementById('toolMenu');
+  plusBtn.onclick = e => { e.stopPropagation(); toolMenu.classList.toggle('open'); plusBtn.classList.toggle('open'); };
 
-  toolMenu.querySelectorAll('.tool-toggle').forEach(row=>{
-    row.onclick=()=>{
-      if(isGuestMode){showToast('Sign up to use this tool','warning');return}
-      const tool=row.dataset.tool;
-      if(tool==='deep'){deepThink=!deepThink;document.getElementById('deepThinkToggle').checked=deepThink}
-      else if(tool==='coding'){bestCodingMode=!bestCodingMode;document.getElementById('bestCodingToggle').checked=bestCodingMode}
-      else if(tool==='liveimage'){liveImageMode=!liveImageMode;document.getElementById('liveImageToggle').checked=liveImageMode}
-      else if(tool==='livevideo'){liveVideoMode=!liveVideoMode;document.getElementById('liveVideoToggle').checked=liveVideoMode}
-      syncToolMenu();renderActiveTools();
+  toolMenu.querySelectorAll('.tool-toggle').forEach(row => {
+    row.onclick = () => {
+      if (isGuestMode) { showToast('Sign up to use this tool', 'warning'); return; }
+      const tool = row.dataset.tool;
+      if (tool === 'deep') { deepThink = !deepThink; document.getElementById('deepThinkToggle').checked = deepThink; }
+      else if (tool === 'coding') { bestCodingMode = !bestCodingMode; document.getElementById('bestCodingToggle').checked = bestCodingMode; }
+      else if (tool === 'liveimage') { liveImageMode = !liveImageMode; document.getElementById('liveImageToggle').checked = liveImageMode; }
+      else if (tool === 'livevideo') { liveVideoMode = !liveVideoMode; document.getElementById('liveVideoToggle').checked = liveVideoMode; }
+      syncToolMenu(); renderActiveTools();
     };
   });
 
-  toolMenu.querySelectorAll('.tool-action').forEach(btn=>{
-    btn.onclick=()=>{
-      if(isProcessing&&btn.dataset.action!=='clear'){showToast('Please wait for the current reply to finish','warning');return}
-      if(isGuestMode && btn.dataset.action!=='clear'){showToast('Sign up to use this tool','warning');return}
-      toolMenu.classList.remove('open');plusBtn.classList.remove('open');
-      const action=btn.dataset.action;const txt=ta.value.trim();
-      if(action==='image'){sendMessage(txt||'cyberpunk city at night, neon',true);ta.value='';cc.textContent='0 characters'}
-      else if(action==='video'){sendMessage(txt||'cinematic drone shot over mountains at sunset',false,true);ta.value='';cc.textContent='0 characters'}
-      else if(action==='attach'){document.getElementById('fileInput').click()}
-      else if(action==='clear'){
-        messagesHistory=[];currentChatId=null;renderWelcomeScreen();showToast('Conversation cleared','info');
+  toolMenu.querySelectorAll('.tool-action').forEach(btn => {
+    btn.onclick = () => {
+      if (isProcessing && btn.dataset.action !== 'clear') { showToast('Please wait for the current reply to finish', 'warning'); return; }
+      if (isGuestMode && btn.dataset.action !== 'clear') { showToast('Sign up to use this tool', 'warning'); return; }
+      toolMenu.classList.remove('open'); plusBtn.classList.remove('open');
+      const action = btn.dataset.action; const txt = ta.value.trim();
+      if (action === 'image') { sendMessage(txt || 'cyberpunk city at night, neon', true); ta.value = ''; cc.textContent = '0 characters'; }
+      else if (action === 'video') { sendMessage(txt || 'cinematic drone shot over mountains at sunset', false, true); ta.value = ''; cc.textContent = '0 characters'; }
+      else if (action === 'attach') { document.getElementById('fileInput').click(); }
+      else if (action === 'clear') {
+        messagesHistory = []; currentChatId = null; renderWelcomeScreen(); showToast('Conversation cleared', 'info');
       }
     };
   });
 
-  function syncToolMenu(){
-    toolMenu.querySelector('[data-tool="deep"]').classList.toggle('active',deepThink);
-    toolMenu.querySelector('[data-tool="coding"]').classList.toggle('active',bestCodingMode);
-    toolMenu.querySelector('[data-tool="liveimage"]').classList.toggle('active',liveImageMode);
-    toolMenu.querySelector('[data-tool="livevideo"]').classList.toggle('active',liveVideoMode);
+  function syncToolMenu() {
+    toolMenu.querySelector('[data-tool="deep"]').classList.toggle('active', deepThink);
+    toolMenu.querySelector('[data-tool="coding"]').classList.toggle('active', bestCodingMode);
+    toolMenu.querySelector('[data-tool="liveimage"]').classList.toggle('active', liveImageMode);
+    toolMenu.querySelector('[data-tool="livevideo"]').classList.toggle('active', liveVideoMode);
   }
-  window.syncToolMenu=syncToolMenu;
+  window.syncToolMenu = syncToolMenu;
   syncToolMenu();
   renderActiveTools();
 
-  document.getElementById('sidebarUsername').textContent=isGuestMode?'Guest (limited)':currentUser.username;
+  document.getElementById('sidebarUsername').textContent = isGuestMode ? 'Guest (limited)' : currentUser.username;
   await renderTournaments();
   await loadChatHistoryList();
   renderWelcomeScreen();
   startActivityTracking();
 
-  window.addEventListener('resize',()=>{if(window.innerWidth>820){sidebar.classList.remove('open');overlay.classList.remove('active')}});
+  window.addEventListener('resize', () => { if (window.innerWidth > 820) { sidebar.classList.remove('open'); overlay.classList.remove('active'); } });
 }
 
-/* Global tool menu close — attached ONCE */
-document.addEventListener('click',e=>{
-  const tm=document.getElementById('toolMenu');
-  const pb=document.getElementById('plusBtn');
-  if(tm&&pb&&!tm.contains(e.target)&&e.target!==pb){
+document.addEventListener('click', e => {
+  const tm = document.getElementById('toolMenu');
+  const pb = document.getElementById('plusBtn');
+  if (tm && pb && !tm.contains(e.target) && e.target !== pb) {
     tm.classList.remove('open');
     pb.classList.remove('open');
   }
 });
 
-/* GOOGLE OAUTH */
-window.handleGoogleLogin=async(response)=>{
-  try{
-    const res=await apiPost('/api/auth/google',{token:response.credential});
-    if(res.success){
-      isGuestMode=false;
-      currentUser={email:res.email,username:res.username,name:res.name,profilePic:res.profilePic,extraChatCredits:res.extraChatCredits||0,extraImageCredits:res.extraImageCredits||0,banned:res.banned||false,totalHoursLive:res.totalHoursLive||0};
-      localStorage.setItem('vrythos_current_session',res.email);
+// ============================================================
+// GOOGLE LOGIN (patched to save sessionToken)
+// ============================================================
+window.handleGoogleLogin = async (response) => {
+  try {
+    const res = await apiPost('/api/auth/google', { token: response.credential });
+    if (res.success) {
+      isGuestMode = false;
+      sessionToken = res.sessionToken;
+      localStorage.setItem('vrythos_session_token', res.sessionToken);
+      currentUser = { email: res.email, username: res.username, name: res.name, profilePic: res.profilePic, extraChatCredits: res.extraChatCredits || 0, extraImageCredits: res.extraImageCredits || 0, banned: res.banned || false, totalHoursLive: res.totalHoursLive || 0 };
       await buildUI();
-    }else{
-      const el=document.getElementById('authMessage');if(el)el.textContent=res.error||'Google login failed';
+    } else {
+      const el = document.getElementById('authMessage'); if (el) el.textContent = res.error || 'Google login failed';
     }
-  }catch(e){const el=document.getElementById('authMessage');if(el)el.textContent='Google login error: '+e.message}
+  } catch (e) { const el = document.getElementById('authMessage'); if (el) el.textContent = 'Google login error: ' + e.message; }
 };
 
-/* AUTH INIT */
-async function initAuth(){
-  const saved=localStorage.getItem('vrythos_current_session');
-  if(saved){
-    try{
-      const users=await loadUsers();
-      const dbUser=users.find(u=>u.email===saved&&!u.banned);
-      if(dbUser){
-        isGuestMode=false;
-        currentUser={email:dbUser.email,username:dbUser.username,name:dbUser.name||'',profilePic:dbUser.profilePic||'',passwordHash:dbUser.passwordHash||null,extraChatCredits:dbUser.extraChatCredits||0,extraImageCredits:dbUser.extraImageCredits||0,banned:dbUser.banned||false,totalHoursLive:dbUser.totalHoursLive||0,authProvider:dbUser.authProvider||'email'};
-        await loadAllData();await buildUI();return;
-      }
-    }catch(_){localStorage.removeItem('vrythos_current_session')}
+// ============================================================
+// AUTH INIT (patched to load token from localStorage)
+// ============================================================
+async function initAuth() {
+  const saved = localStorage.getItem('vrythos_session_token');
+  if (saved) {
+    sessionToken = saved;
+    try {
+      const dbUser = await apiGet('/api/me');
+      isGuestMode = false;
+      currentUser = { email: dbUser.email, username: dbUser.username, name: dbUser.name || '', profilePic: dbUser.profilePic || '', passwordHash: null, extraChatCredits: dbUser.extraChatCredits || 0, extraImageCredits: dbUser.extraImageCredits || 0, banned: dbUser.banned || false, totalHoursLive: dbUser.totalHoursLive || 0, authProvider: dbUser.authProvider || 'email' };
+      await loadAllData(); await buildUI(); return;
+    } catch (_) { sessionToken = null; localStorage.removeItem('vrythos_session_token'); }
   }
-  document.getElementById('app-root').innerHTML=`
+  document.getElementById('app-root').innerHTML = `
     <div class="auth-container">
       <div class="auth-card">
         <div class="auth-logo">Vrythos</div>
@@ -1103,120 +1193,120 @@ async function initAuth(){
       <div class="auth-footer"><a href="#">Terms</a>·<a href="#">Privacy</a>·<a href="#">Help</a><div style="margin-top:.5rem;">© Vrythos AI</div></div>
     </div>`;
 
-  let recaptchaTries=0;
-  function initRecaptchas(){
+  let recaptchaTries = 0;
+  function initRecaptchas() {
     recaptchaTries++;
-    if(window.grecaptcha && grecaptcha.render){
-      try{
-        grecaptcha.render('recaptchaLogin',{sitekey:'6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg',theme:'dark'});
-        grecaptcha.render('recaptchaRegister',{sitekey:'6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg',theme:'dark'});
-      }catch(_){}
-    } else if(recaptchaTries < 20){
-      setTimeout(initRecaptchas,300);
+    if (window.grecaptcha && grecaptcha.render) {
+      try {
+        grecaptcha.render('recaptchaLogin', { sitekey: '6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg', theme: 'dark' });
+        grecaptcha.render('recaptchaRegister', { sitekey: '6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg', theme: 'dark' });
+      } catch (_) {}
+    } else if (recaptchaTries < 20) {
+      setTimeout(initRecaptchas, 300);
     } else {
-      const msg=document.getElementById('authMessage');
-      if(msg && !msg.textContent){
-        msg.style.color='var(--danger)';
-        msg.textContent='reCAPTCHA failed to load. Please refresh or disable adblockers.';
+      const msg = document.getElementById('authMessage');
+      if (msg && !msg.textContent) {
+        msg.style.color = 'var(--danger)';
+        msg.textContent = 'reCAPTCHA failed to load. Please refresh or disable adblockers.';
       }
     }
   }
-  setTimeout(initRecaptchas,300);
+  setTimeout(initRecaptchas, 300);
 
-  if(window.google&&window.google.accounts){
+  if (window.google && window.google.accounts) {
     window.google.accounts.id.initialize({
-      client_id:'527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com',
-      callback:window.handleGoogleLogin
+      client_id: '527067177247-mk8l2ratnkatefh8sogs4vedogmg9lk8.apps.googleusercontent.com',
+      callback: window.handleGoogleLogin
     });
-    window.google.accounts.id.renderButton(document.querySelector('.g_id_signin'),{theme:'filled_black',size:'large',shape:'rectangular',text:'sign_in_with',logo_alignment:'center'});
+    window.google.accounts.id.renderButton(document.querySelector('.g_id_signin'), { theme: 'filled_black', size: 'large', shape: 'rectangular', text: 'sign_in_with', logo_alignment: 'center' });
   }
 
-  document.getElementById('loginPassword').addEventListener('keypress',e=>{if(e.key==='Enter')document.getElementById('doLoginBtn').click()});
+  document.getElementById('loginPassword').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('doLoginBtn').click(); });
 
-  document.getElementById('doLoginBtn').onclick=async()=>{
-    const email=document.getElementById('loginEmail').value.trim();
-    const pwd=document.getElementById('loginPassword').value;
-    const msgEl=document.getElementById('authMessage');msgEl.textContent='';
+  document.getElementById('doLoginBtn').onclick = async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pwd = document.getElementById('loginPassword').value;
+    const msgEl = document.getElementById('authMessage'); msgEl.textContent = '';
     const recaptchaToken = (window.grecaptcha && grecaptcha.getResponse) ? grecaptcha.getResponse() : '';
-    if(!recaptchaToken){msgEl.textContent='Please complete the reCAPTCHA';return}
-    try{
-      const res=await apiPost('/api/login',{email,password:pwd,recaptchaToken});
-      if(res.success){
-        isGuestMode=false;
-        currentUser={email:res.email,username:res.username,name:res.name||'',profilePic:res.profilePic||'',passwordHash:null,extraChatCredits:res.extraChatCredits||0,extraImageCredits:res.extraImageCredits||0,banned:res.banned||false,totalHoursLive:res.totalHoursLive||0,authProvider:res.authProvider||'email'};
-        localStorage.setItem('vrythos_current_session',res.email);
-        await loadAllData();await buildUI();
+    if (!recaptchaToken) { msgEl.textContent = 'Please complete the reCAPTCHA'; return; }
+    try {
+      const res = await apiPost('/api/login', { email, password: pwd, recaptchaToken });
+      if (res.success) {
+        isGuestMode = false;
+        sessionToken = res.sessionToken;
+        localStorage.setItem('vrythos_session_token', res.sessionToken);
+        currentUser = { email: res.email, username: res.username, name: res.name || '', profilePic: res.profilePic || '', passwordHash: null, extraChatCredits: res.extraChatCredits || 0, extraImageCredits: res.extraImageCredits || 0, banned: res.banned || false, totalHoursLive: res.totalHoursLive || 0, authProvider: res.authProvider || 'email' };
+        await loadAllData(); await buildUI();
       }
-    }catch(e){
-      msgEl.textContent=e.message||'Login failed';
-      if(window.grecaptcha && grecaptcha.reset){grecaptcha.reset()}
+    } catch (e) {
+      msgEl.textContent = e.message || 'Login failed';
+      if (window.grecaptcha && grecaptcha.reset) { grecaptcha.reset(); }
     }
   };
 
-  document.getElementById('showRegisterBtn').onclick=()=>{
+  document.getElementById('showRegisterBtn').onclick = () => {
     document.getElementById('loginForm').classList.add('hidden');
     document.getElementById('registerForm').classList.remove('hidden');
-    document.getElementById('authHeading').textContent='Create your account';
-    document.getElementById('authSubheading').textContent='Start using Vrythos AI in seconds';
-    document.getElementById('authMessage').textContent='';
-    if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
+    document.getElementById('authHeading').textContent = 'Create your account';
+    document.getElementById('authSubheading').textContent = 'Start using Vrythos AI in seconds';
+    document.getElementById('authMessage').textContent = '';
+    if (window.grecaptcha && grecaptcha.reset) { try { grecaptcha.reset(); } catch (_) {} }
   };
-  document.getElementById('showLoginBtn').onclick=()=>{
+  document.getElementById('showLoginBtn').onclick = () => {
     document.getElementById('registerForm').classList.add('hidden');
     document.getElementById('loginForm').classList.remove('hidden');
-    document.getElementById('authHeading').textContent='Welcome back';
-    document.getElementById('authSubheading').textContent='Sign in to continue to your AI assistant';
-    document.getElementById('authMessage').textContent='';
-    if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
+    document.getElementById('authHeading').textContent = 'Welcome back';
+    document.getElementById('authSubheading').textContent = 'Sign in to continue to your AI assistant';
+    document.getElementById('authMessage').textContent = '';
+    if (window.grecaptcha && grecaptcha.reset) { try { grecaptcha.reset(); } catch (_) {} }
   };
-  document.getElementById('forgotPasswordBtn').onclick=()=>{showToast('Password reset not available. Use Google login or contact admin.','warning')};
+  document.getElementById('forgotPasswordBtn').onclick = () => { showToast('Password reset not available. Use Google login or contact admin.', 'warning'); };
 
-  document.getElementById('guestBtn').onclick=async()=>{
-    isGuestMode=true;
-    currentUser={email:null,username:'Guest',name:'Guest User',profilePic:'',passwordHash:null,extraChatCredits:0,extraImageCredits:0,banned:false,totalHoursLive:0,isGuest:true};
+  document.getElementById('guestBtn').onclick = async () => {
+    isGuestMode = true;
+    sessionToken = null;
+    currentUser = { email: null, username: 'Guest', name: 'Guest User', profilePic: '', passwordHash: null, extraChatCredits: 0, extraImageCredits: 0, banned: false, totalHoursLive: 0, isGuest: true };
     await loadAllData();
     await buildUI();
-    showToast('Guest mode — 10 messages/hour. Sign up to save chats.','info');
+    showToast('Guest mode — 10 messages/hour. Sign up to save chats.', 'info');
   };
 
-  document.getElementById('doRegisterBtn').onclick=async()=>{
-    const username=document.getElementById('regUsername').value.trim();
-    const name=document.getElementById('regName').value.trim();
-    const email=document.getElementById('regEmail').value.trim();
-    const password=document.getElementById('regPassword').value;
-    const confirm=document.getElementById('regPasswordConfirm').value;
-    const msgEl=document.getElementById('authMessage');
-    if(!username||!name||!email||password.length<4||password!==confirm){msgEl.textContent='Please fill all fields correctly (password min 4 characters, must match)';return}
+  document.getElementById('doRegisterBtn').onclick = async () => {
+    const username = document.getElementById('regUsername').value.trim();
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const confirm = document.getElementById('regPasswordConfirm').value;
+    const msgEl = document.getElementById('authMessage');
+    if (!username || !name || !email || password.length < 4 || password !== confirm) { msgEl.textContent = 'Please fill all fields correctly (password min 4 characters, must match)'; return; }
     const recaptchaToken = (window.grecaptcha && grecaptcha.getResponse) ? grecaptcha.getResponse() : '';
-    if(!recaptchaToken){msgEl.textContent='Please complete the reCAPTCHA';return}
-    try{
-      const users=await loadUsers();
-      if(users.find(u=>u.email===email)){msgEl.textContent='Email already registered';return}
-      if(users.find(u=>u.username===username)){msgEl.textContent='Username already taken';return}
-      const passwordHash=await hashPassword(password);
-      await apiPost('/api/users',{recaptchaToken,email,username,name,passwordHash,profilePic:'',dailyCallsRecord:{date:'',count:0},extraChatCredits:0,extraImageCredits:0,banned:false,createdAt:Date.now(),totalHoursLive:0,lastActive:Date.now(),authProvider:'email'});
-      msgEl.style.color='var(--success)';msgEl.innerHTML='Account created. Please sign in.';
+    if (!recaptchaToken) { msgEl.textContent = 'Please complete the reCAPTCHA'; return; }
+    try {
+      await apiPost('/api/users', { recaptchaToken, email, username, name, password, profilePic: '', dailyCallsRecord: { date: '', count: 0 }, extraChatCredits: 0, extraImageCredits: 0, banned: false, createdAt: Date.now(), totalHoursLive: 0, lastActive: Date.now(), authProvider: 'email' });
+      msgEl.style.color = 'var(--success)'; msgEl.innerHTML = 'Account created. Please sign in.';
       document.getElementById('registerForm').classList.add('hidden');
       document.getElementById('loginForm').classList.remove('hidden');
-      document.getElementById('authHeading').textContent='Welcome back';
-      document.getElementById('authSubheading').textContent='Sign in to continue to your AI assistant';
-      if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
-    }catch(e){
-      msgEl.style.color='var(--danger)';msgEl.textContent=e.message||'Registration error';
-      if(window.grecaptcha && grecaptcha.reset){try{grecaptcha.reset()}catch(_){}}
+      document.getElementById('authHeading').textContent = 'Welcome back';
+      document.getElementById('authSubheading').textContent = 'Sign in to continue to your AI assistant';
+      if (window.grecaptcha && grecaptcha.reset) { try { grecaptcha.reset(); } catch (_) {} }
+    } catch (e) {
+      msgEl.style.color = 'var(--danger)'; msgEl.textContent = e.message || 'Registration error';
+      if (window.grecaptcha && grecaptcha.reset) { try { grecaptcha.reset(); } catch (_) {} }
     }
   };
 }
 
-/* BOOT */
-(async function boot(){
-  try{await loadAllData();await initAuth()}
-  catch(err){
-    console.error('Boot error:',err);
-    const root=document.getElementById('app-root');
-    if(!root){document.body.innerHTML='<h2 style="color:red;padding:2rem;font-family:monospace;">Fatal: #app-root missing from page</h2>';return}
-    root.className='error';
-    root.innerHTML=`<h2>Startup Error</h2><p>The app failed to start. This is a bug, not a connection issue.</p><p style="font-size:.8rem;color:#888;font-family:monospace;background:#111;padding:.5rem;border-radius:6px;overflow-x:auto;max-width:600px;">${escapeHtml(err.message)}<br>${escapeHtml((err.stack||'').split('\n').slice(1,3).join('\n'))}</p><button onclick="location.reload()">Retry</button>`;
+// ============================================================
+// BOOT
+// ============================================================
+(async function boot() {
+  try { await loadAllData(); await initAuth(); }
+  catch (err) {
+    console.error('Boot error:', err);
+    const root = document.getElementById('app-root');
+    if (!root) { document.body.innerHTML = '<h2 style="color:red;padding:2rem;font-family:monospace;">Fatal: #app-root missing from page</h2>'; return; }
+    root.className = 'error';
+    root.innerHTML = `<h2>Startup Error</h2><p>The app failed to start. This is a bug, not a connection issue.</p><p style="font-size:.8rem;color:#888;font-family:monospace;background:#111;padding:.5rem;border-radius:6px;overflow-x:auto;max-width:600px;">${escapeHtml(err.message)}<br>${escapeHtml((err.stack || '').split('\n').slice(1, 3).join('\n'))}</p><button onclick="location.reload()">Retry</button>`;
   }
 })();
 </script>
