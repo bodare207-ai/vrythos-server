@@ -1082,7 +1082,7 @@ async function initAuth(){
           <div class="auth-divider">or continue with email</div>
           <div class="auth-form-group"><input type="email" class="auth-input" id="loginEmail" placeholder="Email address" autocomplete="off" /></div>
           <div class="auth-form-group"><input type="password" class="auth-input" id="loginPassword" placeholder="Password" /></div>
-          <div class="recaptcha-wrap"><div class="g-recaptcha" id="recaptchaLogin" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" data-theme="dark"></div></div>
+          <div class="recaptcha-wrap"><div class="g-recaptcha" id="recaptchaLogin" data-sitekey="6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg" data-theme="dark"></div></div>
           <div class="auth-forgot" id="forgotPasswordBtn">Forgot password?</div>
           <button class="auth-btn" id="doLoginBtn">Sign in</button>
           <div class="auth-switch" id="showRegisterBtn">Don't have an account?<strong>Sign up</strong></div>
@@ -1094,7 +1094,7 @@ async function initAuth(){
           <div class="auth-form-group"><input type="email" class="auth-input" id="regEmail" placeholder="Email address" /></div>
           <div class="auth-form-group"><input type="password" class="auth-input" id="regPassword" placeholder="Password (min 4 characters)" /></div>
           <div class="auth-form-group"><input type="password" class="auth-input" id="regPasswordConfirm" placeholder="Confirm password" /></div>
-          <div class="recaptcha-wrap"><div class="g-recaptcha" id="recaptchaRegister" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" data-theme="dark"></div></div>
+          <div class="recaptcha-wrap"><div class="g-recaptcha" id="recaptchaRegister" data-sitekey="6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg" data-theme="dark"></div></div>
           <button class="auth-btn" id="doRegisterBtn">Create account</button>
           <div class="auth-switch" id="showLoginBtn">← Back to sign in</div>
         </div>
@@ -1108,8 +1108,8 @@ async function initAuth(){
     recaptchaTries++;
     if(window.grecaptcha && grecaptcha.render){
       try{
-        grecaptcha.render('recaptchaLogin',{sitekey:'6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI',theme:'dark'});
-        grecaptcha.render('recaptchaRegister',{sitekey:'6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI',theme:'dark'});
+        grecaptcha.render('recaptchaLogin',{sitekey:'6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg',theme:'dark'});
+        grecaptcha.render('recaptchaRegister',{sitekey:'6LfA_w0uAAAAANSfpG9oBeeL3-7D0Ze2lAaRU6rg',theme:'dark'});
       }catch(_){}
     } else if(recaptchaTries < 20){
       setTimeout(initRecaptchas,300);
