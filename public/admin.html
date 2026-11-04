@@ -52,7 +52,7 @@ button.success{background:#2e5c3e}
 <div id="authArea">
     <input type="password" id="adminPassword" placeholder="Master Password">
     <button id="adminLoginBtn">Login</button>
-    <div style="margin-top:8px"><span class="forgot-link" id="forgotPwdLink">🔑 Forgot admin password?</span></div>
+    <div style="margin-top:8px"><span class="forgot-link" id="forgotPwdLink">🔑 Can't log in?</span></div>
     <div id="adminMsg" style="color:#f97316;margin-top:8px"></div>
 </div>
 
@@ -139,11 +139,11 @@ button.success{background:#2e5c3e}
     </div>
 
     <div class="card">
-        <h3>🔐 Admin Password</h3>
+        <h3>🔐 Change Admin Password</h3>
         <p>Daily limit: <span id="pwdLimitStatus">3 remaining</span></p>
-        <input type="email" id="adminEmail" value="bodare207@gmail.com" style="width:100%;margin-bottom:6px">
-        <input type="password" id="newAdminPwd" placeholder="New password" style="width:100%;margin-bottom:6px">
-        <button id="requestAdminPwdChange">Request Password Change</button>
+        <input type="password" id="currentAdminPwd" placeholder="Current password" style="width:100%;margin-bottom:6px">
+        <input type="password" id="newAdminPwd" placeholder="New password (min 8 chars)" style="width:100%;margin-bottom:6px">
+        <button id="requestAdminPwdChange">Change Password</button>
         <div id="pwdChangeStatus" style="font-size:12px;margin-top:8px"></div>
     </div>
 
@@ -185,18 +185,15 @@ button.success{background:#2e5c3e}
 
 <div id="forgotModal" class="modal-overlay" style="display:none">
     <div class="modal-box">
-        <h2>🔑 Reset Admin Password</h2>
-        <p style="color:#8e9dc2;margin-bottom:1rem">New password sent to bodare207@gmail.com</p>
-        <input type="password" id="forgotNewPwd" placeholder="New password">
-        <button id="forgotSendBtn">Send Reset Email</button>
-        <button id="forgotCloseBtn" style="background:#555;margin-top:8px">Cancel</button>
-        <div id="forgotStatus" style="margin-top:8px;font-size:14px"></div>
+        <h2>🔑 Password Recovery</h2>
+        <p style="color:#8e9dc2;margin-bottom:1rem;line-height:1.5">The server requires your <strong>current password</strong> to change it. If you've truly forgotten it, you must reset via MongoDB Atlas:<br><br>1. Open MongoDB Atlas → Browse Collections → <code>settings</code><br>2. Delete the document<br>3. Set a new <code>ADMIN_INITIAL_PASSWORD</code> env var in Render<br>4. Redeploy</p>
+        <button id="forgotCloseBtn" style="background:#555">Got it</button>
     </div>
 </div>
 
 <script>
 // ========== STATE ==========
-let adminToken = null;   // populated after login
+let adminToken = null;
 let modules = [];
 let users = [];
 let bugs = [];
@@ -214,7 +211,7 @@ let imgStoreCounter = 0;
 let statsInterval = null;
 let adminAbuseScore = 0;
 
-// ========== API HELPERS — all send token when available ==========
+// ========== API HELPERS ==========
 function authHeaders() {
     return adminToken ? { 'X-Admin-Token': adminToken } : {};
 }
@@ -387,7 +384,6 @@ async function showUserProfile(email) {
     }
 }
 
-// New server endpoints for admin actions
 async function grantCredits(addChat, addImage) {
     const sel = document.getElementById('userSelect').value;
     if (!sel) return;
@@ -623,18 +619,24 @@ document.getElementById('saveVideoSettings').onclick = async () => {
     setTimeout(() => status.textContent = '', 3000);
 };
 
-// ========== ADMIN PASSWORD CHANGE ==========
+// ========== ADMIN PASSWORD CHANGE (now requires current password) ==========
 document.getElementById('requestAdminPwdChange').onclick = async () => {
-    const email = document.getElementById('adminEmail').value.trim();
+    const currentPwd = document.getElementById('currentAdminPwd').value;
     const newPwd = document.getElementById('newAdminPwd').value;
-    if (!email || !newPwd) { alert('Enter email and new password'); return; }
+    if (!currentPwd || !newPwd) { alert('Enter current and new password'); return; }
+    if (newPwd.length < 8) { alert('New password must be at least 8 characters'); return; }
     const status = document.getElementById('pwdChangeStatus');
     try {
-        const res = await apiPost('/api/admin/change-password', { email, newPassword: newPwd });
+        const res = await apiPost('/api/admin/change-password', {
+            email: 'bodare207@gmail.com',
+            currentPassword: currentPwd,
+            newPassword: newPwd
+        });
         if (res.success) {
-            status.style.color = '#10b981'; status.textContent = '✅ Email sent!';
-            adminToken = null;  // Force re-login
-            setTimeout(() => handle401(), 1500);
+            status.style.color = '#10b981'; status.textContent = `✅ Password changed. You must log in again (${res.remaining} changes left today).`;
+            document.getElementById('currentAdminPwd').value = '';
+            document.getElementById('newAdminPwd').value = '';
+            setTimeout(() => handle401(), 2500);
         }
     } catch(e) {
         status.style.color = '#ef4444'; status.textContent = '❌ ' + e.message;
@@ -767,27 +769,43 @@ function addAdminMessage(text, isUser = false, isHtml = false) {
     if (!isHtml) adminMessagesHistory.push({ role: isUser ? 'user' : 'assistant', content: text });
 }
 
+// FIXED: now sends X-Admin-Token
 async function callChatAPI(module_id, messages, deepThink) {
     const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Token': adminToken
+        },
         body: JSON.stringify({ module_id, messages, deep_think: deepThink })
     });
+    if (res.status === 401) { handle401(); throw new Error('Admin session expired'); }
     const data = await res.json();
     if (!data.success) throw new Error(data.error);
     return data.reply;
 }
 
+// FIXED: now sends X-Admin-Token (server must also accept admin on these endpoints)
 async function generateImage(prompt) {
     try {
         const res = await fetch('/api/generate/image', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt })
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Token': adminToken
+            },
+            body: JSON.stringify({ prompt })
         });
         const data = await res.json();
         if (data.success) return data.image;
     } catch(_) {}
     const fb = await fetch('/api/fallback/image', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt })
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Token': adminToken
+        },
+        body: JSON.stringify({ prompt })
     });
     const fbData = await fb.json();
     if (fbData.success) return fbData.image;
@@ -886,35 +904,13 @@ async function refreshAll() {
     await refreshStats();
 }
 
-// ========== FORGOT PASSWORD MODAL ==========
+// ========== PASSWORD RECOVERY MODAL ==========
 const forgotModal = document.getElementById('forgotModal');
 document.getElementById('forgotPwdLink').onclick = () => {
     forgotModal.style.display = 'flex';
-    document.getElementById('forgotStatus').textContent = '';
-    document.getElementById('forgotNewPwd').value = '';
 };
 document.getElementById('forgotCloseBtn').onclick = () => forgotModal.style.display = 'none';
 forgotModal.addEventListener('click', e => { if (e.target === forgotModal) forgotModal.style.display = 'none'; });
-document.getElementById('forgotSendBtn').onclick = async () => {
-    const newPwd = document.getElementById('forgotNewPwd').value.trim();
-    if (newPwd.length < 4) { document.getElementById('forgotStatus').textContent = 'Min 4 chars'; return; }
-    const status = document.getElementById('forgotStatus');
-    status.textContent = 'Sending…';
-    try {
-        const res = await apiPost('/api/admin/change-password', { email: 'bodare207@gmail.com', newPassword: newPwd });
-        if (res.success) { status.style.color = '#10b981'; status.textContent = `✅ Email sent (${res.remaining} left today)`; setTimeout(() => forgotModal.style.display = 'none', 3000); }
-    } catch(e) { status.style.color = '#ef4444'; status.textContent = '❌ ' + e.message; }
-};
-
-// ========== ABUSE DETECTION (admin panel) ==========
-document.addEventListener('contextmenu', e => { e.preventDefault(); alert('Right-click disabled in admin panel.'); return false; });
-document.addEventListener('keydown', e => {
-    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || (e.ctrlKey && e.key === 'U')) {
-        e.preventDefault();
-        alert('Developer tools forbidden.');
-        return false;
-    }
-});
 
 // ========== LOGIN ==========
 document.getElementById('adminPassword').addEventListener('keypress', e => {
