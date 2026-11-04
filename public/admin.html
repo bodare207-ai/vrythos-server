@@ -212,6 +212,10 @@ let statsInterval = null;
 let adminAbuseScore = 0;
 
 // ========== API HELPERS ==========
+// IMPORTANT: Only treat 401 as "session expired" when a token exists.
+// The /api/admin/verify endpoint returns 401 for wrong passwords too —
+// without the `&& adminToken` check, that would misreport "Invalid password"
+// as "Session expired" and wipe the login form.
 function authHeaders() {
     return adminToken ? { 'X-Admin-Token': adminToken } : {};
 }
@@ -225,7 +229,7 @@ function handle401() {
 }
 async function apiGet(endpoint) {
     const res = await fetch(endpoint, { headers: authHeaders() });
-    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (res.status === 401 && adminToken) { handle401(); throw new Error('Session expired'); }
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }
@@ -235,7 +239,7 @@ async function apiPost(endpoint, data) {
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(data || {})
     });
-    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (res.status === 401 && adminToken) { handle401(); throw new Error('Session expired'); }
     if (!res.ok) {
         let msg = await res.text();
         try { const j = JSON.parse(msg); msg = j.error || msg; } catch(_) {}
@@ -249,13 +253,13 @@ async function apiPut(endpoint, data) {
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(data || {})
     });
-    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (res.status === 401 && adminToken) { handle401(); throw new Error('Session expired'); }
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }
 async function apiDelete(endpoint) {
     const res = await fetch(endpoint, { method: 'DELETE', headers: authHeaders() });
-    if (res.status === 401) { handle401(); throw new Error('Session expired'); }
+    if (res.status === 401 && adminToken) { handle401(); throw new Error('Session expired'); }
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }
@@ -619,7 +623,7 @@ document.getElementById('saveVideoSettings').onclick = async () => {
     setTimeout(() => status.textContent = '', 3000);
 };
 
-// ========== ADMIN PASSWORD CHANGE (now requires current password) ==========
+// ========== ADMIN PASSWORD CHANGE (requires current password) ==========
 document.getElementById('requestAdminPwdChange').onclick = async () => {
     const currentPwd = document.getElementById('currentAdminPwd').value;
     const newPwd = document.getElementById('newAdminPwd').value;
@@ -769,7 +773,6 @@ function addAdminMessage(text, isUser = false, isHtml = false) {
     if (!isHtml) adminMessagesHistory.push({ role: isUser ? 'user' : 'assistant', content: text });
 }
 
-// FIXED: now sends X-Admin-Token
 async function callChatAPI(module_id, messages, deepThink) {
     const res = await fetch('/api/chat', {
         method: 'POST',
@@ -785,7 +788,6 @@ async function callChatAPI(module_id, messages, deepThink) {
     return data.reply;
 }
 
-// FIXED: now sends X-Admin-Token (server must also accept admin on these endpoints)
 async function generateImage(prompt) {
     try {
         const res = await fetch('/api/generate/image', {
