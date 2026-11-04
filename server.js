@@ -133,7 +133,7 @@ const chatHistorySchema = new mongoose.Schema({
 chatHistorySchema.index({ updatedAt: 1 }, { expireAfterSeconds: 2592000 });
 const ChatHistory = mongoose.model('ChatHistory', chatHistorySchema);
 
-// ========== Password helpers (bcrypt with SHA-256 backward compat) ==========
+// ========== Password helpers (bcrypt with SHA-256 legacy compat) ==========
 async function hashPassword(plain) {
   return bcrypt.hash(plain, 12);
 }
@@ -182,7 +182,7 @@ async function requireSession(req, res, next) {
   next();
 }
 
-// Accepts either admin token OR user session (for /api/chat used by admin tester)
+// Accepts either admin token OR user session (for /api/chat and image endpoints)
 async function requireSessionOrAdmin(req, res, next) {
   const adminToken = req.headers['x-admin-token'];
   if (adminToken) {
@@ -749,7 +749,7 @@ app.delete('/api/userApiKeys/self/:keyName', requireSession, asyncHandler(async 
   res.json({ success: true });
 }));
 
-// LEGACY endpoint — still present, but requires admin (was public before)
+// LEGACY endpoints — admin-only
 app.post('/api/userApiKeys', requireAdmin, asyncHandler(async (req, res) => {
   await UserApiKey.findOneAndUpdate({ email: req.body.email }, req.body, { upsert: true, new: true });
   res.json({ success: true });
@@ -957,7 +957,6 @@ app.post('/api/external/chat', asyncHandler(async (req, res) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing Authorization' });
   const token = authHeader.split(' ')[1];
 
-  // Fast indexed lookup
   let foundUserKey = null, foundUserEmail = null;
   const userKeyDoc = await UserApiKey.findOne({ 'keys.key': token });
   if (userKeyDoc) {
@@ -1088,8 +1087,8 @@ app.post('/api/free-api-key/revoke', requireSession, asyncHandler(async (req, re
   res.json({ success: true });
 }));
 
-// ========== IMAGE (session required) ==========
-app.post('/api/generate/image', requireSession, asyncHandler(async (req, res) => {
+// ========== IMAGE (accepts EITHER admin token OR user session — PATCHED) ==========
+app.post('/api/generate/image', requireSessionOrAdmin, asyncHandler(async (req, res) => {
   const { prompt } = req.body;
   const settings = await Setting.findOne();
   if (!settings || !settings.cloudflareImageAccountId || !settings.cloudflareImageApiToken) {
@@ -1108,7 +1107,7 @@ app.post('/api/generate/image', requireSession, asyncHandler(async (req, res) =>
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 }));
 
-app.post('/api/fallback/image', requireSession, asyncHandler(async (req, res) => {
+app.post('/api/fallback/image', requireSessionOrAdmin, asyncHandler(async (req, res) => {
   const { prompt } = req.body;
   try {
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&model=flux`;
